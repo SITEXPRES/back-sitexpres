@@ -6,6 +6,7 @@ import authRoutes from "./routes/authRoutes.js";
 import siteRoutes from "./routes/siteRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import paypalRoutes from "./routes/paypalRoutes.js";
+import interRoutes from "./routes/InterRoutes.js";
 import githubIntegrationRoutes from "./routes/githubIntegrationRoutes.js";
  
 import path from "path";
@@ -40,6 +41,7 @@ app.use("/api/sites", siteRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/integrations/github", githubIntegrationRoutes);
 app.use("/api/paypal", paypalRoutes);
+app.use("/api/pix-inter", interRoutes);
 
  
  
