@@ -43,7 +43,7 @@ export async function createOrder(req, res) {
         {
           amount: {
             currency_code: "BRL",
-            value: "0.5" // req.body.value || "29.90"
+            value: req.body.value || "29.90"
           },
           description: req.body.description || "Pagamento SitExpres"
         }

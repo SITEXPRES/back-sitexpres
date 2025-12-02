@@ -47,9 +47,11 @@ export async function gerarParte(prompt, parte, req, id_projeto, baseHTML = "") 
     2. O site deve ser semântico (header, nav, main, footer, etc.).
     3. Inclua meta tags completas (title, description, canonical, OpenGraph, Twitter Card, hreflang pt-BR).
     4. Todas as imagens devem ter alt descritivo e srcset/sizes apropriados.
+    4.1.Nenhuma imagem deve vim quebrada, qualquer coisa busque na internet url de imagem ou banco de img ou icones para não deixar campos de imagens quebradas
     5. Utilize placeholders relevantes (source.unsplash.com/random/800x600?<tema>).
     6. O rodapé deve conter o ano atual (${ano}) atualizado dinamicamente via JS (<span id="ano"></span> + script).
     7. Utilize apenas HTML, CSS e JS puro (sem frameworks).
+    8- Ultilze  Animações sutis de entrada e hoverse prescisar pra interagir no site
 
     ⚠️ Regras adicionais:
     - O HTML deve ser coerente com o prompt do cliente.

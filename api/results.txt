@@ -1,0 +1,13 @@
+=== Starting Billing Logic Tests ===
+
+--- Testing criarCobranca ---
+Test 1: Valid Standard Purchase (8 credits, 6.80)
+PASSED
+
+--- Testing criarCobrancaUnica ---
+Test 4: Valid Standard Purchase (Unica) (10 credits, 8.50)
+PASSED
+Test 5: Valid Plan Purchase (Unica) (29.90)
+PASSED
+Test 6: Invalid Purchase (Unica) (10 credits, 5.00)
+PASSED: Got expected 400 error
