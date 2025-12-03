@@ -5,3 +5,10 @@ PASSED: Got 400 for missing TXID
 
 Test 2: Valid TXID (Execution Flow)
 PASSED: Controller accepted TXID (Status 500)
+=== Starting Consultar Pix Tests ===
+
+Test 1: Missing TXID
+PASSED: Got 400 for missing TXID
+
+Test 2: Valid TXID (Execution Flow)
+PASSED: Controller accepted TXID (Status 500)

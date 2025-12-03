@@ -191,137 +191,148 @@ export const listarWebhookInter = async () => {
     });
 };
 
+export const consultarPix = async (req, res) => {
+    try {
+        const { txid } = req.body;
+        console.log("==> Consultando cobrança PIX...", txid);
 
-
-export const consultarPix = async (txid) => {
-    console.log("Consultando cobrança PIX e processando pagamento...", { txid });
-
-    if (!txid) {
-        throw new Error("TXID é obrigatório para consultar a cobrança.");
-    }
-
-    // 1. Gera token com escopo necessário
-    const tokenData = await gerarToken("cob.read");
-    const token = tokenData.access_token;
-
-    if (!token) {
-        throw new Error("Token não gerado ao consultar PIX.");
-    }
-
-    // 2. Consulta no Banco Inter
-    const options = {
-        hostname: "cdpj.partners.bancointer.com.br",
-        port: 443,
-        path: `/pix/v2/cob/${txid}`,
-        method: "GET",
-        cert,
-        key,
-        headers: {
-            "Authorization": `Bearer ${token}`,
-            "Content-Type": "application/json",
-            "x-conta-corrente": CONTA_CORRENTE
+        if (!txid) {
+            return res.status(400).json({ error: "TXID é obrigatório para consultar a cobrança." });
         }
-    };
 
-    const respostaInter = await new Promise((resolve, reject) => {
-        const req = https.request(options, (res) => {
-            let data = "";
-            res.on("data", chunk => data += chunk);
-            res.on("end", () => {
-                if (res.statusCode === 404) {
-                    resolve({ status: "NAO_ENCONTRADA" });
-                    return;
-                }
-                if (res.statusCode >= 400) {
-                    reject(new Error(`Erro HTTP ${res.statusCode}`));
-                    return;
-                }
-                try {
-                    resolve(JSON.parse(data));
-                } catch (e) {
-                    resolve({ status: "ERRO_PARSE" });
-                }
+        // 1. Gera token com escopo necessário
+        const tokenData = await gerarToken();
+        console.log(tokenData);
+        console.log('Conta corrente:', CONTA_CORRENTE);
+        const token = tokenData.access_token;
+
+        if (!token) {
+            return res.status(500).json({ error: "Token não gerado ao consultar PIX." });
+        }
+
+        // 2. Consulta no Banco Inter
+        const options = {
+            hostname: "cdpj.partners.bancointer.com.br",
+            port: 443,
+            path: `/pix/v2/cob/${encodeURIComponent(txid)}`,
+            method: "GET",
+            cert,
+            key,
+            headers: {
+                "Authorization": `Bearer ${token}`,
+                "Content-Type": "application/json",
+                "x-conta-corrente": CONTA_CORRENTE
+            }
+        };
+
+        const respostaInter = await new Promise((resolve, reject) => {
+            const req = https.request(options, (res) => {
+                let data = "";
+                res.on("data", chunk => data += chunk);
+                res.on("end", () => {
+                    if (res.statusCode === 404) {
+                        resolve({ status: "NAO_ENCONTRADA" });
+                        return;
+                    }
+                    if (res.statusCode >= 400) {
+                        reject(new Error(`Erro HTTP ${res.statusCode}`));
+                        return;
+                    }
+                    try {
+                        resolve(JSON.parse(data));
+                    } catch (e) {
+                        resolve({ status: "ERRO_PARSE" });
+                    }
+                });
             });
+            req.on("error", reject);
+            req.end();
         });
-        req.on("error", reject);
-        req.end();
-    });
 
-    // 3. Se NÃO estiver CONCLUIDA → só retorna o status (não faz nada no banco)
-    if (respostaInter.status !== "CONCLUIDA") {
-        console.log(`Pix ${txid} ainda não pago. Status: ${respostaInter.status || 'não encontrado'}`);
-        return {
-            pago: false,
-            status: respostaInter.status || 'não encontrado',
-            mensagem: "Aguardando pagamento..."
-        };
-    }
+        // 3. Se NÃO estiver CONCLUIDA → só retorna o status (não faz nada no banco)
+        if (respostaInter.status !== "CONCLUIDA") {
+            console.log(`Pix ${txid} ainda não pago. Status: ${respostaInter.status || 'não encontrado'}`);
+            return res.json({
+                pago: false,
+                status: respostaInter.status || 'não encontrado',
+                mensagem: "Aguardando pagamento..."
+            });
+        }
 
-    // 4. AQUI O PAGAMENTO ESTÁ CONCLUÍDO NO INTER!
-    console.log(`PAGAMENTO CONFIRMADO no Inter! Valor: ${respostaInter.valor?.original}`);
+        // 4. AQUI O PAGAMENTO ESTÁ CONCLUÍDO NO INTER!
+        console.log(`PAGAMENTO CONFIRMADO no Inter! Valor: ${respostaInter.valor?.original}`);
 
-    // 5. Busca a transação no seu banco
-    const result = await pool.query(
-        `SELECT * FROM public.transactions WHERE payment_id = $1`,
-        [txid]
-    );
-
-    if (result.rows.length === 0) {
-        console.error("Transação não encontrada no banco com txid:", txid);
-        return {
-            pago: true,
-            status: "CONCLUIDA",
-            erro: "Transação não encontrada no sistema"
-        };
-    }
-
-    const transacao = result.rows[0];
-
-    // 6. Se já estiver completed → evita duplicar
-    if (transacao.status === 'completed') {
-        console.log(`Pagamento ${txid} já foi processado antes.`);
-        return {
-            pago: true,
-            status: "CONCLUIDA",
-            jaProcessado: true,
-            mensagem: "Pagamento já creditado!",
-            redirect: `https://sitexpres.com.br/sucesso?order=${txid}`
-        };
-    }
-
-    // 7. Se ainda estiver pending → PROCESSA!
-    if (transacao.status === 'pending') {
-        console.log(`Adicionando ${transacao.credits} créditos ao usuário ${transacao.user_id}`);
-
-        // Adiciona créditos
-        await pool.query(
-            `UPDATE public.users SET credits = credits + $1 WHERE id = $2`,
-            [transacao.credits, transacao.user_id]
-        );
-
-        // Atualiza status da transação
-        await pool.query(
-            `UPDATE public.transactions SET status = 'completed', updated_at = NOW() WHERE payment_id = $1`,
+        // 5. Busca a transação no seu banco
+        const result = await pool.query(
+            `SELECT * FROM public.transactions WHERE payment_id = $1`,
             [txid]
         );
 
-        console.log(`Créditos adicionados e transação ${txid} marcada como completed!`);
+        if (result.rows.length === 0) {
+            console.error("Transação não encontrada no banco com txid:", txid);
+            return res.json({
+                pago: true,
+                status: "CONCLUIDA",
+                erro: "Transação não encontrada no sistema"
+            });
+        }
 
-        return {
+        const transacao = result.rows[0];
+
+        // 6. Se já estiver completed → evita duplicar
+        if (transacao.status === 'completed') {
+            console.log(`Pagamento ${txid} já foi processado antes.`);
+            return res.json({
+                pago: true,
+                status: "CONCLUIDA",
+                jaProcessado: true,
+                mensagem: "Pagamento já creditado!",
+                redirect: `https://sitexpres.com.br/sucesso?order=${txid}`
+            });
+        }
+
+        // 7. Se ainda estiver pending → PROCESSA!
+        if (transacao.status === 'pending') {
+            console.log(`Adicionando ${transacao.credits} créditos ao usuário ${transacao.user_id}`);
+
+            // Adiciona créditos
+            await pool.query(
+                `UPDATE public.users SET credits = credits + $1 WHERE id = $2`,
+                [transacao.credits, transacao.user_id]
+            );
+
+            // Atualiza status da transação
+            await pool.query(
+                `UPDATE public.transactions SET status = 'completed', updated_at = NOW() WHERE payment_id = $1`,
+                [txid]
+            );
+
+            console.log(`Créditos adicionados e transação ${txid} marcada como completed!`);
+
+            return res.json({
+                pago: true,
+                status: "CONCLUIDA",
+                mensagem: "Pagamento processado com sucesso!",
+                creditsAdicionados: transacao.credits,
+                redirect: `https://sitexpres.com.br/sucesso?order=${txid}`
+            });
+        }
+
+        // Caso raro (ex: cancelled)
+        return res.json({
             pago: true,
             status: "CONCLUIDA",
-            mensagem: "Pagamento processado com sucesso!",
-            creditsAdicionados: transacao.credits,
-            redirect: `https://sitexpres.com.br/sucesso?order=${txid}`
-        };
+            mensagem: `Transação com status ${transacao.status} (não processada)`
+        });
+    } catch (error) {
+        console.error("Erro ao consultar PIX:", error);
+        return res.status(500).json({
+            pago: false,
+            status: "ERRO",
+            mensagem: "Erro interno ao consultar PIX",
+            erro: error.message
+        });
     }
-
-    // Caso raro (ex: cancelled)
-    return {
-        pago: true,
-        status: "CONCLUIDA",
-        mensagem: `Transação com status ${transacao.status} (não processada)`
-    };
 };
 
 /* -----------------------------------------
