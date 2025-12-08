@@ -2,6 +2,7 @@ import fs from "fs";
 import https from "https";
 import { console } from "inspector";
 import pool from "../config/db.js";
+import { gerandonotafiscal } from "../services/notafiscalService.js";
 
 const cert = fs.readFileSync("certificados/inter.crt");
 const key = fs.readFileSync("certificados/inter.key");
@@ -307,6 +308,45 @@ export const consultarPix = async (req, res) => {
                 [txid]
             );
 
+            //Consultar dados do usuário para nota fiscal
+            const result = await pool.query(
+                `SELECT * FROM public.users WHERE id = $1`,
+                [transacao.user_id]
+            );
+
+            // ENVIA NOTA FISCAL
+            var notaFiscal = await gerandonotafiscal({
+                valor_servico: transacao.monetary_value,
+                cnpj_cpf: result.rows[0].cnpj_cpf,
+                razao_social: result.rows[0].razao_social || result.rows[0].name,
+                endereco: result.rows[0].endereco,
+                bairro: result.rows[0].bairro,
+                cod_municipio: result.rows[0].cod_municipio,
+                uf: result.rows[0].uf,
+                cep: result.rows[0].cep,
+                telefone: result.rows[0].telefone,
+                email: result.rows[0].email
+            });
+
+            console.log("Retorno NF:", notaFiscal);
+
+            // Converte o JSON da resposta
+            const responseNF = JSON.parse(notaFiscal.resposta_nf);
+
+            // Separa somente o link
+            const linkNF = responseNF.message?.split("||")[1] || null;
+
+            console.log("Link da Nota Fiscal:", linkNF);
+
+            // Salva o link no banco
+            await pool.query(
+                `UPDATE public.transactions SET nota_fiscal = $1 WHERE payment_id = $2`,
+                [linkNF, txid]
+            );
+
+
+
+
             console.log(`Créditos adicionados e transação ${txid} marcada como completed!`);
 
             return res.json({
@@ -314,6 +354,7 @@ export const consultarPix = async (req, res) => {
                 status: "CONCLUIDA",
                 mensagem: "Pagamento processado com sucesso!",
                 creditsAdicionados: transacao.credits,
+                RetornoNotaFiscal: notaFiscal,
                 redirect: `https://sitexpres.com.br/sucesso?order=${txid}`
             });
         }
@@ -522,14 +563,72 @@ export const criarCobranca = async (req, res) => {
 --------------------------------------------*/
 export const criarCobrancaUnica = async (req, res) => {
     const {
-        value,
         nome,
         cpf,
-        descricao,
-        chave,
-        expiracao,
+        cnpj_cpf,
+        razao_social,
+        endereco,
+        bairro,
+        cod_municipio,
+        uf,
+        cep,
+        telefone,
+        email,
+        userid,
+        value,
         qtd_creditos
     } = req.body;
+
+
+
+
+
+    // -----------------------------
+    // 🔥 ATUALIZA USUÁRIO NO BANCO
+    // -----------------------------
+    const camposParaAtualizar = {
+        cnpj_cpf,
+        razao_social,
+        endereco,
+        bairro,
+        cod_municipio,
+        uf,
+        cep,
+        telefone,
+        email
+    };
+
+    // Monta dinamicamente o SQL
+    const sets = [];
+    const values = [];
+
+    let index = 1;
+
+    for (const [campo, valor] of Object.entries(camposParaAtualizar)) {
+        if (valor !== undefined && valor !== null && valor !== "") {
+            sets.push(`${campo} = $${index}`);
+            values.push(valor);
+            index++;
+        }
+    }
+
+    if (sets.length > 0) {
+        values.push(userid); // último parâmetro no WHERE
+
+        const sqlUpdate = `
+                UPDATE users
+                SET ${sets.join(", ")}, updated_at = NOW()
+                WHERE id = $${index}
+            `;
+
+        await pool.query(sqlUpdate, values);
+    }
+
+
+    // -----------------------------
+    // fluxo do PIX
+    // -----------------------------
+
 
     // Mapeia 'value' para 'valor'
     const valor = value;
@@ -572,7 +671,7 @@ export const criarCobrancaUnica = async (req, res) => {
 
     const payload = {
         calendario: {
-            expiracao: expiracao ?? 3600 // 1 hora
+            expiracao: 3600 // 1 hora
         },
         devedor: {
             nome: nome,
@@ -582,7 +681,7 @@ export const criarCobrancaUnica = async (req, res) => {
             original: valor
         },
         chave: process.env.INTER_CHAVE_PIX,
-        solicitacaoPagador: descricao ?? "Pagamento Serviço Sitexpress"
+        solicitacaoPagador: "Pagamento Servico Sitexpress IA e WebHosting"
     };
 
     const dataString = JSON.stringify(payload);
@@ -603,9 +702,9 @@ export const criarCobrancaUnica = async (req, res) => {
         qtd_creditos,
         nome,
         cpf,
-        descricao,
-        chave,
-        expiracao,
+        descricao: 'Compra via pix Sitexpress IA e WebHosting',
+        chave: process.env.INTER_CHAVE_PIX,
+        expiracao: 3600,
         status: "pending"
     });
 
@@ -705,7 +804,7 @@ const criarTransacao = async ({
             [
                 ID_user,                        // $1
                 status,                         // $2
-                descricao || "Compra PIX",      // $3
+                "Compra PIX",      // $3
                 qtd_creditos,                   // $4
                 valor,                          // $5 (monetary_value)
                 txid,                           // $6 (payment_id)

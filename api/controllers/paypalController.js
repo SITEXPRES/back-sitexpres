@@ -181,7 +181,7 @@ export async function paymentSuccess(req, res) {
     } else {
 
       // Check if transaction is pending before adding credits
-      if (payment.rows[0].status === 'pending') { 
+      if (payment.rows[0].status === 'pending') {
         console.log('Pagamento pendente, adicionando créditos ao usuário!');
         //Atualizando o usuario
         await pool.query(
@@ -193,6 +193,41 @@ export async function paymentSuccess(req, res) {
         await pool.query(
           `UPDATE public.transactions SET status = 'completed' WHERE payment_id = $1`,
           [token]
+        );
+
+        const result = await pool.query(
+          `SELECT * FROM public.users WHERE id = $1`,
+          [payment.rows[0].user_id]
+        );
+
+        // ENVIA NOTA FISCAL
+        var notaFiscal = await gerandonotafiscal({
+          valor_servico: payment.rows[0].monetary_value,
+          cnpj_cpf: result.rows[0].cnpj_cpf,
+          razao_social: result.rows[0].razao_social || result.rows[0].name,
+          endereco: result.rows[0].endereco,
+          bairro: result.rows[0].bairro,
+          cod_municipio: result.rows[0].cod_municipio,
+          uf: result.rows[0].uf,
+          cep: result.rows[0].cep,
+          telefone: result.rows[0].telefone,
+          email: result.rows[0].email
+        });
+
+        console.log("Retorno NF:", notaFiscal);
+
+        // Converte o JSON da resposta
+        const responseNF = JSON.parse(notaFiscal.resposta_nf);
+
+        // Separa somente o link
+        const linkNF = responseNF.message?.split("||")[1] || null;
+
+        console.log("Link da Nota Fiscal:", linkNF);
+
+        // Salva o link no banco
+        await pool.query(
+          `UPDATE public.transactions SET nota_fiscal = $1 WHERE payment_id = $2`,
+          [linkNF, payment.rows[0].payment_id]
         );
 
       } else {

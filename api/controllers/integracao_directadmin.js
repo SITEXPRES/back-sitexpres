@@ -34,43 +34,70 @@ export async function criarSubdominioDirectAdmin(subdominio, dominioPrincipal) {
   }
 }
 
- 
+
+export async function deletarSubdominioDirectAdmin(subdominio, dominioPrincipal = 'sitexpres.com.br') {
+  try {
+    const url = `https://srv3br.com.br:2222/CMD_API_SUBDOMAIN`;
+
+    const params = new URLSearchParams({
+      action: "delete",
+      domain: dominioPrincipal,  // ex: sitexpres.com.br
+      subdomain: subdominio
+    });
+
+    const response = await axios.post(url, params.toString(), {
+      auth: {
+        username: process.env.user_directamin,
+        password: process.env.pass_directamin,
+      },
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded"
+      }
+    });
+
+    return response.data; // resposta do DirectAdmin
+  } catch (err) {
+    console.error("Erro ao deletar subdomínio:", err);
+    throw err;
+  }
+}
+
 
 export async function enviarHTMLSubdominio(host, usuario, senha, subdominio, html) {
-    if (!host || !usuario || !senha || !subdominio || !html) {
-        throw new Error("Parâmetros inválidos para enviarHTMLSubdominio");
-    }
+  if (!host || !usuario || !senha || !subdominio || !html) {
+    throw new Error("Parâmetros inválidos para enviarHTMLSubdominio");
+  }
 
-    const client = new ftp.Client();
-    client.ftp.verbose = true;
+  const client = new ftp.Client();
+  client.ftp.verbose = true;
 
-    try {
-        // Conecta no FTP
-        await client.access({ host, user: usuario, password: senha, secure: false });
+  try {
+    // Conecta no FTP
+    await client.access({ host, user: usuario, password: senha, secure: false });
 
-        // Caminho remoto
-        const remoteDir = `/domains/${subdominio}/public_html`;
+    // Caminho remoto
+    const remoteDir = `/domains/${subdominio}/public_html`;
 
-        // Garante que o diretório exista
-        await client.ensureDir(remoteDir);
+    // Garante que o diretório exista
+    await client.ensureDir(remoteDir);
 
-        // Cria um stream a partir da string HTML
-        const htmlStream = Readable.from([html]);
+    // Cria um stream a partir da string HTML
+    const htmlStream = Readable.from([html]);
 
-        // Envia o arquivo
-        await client.uploadFrom(htmlStream, `${remoteDir}/index.html`);
+    // Envia o arquivo
+    await client.uploadFrom(htmlStream, `${remoteDir}/index.html`);
 
-        console.log(`✅ HTML enviado com sucesso para ${subdominio}!`);
-    } catch (err) {
-        console.error("❌ Erro ao enviar HTML:", err);
-        throw err;
-    } finally {
-        client.close();
-    }
+    console.log(`✅ HTML enviado com sucesso para ${subdominio}!`);
+  } catch (err) {
+    console.error("❌ Erro ao enviar HTML:", err);
+    throw err;
+  } finally {
+    client.close();
+  }
 }
 
 // Consulta de Subdominio 
-export async function subdominioExiste(subdominio, dominioPrincipal, usuarioDono ='sitexpres') {
+export async function subdominioExiste(subdominio, dominioPrincipal, usuarioDono = 'sitexpres') {
   try {
     console.log("\n===============================");
     console.log("🔍 VERIFICAÇÃO DE SUBDOMÍNIO");

@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from "uuid";
 import fs from "fs/promises";
 import path from "path";
 import ftp from "basic-ftp";
-import { criarSubdominioDirectAdmin, enviarHTMLSubdominio, subdominioExiste } from "./integracao_directadmin.js";
+import { criarSubdominioDirectAdmin, enviarHTMLSubdominio, subdominioExiste, deletarSubdominioDirectAdmin } from "./integracao_directadmin.js";
 import dotenv from "dotenv";
 dotenv.config();
 import { updateGitHubIfIntegrated } from "./updateGitHubOnSiteChange.js";
@@ -726,3 +726,38 @@ export const restauracao_versao = async (req, res) => {
 export const send_projeto_para_github = async (req, res) => {
 
 }
+export const deletar_site = async (req, res) => {
+  const { id_projeto } = req.body;
+  
+  const dados_sites = await pool.query(
+    `SELECT site_url FROM public.sites
+   WHERE id_projeto = $1`,
+    [id_projeto]
+  );
+
+
+
+  var url_sudminio_directadmin = dados_sites.rows[0]?.site_url;
+
+  var retorno_deletarSubdominioDirectAdmin = await deletarSubdominioDirectAdmin(url_sudminio_directadmin);
+  console.log(retorno_deletarSubdominioDirectAdmin); F
+
+  await pool.query(
+    `DELETE FROM public.site_prompts
+   WHERE id_projeto = $1`,
+    [id_projeto]
+  );
+
+  await pool.query(
+    `DELETE FROM public.generated_sites
+   WHERE id_projeto = $1`,
+    [id_projeto]
+  );
+
+  return res.json({
+    success: true,
+    message: "Site deletado com sucesso!"
+  });
+}
+
+

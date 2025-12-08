@@ -1,10 +1,10 @@
 import express from "express";
-import { gerarNF } from "../controllers/notafiscalController.js";
+import { gerandonotafiscalPOST } from "../controllers/notafiscalController.js";
 
 const routes = express.Router();
 
 // ROTA POST
-routes.post("/nfse/gerar", gerarNF);
+routes.post("/nfse/gerar", gerandonotafiscalPOST);
 
 // Teste GET
 routes.get("/teste", (req, res) => res.send("rota ok"));
