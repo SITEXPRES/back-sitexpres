@@ -10,12 +10,12 @@ const router = express.Router();
 router.post("/gerar_new_site", upload.single("logo"), newsite);
 router.get("/job-status/:jobId", authMiddleware, jobStatus);  //gerando site assincrono
 router.get("/", authMiddleware, getSites);
-router.get("/teste", (req, res) => res.send("rota ok"));
+router.get("/teste", (req, res) => res.send("rota site ok"));
 router.get("/get_dominio/:id_projeto", authMiddleware, get_dominio);
 router.get("/list_sites", authMiddleware, getSites);
 router.get("/list_prompt/:id_projeto", authMiddleware, getPromts);
 router.post("/restauracao", authMiddleware, restauracao_versao);
-router.post("/deletar", authMiddleware, deletar_site);
+router.put("/deletar", deletar_site);
 router.get("/check_id_projeto/:id_projeto", check_id_projeto);
 router.post("/testedom", testecret_domin);
 

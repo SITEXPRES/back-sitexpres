@@ -9,6 +9,7 @@ import { criarSubdominioDirectAdmin, enviarHTMLSubdominio, subdominioExiste, del
 import dotenv from "dotenv";
 dotenv.config();
 import { updateGitHubIfIntegrated } from "./updateGitHubOnSiteChange.js";
+import { url } from "inspector";
 
 const anthropic = new Anthropic({
   apiKey: process.env.CLAUDE_API_KEY,
@@ -727,37 +728,92 @@ export const send_projeto_para_github = async (req, res) => {
 
 }
 export const deletar_site = async (req, res) => {
-  const { id_projeto } = req.body;
-  
-  const dados_sites = await pool.query(
-    `SELECT site_url FROM public.sites
-   WHERE id_projeto = $1`,
-    [id_projeto]
-  );
+  try {
+    const { id_projeto } = req.body;
+
+    // Validação do parâmetro
+    if (!id_projeto) {
+      return res.status(400).json({
+        success: false,
+        message: "ID do projeto não fornecido"
+      });
+    }
+
+    // Busca os dados do site
+    const dados_sites = await pool.query(
+      `SELECT * FROM public.sites
+       WHERE id_projeto = $1`,
+      [id_projeto]
+    );
+
+    // Verifica se o projeto existe
+    if (!dados_sites.rows || dados_sites.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Projeto não encontrado"
+      });
+    }
+    const url_completa = dados_sites.rows[0].site_url; // Ex: https://upeexservices.sitexpres.com.br
+
+    // Deletando subdomínio do directadmin (com tratamento de erro)
+    try {
+      if (url_completa) {
+        // 1. Cria o objeto URL para facilitar a manipulação
+        const urlObj = new URL(url_completa);
+
+        // 2. Pega o hostname (ex: upeexservices.sitexpres.com.br)
+        const hostname = urlObj.hostname;
+
+        // 3. Extrai apenas a parte antes do primeiro ponto
+        // Se o domínio for sempre "sitexpres.com.br", isso pega exatamente o "upeexservices"
+        const subdominio = hostname.split('.')[0];
+
+        console.log(`Extraído: ${subdominio} de ${url_completa}`); // Para debug
+
+        // Chama a função passando apenas o subdomínio limpo
+        const retorno_deletarSubdominioDirectAdmin = await deletarSubdominioDirectAdmin(subdominio);
+
+        console.log("DirectAdmin:", retorno_deletarSubdominioDirectAdmin);
+      }
+    } catch (error) {
+      console.error("Erro ao deletar subdomínio no DirectAdmin:", error);
+      // Continua mesmo se falhar no DirectAdmin
+    }
 
 
+    // Deleta os registros relacionados
+    await pool.query(
+      `DELETE FROM public.site_prompts
+       WHERE id_projeto = $1`,
+      [id_projeto]
+    );
 
-  var url_sudminio_directadmin = dados_sites.rows[0]?.site_url;
+    await pool.query(
+      `DELETE FROM public.generated_sites
+       WHERE id_projeto = $1`,
+      [id_projeto]
+    );
 
-  var retorno_deletarSubdominioDirectAdmin = await deletarSubdominioDirectAdmin(url_sudminio_directadmin);
-  console.log(retorno_deletarSubdominioDirectAdmin); F
+    await pool.query(
+      `DELETE FROM public.sites
+       WHERE id_projeto = $1`,
+      [id_projeto]
+    );
 
-  await pool.query(
-    `DELETE FROM public.site_prompts
-   WHERE id_projeto = $1`,
-    [id_projeto]
-  );
+    return res.json({
+      success: true,
+      url: url_completa,
+      message: "Site deletado com sucesso!"
+    });
 
-  await pool.query(
-    `DELETE FROM public.generated_sites
-   WHERE id_projeto = $1`,
-    [id_projeto]
-  );
-
-  return res.json({
-    success: true,
-    message: "Site deletado com sucesso!"
-  });
-}
+  } catch (error) {
+    console.error("Erro ao deletar site:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Erro ao deletar site",
+      error: error.message
+    });
+  }
+};
 
 

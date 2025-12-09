@@ -41,8 +41,10 @@ export async function deletarSubdominioDirectAdmin(subdominio, dominioPrincipal 
 
     const params = new URLSearchParams({
       action: "delete",
-      domain: dominioPrincipal,  // ex: sitexpres.com.br
-      subdomain: subdominio
+      domain: dominioPrincipal,
+      // AQUI ESTÁ O PULO DO GATO:
+      select0: subdominio, // O DirectAdmin exige 'select0' para deletar, não 'subdomain'
+      contents: "yes"      // Garante que a pasta e os arquivos sejam apagados também
     });
 
     const response = await axios.post(url, params.toString(), {
@@ -55,13 +57,14 @@ export async function deletarSubdominioDirectAdmin(subdominio, dominioPrincipal 
       }
     });
 
-    return response.data; // resposta do DirectAdmin
+    console.log("##==> Resposta do DirectAdmin (Delete):", response.data);
+
+    return response.data; 
   } catch (err) {
     console.error("Erro ao deletar subdomínio:", err);
     throw err;
   }
 }
-
 
 export async function enviarHTMLSubdominio(host, usuario, senha, subdominio, html) {
   if (!host || !usuario || !senha || !subdominio || !html) {
