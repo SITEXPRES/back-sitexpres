@@ -12,7 +12,6 @@ import { updateGitHubIfIntegrated } from "./updateGitHubOnSiteChange.js";
 import { uso_creditos, verificar_creditos_prompt } from "./creditosController.js";
 import { consultaPlano } from "./planoController.js";
 import { console, url } from "inspector";
-import { escape } from "querystring";
 
 const anthropic = new Anthropic({
   apiKey: process.env.CLAUDE_API_KEY,
@@ -33,18 +32,10 @@ function limparRetorno(codigo) {
   return codigo.trim();
 }
 
-export async function gerarParte(prompt,  parte,  req,  id_projeto,  baseHTML = "",  userId,  primeiraVez) {
+export async function gerarParte(prompt, parte, req, id_projeto, baseHTML = "", userId) {
   const agora = new Date();
   const ano = agora.getFullYear();
 
-  if (primeiraVez) {
-    // PRIMEIRA VEZ → gerar HTML novo do zero
-    console.log("Gerando HTML pela primeira vez...");
-  } else {
-    // SEGUNDA VEZ OU MAIS → modificar o HTML existente
-    console.log("Alterando HTML existente...");
-  }
-  
   try {
     // 🔹 Detecta se é criação inicial ou edição
     const isEditing = baseHTML && baseHTML.trim().length > 0;
@@ -240,236 +231,227 @@ async function countTokensManual(systemPrompt) {
 export const jobs = {}; // { jobId: { status, result, error } }
 
 export const newsite = async (req, res) => {
-  /*  try { */
-  const { prompt, id_projeto, userId } = req.body;
+ /*  try { */
+    const { prompt, id_projeto, userId } = req.body;
 
-  const client = await pool.connect();
+    const client = await pool.connect();
 
-  // Busca dados do site
-  const dadosSite = await client.query(
-    `SELECT id, name, html_content FROM generated_sites 
+    // Busca dados do site
+    const dadosSite = await client.query(
+      `SELECT id, name, html_content FROM generated_sites 
            WHERE id_projeto = $1 and status = 'ativo'
            ORDER BY created_at DESC LIMIT 1`,
-    [id_projeto]
-  );
-  const baseHTML = dadosSite.rows[0].html_content;
+      [id_projeto]
+    );
+    const baseHTML = dadosSite.rows[0].html_content;
 
-  const verificar_creditos_prompt_result = await verificar_creditos_prompt(userId, prompt, baseHTML);
-
-
-  if (verificar_creditos_prompt_result.erro) {
-    return res.status(400).json({ success: false, message: verificar_creditos_prompt_result.mensagem });
-  }
-
-  if (!verificar_creditos_prompt_result.podeRodar) {
-    return res.status(400).json({ success: false, message: "Créditos insuficientes" });
-  } else {
-    return res.status(200).json({ success: true, message: "Créditos suficientes", verificar_creditos_prompt_result });
-  }
-
-  // Verifica plano do cliente
-  const plano = await consultaPlano(userId);
-  const isPro = plano.isPro;
-  const typedo_plano = plano.plan;
+    const verificar_creditos_prompt_result = await verificar_creditos_prompt(userId, prompt, baseHTML);
 
 
+    if (verificar_creditos_prompt_result.erro) {
+      return res.status(400).json({ success: false, message: verificar_creditos_prompt_result.mensagem });
+    }
 
-  const imageFile = req.file ? `/uploads/images/${req.file.filename}` : null;
+    if (!verificar_creditos_prompt_result.podeRodar) {
+      return res.status(400).json({ success: false, message: "Créditos insuficientes" });
+    } else {
+      return res.status(200).json({ success: true, message: "Créditos suficientes", verificar_creditos_prompt_result });
+    }
 
-  const baseURL = "https://back.sitexpres.com.br/uploads/logos/";
-  const imageURL = req.file ? `${baseURL}${req.file.filename}` : null;
+    // Verifica plano do cliente
+    const plano = await consultaPlano(userId);
+    const isPro = plano.isPro;
+    const typedo_plano = plano.plan;
 
-  if (!prompt || !prompt.trim()) {
-    return res.status(400).json({ success: false, message: "Prompt não enviado" });
-  }
 
-  // Cria job
-  const jobId = uuidv4();
-  jobs[jobId] = { status: "processing", result: null, error: null };
-  res.json({ success: true, jobId });
 
-  (async () => {
-    let client;
-    try {
-      client = await pool.connect();
+    const imageFile = req.file ? `/uploads/images/${req.file.filename}` : null;
 
-      // Verifica se já existe site gerado
-      const existing = await client.query(
-        `SELECT id, name, html_content FROM generated_sites 
+    const baseURL = "https://back.sitexpres.com.br/uploads/logos/";
+    const imageURL = req.file ? `${baseURL}${req.file.filename}` : null;
+
+    if (!prompt || !prompt.trim()) {
+      return res.status(400).json({ success: false, message: "Prompt não enviado" });
+    }
+
+    // Cria job
+    const jobId = uuidv4();
+    jobs[jobId] = { status: "processing", result: null, error: null };
+    res.json({ success: true, jobId });
+
+    (async () => {
+      let client;
+      try {
+        client = await pool.connect();
+
+        // Verifica se já existe site gerado
+        const existing = await client.query(
+          `SELECT id, name, html_content FROM generated_sites 
            WHERE id_projeto = $1 and status = 'ativo'
            ORDER BY created_at DESC LIMIT 1`,
-        [id_projeto]
-      );
-
-
-      //qtd sites do cliente
-      const qtde_sites = await client.query(
-        `SELECT * FROM public.sites   where  user_id =$1`,
-        [userId]
-      );
-
-      //=============================
-      //Validação dos limites free  1 site 
-      //=============================
-      // Limite FREE
-
-
-
-      if (typedo_plano === 'free') {
-        const qtde_sites_projeto = existing.rows.length;
-        const qtde_sites_cliente = qtde_sites.rows.length;
-
-        if (qtde_sites_projeto == 0 && qtde_sites_cliente >= 1) {
-          jobs[jobId] = {
-            status: "error",
-            result: null,
-            error: "Limite de sites atingido"
-          };
-          return; // Não envia resposta novamente!
-        }
-      }
-
-
-
-      // Verifica se é a primeira vez
-      const primeiraVez = existing.rows.length === 0;
-      const baseHTML = primeiraVez ? "" : existing.rows[0].html_content;
-
-      // Monta prompt final
-      const fullPrompt = imageURL
-        ? `${prompt}\nUse esta URL da imagem no site: ${imageURL}`
-        : prompt;
-
-      // Caso já exista HTML salvo, peça para alterar
-      const finalPrompt = primeiraVez
-        ? fullPrompt
-        : `HTML atual:\n${baseHTML}\nFaça as alterações solicitadas: ${fullPrompt}`;
-
-      // =============================
-      // Gera HTML pela API Claude
-      // =============================
-      const html = await gerarParte(
-        finalPrompt,
-        "HTML",
-        req,
-        id_projeto,
-        baseHTML,
-        userId,
-        primeiraVez 
-      );
-
-
-
-      // Gera nome do subdomínio via IA
-      let nomeSubdominio;
-      if (primeiraVez) {
-        nomeSubdominio = await gerarNomeSubdominio(prompt);
-        // Cria subdomínio no DirectAdmin
-        await criarSubdominioDirectAdmin(nomeSubdominio, "sitexpres.com.br");
-
-        // Colocar site na tabela de sites
-        //Colunas  credits_used,status, metadata pode vim null e title pegar o mesmo do site_name
-        // Insere site na tabela 'sites' do painel admin
-        const siteUrl = `https://${nomeSubdominio}.sitexpres.com.br`;
-        const siteName = `Site de ${nomeSubdominio}`;
-
-        await client.query(
-          `INSERT INTO sites 
-              (user_id, site_name, site_url, credits_used, status, metadata,id_projeto)
-              VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-          [
-            userId,                    // user_id
-            siteName,                  // site_name (mesmo valor que vai para generated_sites)
-            siteUrl,                   // site_url (URL completa do site)
-            10,                        // credits_used (pode ajustar o valor)
-            'active',                  // status
-            JSON.stringify({           // metadata (pode adicionar info útil)
-              id_projeto: id_projeto,
-              subdominio: nomeSubdominio,
-              created_by: 'ai_generation'
-            }),
-            id_projeto
-          ]
+          [id_projeto]
         );
 
 
-      } else {
-        nomeSubdominio = existing.rows[0].name.replace("Site de ", "").toLowerCase();
-      }
+        //qtd sites do cliente
+        const qtde_sites = await client.query(
+          `SELECT * FROM public.sites   where  user_id =$1`,
+          [userId]
+        );
+
+        //=============================
+        //Validação dos limites free  1 site 
+        //=============================
+        // Limite FREE
 
 
-      //  Marca todos os registros existentes como inativos
-      await client.query(
-        `UPDATE generated_sites 
+
+        if (typedo_plano === 'free') {
+          const qtde_sites_projeto = existing.rows.length;
+          const qtde_sites_cliente = qtde_sites.rows.length;
+
+          if (qtde_sites_projeto == 0 && qtde_sites_cliente >= 1) {
+            jobs[jobId] = {
+              status: "error",
+              result: null,
+              error: "Limite de sites atingido"
+            };
+            return; // Não envia resposta novamente!
+          }
+        }
+
+
+
+
+        const primeiraVez = existing.rows.length === 0;
+        const baseHTML = primeiraVez ? "" : existing.rows[0].html_content;
+
+        // Monta prompt final para a IA
+        const fullPrompt = imageURL
+          ? `${prompt}\nUse esta URL da imagem no site: ${imageURL}`
+          : prompt;
+
+        const finalPrompt = baseHTML
+          ? `HTML atual:\n${baseHTML}\nFaça as alterações solicitadas: ${fullPrompt}`
+          : fullPrompt;
+
+
+        //=============================
+        //Gera HTML api Claude
+        //=============================
+        const html = await gerarParte(finalPrompt, "HTML", req, id_projeto, baseHTML, userId); //<h1>Sitee script gerado por IA</h1>
+
+
+        // Gera nome do subdomínio via IA
+        let nomeSubdominio;
+        if (primeiraVez) {
+          nomeSubdominio = await gerarNomeSubdominio(prompt);
+          // Cria subdomínio no DirectAdmin
+          await criarSubdominioDirectAdmin(nomeSubdominio, "sitexpres.com.br");
+
+          // Colocar site na tabela de sites
+          //Colunas  credits_used,status, metadata pode vim null e title pegar o mesmo do site_name
+          // Insere site na tabela 'sites' do painel admin
+          const siteUrl = `https://${nomeSubdominio}.sitexpres.com.br`;
+          const siteName = `Site de ${nomeSubdominio}`;
+
+          await client.query(
+            `INSERT INTO sites 
+              (user_id, site_name, site_url, credits_used, status, metadata,id_projeto)
+              VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [
+              userId,                    // user_id
+              siteName,                  // site_name (mesmo valor que vai para generated_sites)
+              siteUrl,                   // site_url (URL completa do site)
+              10,                        // credits_used (pode ajustar o valor)
+              'active',                  // status
+              JSON.stringify({           // metadata (pode adicionar info útil)
+                id_projeto: id_projeto,
+                subdominio: nomeSubdominio,
+                created_by: 'ai_generation'
+              }),
+              id_projeto
+            ]
+          );
+
+
+        } else {
+          nomeSubdominio = existing.rows[0].name.replace("Site de ", "").toLowerCase();
+        }
+
+
+        //  Marca todos os registros existentes como inativos
+        await client.query(
+          `UPDATE generated_sites 
             SET status = 'inativo'
             WHERE id_projeto = $1`,
-        [id_projeto]
-      );
+          [id_projeto]
+        );
 
-      await client.query(
-        `UPDATE site_prompts 
+        await client.query(
+          `UPDATE site_prompts 
         SET status = 'inativo'
         WHERE id_projeto = $1`,
-        [id_projeto]
-      );
+          [id_projeto]
+        );
 
 
 
-      // Insere registro no banco
-      const insertSite = await client.query(
-        `INSERT INTO generated_sites 
+        // Insere registro no banco
+        const insertSite = await client.query(
+          `INSERT INTO generated_sites 
            (user_id, name, prompt, html_content, id_projeto, image_path,subdominio,status)
            VALUES ($1, $2, $3, $4, $5, $6 ,$7, $8)
            RETURNING id, name, prompt, html_content, created_at`,
-        [userId, `Site de ${nomeSubdominio}`, prompt, html, id_projeto, imageURL, nomeSubdominio, 'ativo']
-      );
+          [userId, `Site de ${nomeSubdominio}`, prompt, html, id_projeto, imageURL, nomeSubdominio, 'ativo']
+        );
 
-      // pega o ID recém inserido
-      const novoId = insertSite.rows[0].id;
+        // pega o ID recém inserido
+        const novoId = insertSite.rows[0].id;
 
-      await client.query(
-        `INSERT INTO site_prompts (user_id, id_projeto, prompt,id_site_gererate,status)
+        await client.query(
+          `INSERT INTO site_prompts (user_id, id_projeto, prompt,id_site_gererate,status)
            VALUES ($1, $2, $3, $4, $5)`,
-        [userId, id_projeto, prompt, novoId, 'ativo']
-      );
+          [userId, id_projeto, prompt, novoId, 'ativo']
+        );
 
-      // Envia ou atualiza HTML no subdomínio
-      await enviarHTMLSubdominio(
-        "ftp.sitexpres.com.br",
-        process.env.user_directamin,
-        process.env.pass_directamin,
-        nomeSubdominio + '.sitexpres.com.br',
-        html
-      );
+        // Envia ou atualiza HTML no subdomínio
+        await enviarHTMLSubdominio(
+          "ftp.sitexpres.com.br",
+          process.env.user_directamin,
+          process.env.pass_directamin,
+          nomeSubdominio + '.sitexpres.com.br',
+          html
+        );
 
-      //Fazendo update no github caso já esteja integrado ou já tenha repositório conectado caso não ignore e passe direto
-      const githubResult = await updateGitHubIfIntegrated(
-        userId,
-        id_projeto,
-        html,
-        "Atualização do site via SiteXpress"
-      );
+        //Fazendo update no github caso já esteja integrado ou já tenha repositório conectado caso não ignore e passe direto
+        const githubResult = await updateGitHubIfIntegrated(
+          userId,
+          id_projeto,
+          html,
+          "Atualização do site via SiteXpress"
+        );
 
-      if (githubResult.updated) {
-        console.log("GitHub atualizado:", githubResult.repoUrl);
+        if (githubResult.updated) {
+          console.log("GitHub atualizado:", githubResult.repoUrl);
+        }
+        //-------------
+
+
+        jobs[jobId] = { status: "done", result: insertSite.rows[0], error: null };
+
+      } catch (error) {
+        console.error(error);
+        jobs[jobId] = { status: "error", result: null, error: error.message };
+      } finally {
+        if (client) client.release();
       }
-      //-------------
+    })();
 
-
-      jobs[jobId] = { status: "done", result: insertSite.rows[0], error: null };
-
-    } catch (error) {
-      console.error(error);
-      jobs[jobId] = { status: "error", result: null, error: error.message };
-    } finally {
-      if (client) client.release();
-    }
-  })();
-
-  /*   } catch (error) {
-      console.error(error);
-      res.status(500).json({ success: false, message: "Erro ao criar job" });
-    } */
+/*   } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Erro ao criar job" });
+  } */
 };
 
 
