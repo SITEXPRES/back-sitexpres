@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.67.0",
+    "@anthropic-ai/tokenizer": "^0.0.4",
     "@google/generative-ai": "^0.14.1",
     "@octokit/rest": "^22.0.1",
     "@paypal/checkout-server-sdk": "^1.0.3",
@@ -24,6 +25,7 @@
     "node-fetch": "^3.3.2",
     "nodemailer": "^7.0.10",
     "pg": "^8.11.3",
+    "tiktoken": "^1.0.22",
     "uuid": "^9.0.0",
     "xml2js": "^0.6.2",
     "xmlbuilder2": "^4.0.3"

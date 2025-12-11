@@ -9,6 +9,7 @@ import paypalRoutes from "./routes/paypalRoutes.js";
 import interRoutes from "./routes/InterRoutes.js";
 import githubIntegrationRoutes from "./routes/githubIntegrationRoutes.js";
 import notafiscalRoutes from "./routes/notaRoutes.js";
+import transactionsRoutes from "./routes/transactionsRoutes.js";
  
 import path from "path";
 import { fileURLToPath } from "url";
@@ -44,7 +45,7 @@ app.use("/api/integrations/github", githubIntegrationRoutes);
 app.use("/api/paypal", paypalRoutes);
 app.use("/api/pix-inter", interRoutes);
 app.use("/api/notafiscal", notafiscalRoutes);
-
+app.use("/api/transactions", transactionsRoutes);
  
  
 

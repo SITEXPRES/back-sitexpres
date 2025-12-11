@@ -9,9 +9,7 @@ import { criarSubdominioDirectAdmin, enviarHTMLSubdominio, subdominioExiste, del
 import dotenv from "dotenv";
 dotenv.config();
 import { updateGitHubIfIntegrated } from "./updateGitHubOnSiteChange.js";
-import { uso_creditos, verificar_creditos_prompt } from "./creditosController.js";
-import { consultaPlano } from "./planoController.js";
-import { console, url } from "inspector";
+import { url } from "inspector";
 
 const anthropic = new Anthropic({
   apiKey: process.env.CLAUDE_API_KEY,
@@ -32,7 +30,7 @@ function limparRetorno(codigo) {
   return codigo.trim();
 }
 
-export async function gerarParte(prompt, parte, req, id_projeto, baseHTML = "", userId) {
+export async function gerarParte(prompt, parte, req, id_projeto, baseHTML = "") {
   const agora = new Date();
   const ano = agora.getFullYear();
 
@@ -132,9 +130,6 @@ ${prompt}
 
     let html = "";
 
-
-
-
     // ✅ Seleciona modelo de IA
     if (USE_GEMINI) {
       const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
@@ -147,80 +142,30 @@ ${prompt}
 
 
     } else {
-      // 1. Inicia o stream
       const stream = await anthropic.messages.stream({
         model: "claude-haiku-4-5-20251001",
         max_tokens: 22000,
         system: "Você é um especialista em HTML, CSS e SEO. Sempre gere apenas código HTML puro.",
-        messages: [{ role: "user", content: systemPrompt }]
+        messages: [{ role: "user", content: systemPrompt }],
       });
 
-      let html = "";
+      console.log('Resultado do Claude:');
+      console.log(stream);
 
-      // ===========================================
-      // 2. LÊ O STREAM (gerando o HTML)
-      // ===========================================
       for await (const event of stream) {
         if (event.type === "content_block_delta" && event.delta?.text) {
           html += event.delta.text;
         }
       }
 
-      // ===========================================
-      // 3. APÓS terminar o stream, pega o usage real
-      // ===========================================
-      const finalMessage = await stream.finalMessage();
-
-      const inputTokens = finalMessage.usage?.input_tokens ?? 0;
-      const outputTokens = finalMessage.usage?.output_tokens ?? 0;
-
-      console.log("============== TOKEN USAGE REAL ==============");
-      console.log("Tokens de entrada:", inputTokens);
-      console.log("Tokens de saída:", outputTokens);
-      console.log("Total:", inputTokens + outputTokens);
-      console.log("===============================================");
-
-      await uso_creditos(userId, inputTokens + outputTokens, inputTokens + outputTokens, id_projeto);
-
-      // ===========================================
-      // 4. Retorna HTML pronto
-      // ===========================================
-      console.log("##==> HTML FINAL GERADO ENVIANDO PARA DIRECT ADMIN");
+      console.log("##==> HTML FINAL GERADO:"); // debug
       return limparRetorno(html);
     }
-
-
   } catch (error) {
     console.error("Erro ao gerar parte do site:", error);
     if (error?.error?.message) console.error("Mensagem do modelo:", error.error.message);
     if (error?.requestID) console.error("ID da requisição:", error.requestID);
     return "<!-- Erro ao gerar conteúdo -->";
-  }
-}
-
-
-async function countTokensManual(systemPrompt) {
-  try {
-    const response = await fetch("https://api.anthropic.com/v1/messages/count_tokens", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01"
-      },
-      body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
-        system: "Você é um especialista em HTML, CSS e SEO. Sempre gere apenas código HTML puro.",
-        messages: [
-          { role: "user", content: systemPrompt }
-        ]
-      })
-    });
-
-    return await response.json();
-  } catch (err) {
-    console.error("Erro ao contar tokens manualmente:", err);
-    return null;
   }
 }
 
@@ -231,39 +176,11 @@ async function countTokensManual(systemPrompt) {
 export const jobs = {}; // { jobId: { status, result, error } }
 
 export const newsite = async (req, res) => {
- /*  try { */
+  try {
     const { prompt, id_projeto, userId } = req.body;
 
-    const client = await pool.connect();
-
-    // Busca dados do site
-    const dadosSite = await client.query(
-      `SELECT id, name, html_content FROM generated_sites 
-           WHERE id_projeto = $1 and status = 'ativo'
-           ORDER BY created_at DESC LIMIT 1`,
-      [id_projeto]
-    );
-    const baseHTML = dadosSite.rows[0].html_content;
-
-    const verificar_creditos_prompt_result = await verificar_creditos_prompt(userId, prompt, baseHTML);
-
-
-    if (verificar_creditos_prompt_result.erro) {
-      return res.status(400).json({ success: false, message: verificar_creditos_prompt_result.mensagem });
-    }
-
-    if (!verificar_creditos_prompt_result.podeRodar) {
-      return res.status(400).json({ success: false, message: "Créditos insuficientes" });
-    } else {
-      return res.status(200).json({ success: true, message: "Créditos suficientes", verificar_creditos_prompt_result });
-    }
-
-    // Verifica plano do cliente
-    const plano = await consultaPlano(userId);
-    const isPro = plano.isPro;
-    const typedo_plano = plano.plan;
-
-
+    console.log(req.body)
+    console.log(userId)
 
     const imageFile = req.file ? `/uploads/images/${req.file.filename}` : null;
 
@@ -292,37 +209,6 @@ export const newsite = async (req, res) => {
           [id_projeto]
         );
 
-
-        //qtd sites do cliente
-        const qtde_sites = await client.query(
-          `SELECT * FROM public.sites   where  user_id =$1`,
-          [userId]
-        );
-
-        //=============================
-        //Validação dos limites free  1 site 
-        //=============================
-        // Limite FREE
-
-
-
-        if (typedo_plano === 'free') {
-          const qtde_sites_projeto = existing.rows.length;
-          const qtde_sites_cliente = qtde_sites.rows.length;
-
-          if (qtde_sites_projeto == 0 && qtde_sites_cliente >= 1) {
-            jobs[jobId] = {
-              status: "error",
-              result: null,
-              error: "Limite de sites atingido"
-            };
-            return; // Não envia resposta novamente!
-          }
-        }
-
-
-
-
         const primeiraVez = existing.rows.length === 0;
         const baseHTML = primeiraVez ? "" : existing.rows[0].html_content;
 
@@ -335,12 +221,8 @@ export const newsite = async (req, res) => {
           ? `HTML atual:\n${baseHTML}\nFaça as alterações solicitadas: ${fullPrompt}`
           : fullPrompt;
 
-
-        //=============================
-        //Gera HTML api Claude
-        //=============================
-        const html = await gerarParte(finalPrompt, "HTML", req, id_projeto, baseHTML, userId); //<h1>Sitee script gerado por IA</h1>
-
+        // Gera HTML
+        const html = await gerarParte(finalPrompt, "HTML", req, id_projeto, baseHTML); //'<h1>Sitee script gerado por IA</h1>' //
 
         // Gera nome do subdomínio via IA
         let nomeSubdominio;
@@ -448,10 +330,10 @@ export const newsite = async (req, res) => {
       }
     })();
 
-/*   } catch (error) {
+  } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: "Erro ao criar job" });
-  } */
+  }
 };
 
 

@@ -2,7 +2,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import pool from "../config/db.js";
 import { sendMail } from "../services/emailService.js";
-
+import 'dotenv/config';
 const JWT_SECRET = process.env.JWT_SECRET || "seu_secret_aqui_MUDE_EM_PRODUCAO";
 
 export const register = async (req, res) => {
@@ -16,8 +16,8 @@ export const register = async (req, res) => {
 
     const password_hash = await bcrypt.hash(password, 10);
     const result = await pool.query(
-      "INSERT INTO users (name, email, password_hash) VALUES ($1, $2, $3) RETURNING id, name, email",
-      [name, email, password_hash]
+      "INSERT INTO users (name, email, password_hash, credits) VALUES ($1, $2, $3, $4) RETURNING id, name, email, credits",
+      [name, email, password_hash, process.env.QTD_CREDIT_FREE]
     );
 
     const user = result.rows[0];
@@ -82,7 +82,8 @@ export const login = async (req, res) => {
           cod_municipio: user.cod_municipio,
           uf: user.uf,
           cep: user.cep,
-          telefone: user.telefone,
+          telefone: user.telefone
+         
         }
 
       }
