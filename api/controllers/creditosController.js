@@ -90,7 +90,7 @@ export async function verificar_creditos_prompt(id_user, prompt_cliente, basehtm
                 erro: true,
                 mensagem: "Usuário não encontrado",
                 podeRodar: false
-            };
+             };
         }
 
         // Créditos → cada 1 crédito = 10.000 tokens

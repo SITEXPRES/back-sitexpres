@@ -11,6 +11,7 @@ dotenv.config();
 import { updateGitHubIfIntegrated } from "./updateGitHubOnSiteChange.js";
 import { uso_creditos, verificar_creditos_prompt } from "./creditosController.js";
 import { consultaPlano } from "./planoController.js";
+import { gerar_site } from "./gerar_siteController.js";
 import { console, url } from "inspector";
 import { escape } from "querystring";
 
@@ -33,179 +34,6 @@ function limparRetorno(codigo) {
   return codigo.trim();
 }
 
-export async function gerarParte(prompt,  parte,  req,  id_projeto,  baseHTML = "",  userId,  primeiraVez) {
-  const agora = new Date();
-  const ano = agora.getFullYear();
-
-  if (primeiraVez) {
-    // PRIMEIRA VEZ → gerar HTML novo do zero
-    console.log("Gerando HTML pela primeira vez...");
-  } else {
-    // SEGUNDA VEZ OU MAIS → modificar o HTML existente
-    console.log("Alterando HTML existente...");
-  }
-  
-  try {
-    // 🔹 Detecta se é criação inicial ou edição
-    const isEditing = baseHTML && baseHTML.trim().length > 0;
-
-    // 🔹 Prompt principal da IA — com SEO e boas práticas
-    const systemPromptBase = `
-Você é um designer e desenvolvedor web sênior, criador de interfaces modernas de alto nível (Lovable, Webflow, Framer).
-Sempre gere HTML visualmente premium.
-
-⚠️ O retorno deve ser APENAS código HTML (sem markdown).
-
-=========================================================
-🎨 DESIGN SYSTEM OBRIGATÓRIO (DEVE SEMPRE SER MANTIDO)
-=========================================================
-- Tipografia premium via Google Fonts (Inter, Poppins, Montserrat ou Outfit).
-- Seções amplas com padding grande (60–100px).
-- Layout em containers centralizados (max-width 1200px).
-- Cards modernos com bordas arredondadas, sombras suaves e hover animado.
-- Botões grandes, arredondados, com animação no hover.
-- Paleta de cores harmônica conforme o tema.
-- Grids modernos com display:flex ou display:grid.
-- Animações suaves (fade-in, hover, transitions).
-- Hero principal com destaque visual (gradiente, título grande e CTAs).
-- Header responsivo com menu mobile (hamburger + JS).
-- Footer com ano dinâmico (<span id="ano"></span>).
-
-=========================================================
-🧠 REGRAS PARA CRIAÇÃO (quando não existe HTML-base)
-=========================================================
-- Gere um site completo e moderno seguindo TODAS as regras acima.
-- Estrutura obrigatória:
-  header, nav, hero, features/benefícios, sobre, serviços/produtos,
-  depoimentos, FAQ com JS, contato, footer.
-- Gere HTML premium, bonito e detalhado, semelhante ao Lovable.
-
-=========================================================
-🧠 REGRAS PARA EDIÇÃO (quando HTML-base for fornecido)
-=========================================================
-- NÃO remova seções, imagens, textos ou estilos existentes,
-  exceto se o cliente pedir explicitamente.
-- Mantenha TODO o design atual: cores, estilo, classes, estrutura.
-- Apenas modifique o que o prompt solicitar.
-- Preserve todos os elementos do Design System listados acima.
-- Preserve scripts, menus, animações e responsividade.
-- Retorne o HTML COMPLETO atualizado.
-
-=========================================================
-🔎 SEO COMPLETO
-=========================================================
-- title, description, canonical
-- OpenGraph completo (og:title, og:description, og:image, og:url)
-- Twitter Card (summary_large_image)
-- meta hreflang="pt-BR"
-
-=========================================================
-📸 Imagens
-=========================================================
-- Sempre usar alt descritivo
-- Sempre usar srcset + sizes
-- Sempre usar placeholders do Unsplash conforme o tema
-
-=========================================================
-📌 REGRAS FINAIS
-=========================================================
-- O HTML final deve ser profissional, moderno e visualmente premium.
-- Nunca simplifique o layout.
-- Nunca substitua o estilo por algo mais básico.
-- Quando editar, conserve tudo o que já existe (estilo, CSS, HTML).
-`;
-
-
-    // 🔹 Se estiver editando, insere o HTML base no contexto
-    const systemPrompt = isEditing
-      ? `${systemPromptBase}
-
-Você está editando um site já existente.  
-HTML atual:
-${baseHTML}
-
-Solicitação do cliente:
-${prompt}
-
-🧠 Instruções:
-- Apenas modifique, adicione ou substitua o que foi pedido no prompt.
-- Não apague ou altere conteúdo que não foi mencionado.
-- Preserve todas as imagens, seções e estilos atuais.
-- Retorne o HTML completo atualizado.`
-      : `${systemPromptBase}
-
-Descrição do site:
-${prompt}
-
-🧠 Gere o HTML completo seguindo todas as boas práticas acima.`;
-
-    let html = "";
-
-
-
-
-    // ✅ Seleciona modelo de IA
-    if (USE_GEMINI) {
-      const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
-      const result = await model.generateContent(systemPrompt);
-
-
-
-      html = result.response.text();
-      return limparRetorno(html);
-
-
-    } else {
-      // 1. Inicia o stream
-      const stream = await anthropic.messages.stream({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 22000,
-        system: "Você é um especialista em HTML, CSS e SEO. Sempre gere apenas código HTML puro.",
-        messages: [{ role: "user", content: systemPrompt }]
-      });
-
-      let html = "";
-
-      // ===========================================
-      // 2. LÊ O STREAM (gerando o HTML)
-      // ===========================================
-      for await (const event of stream) {
-        if (event.type === "content_block_delta" && event.delta?.text) {
-          html += event.delta.text;
-        }
-      }
-
-      // ===========================================
-      // 3. APÓS terminar o stream, pega o usage real
-      // ===========================================
-      const finalMessage = await stream.finalMessage();
-
-      const inputTokens = finalMessage.usage?.input_tokens ?? 0;
-      const outputTokens = finalMessage.usage?.output_tokens ?? 0;
-
-      console.log("============== TOKEN USAGE REAL ==============");
-      console.log("Tokens de entrada:", inputTokens);
-      console.log("Tokens de saída:", outputTokens);
-      console.log("Total:", inputTokens + outputTokens);
-      console.log("===============================================");
-
-      await uso_creditos(userId, inputTokens + outputTokens, inputTokens + outputTokens, id_projeto);
-
-      // ===========================================
-      // 4. Retorna HTML pronto
-      // ===========================================
-      console.log("##==> HTML FINAL GERADO ENVIANDO PARA DIRECT ADMIN");
-      return limparRetorno(html);
-    }
-
-
-  } catch (error) {
-    console.error("Erro ao gerar parte do site:", error);
-    if (error?.error?.message) console.error("Mensagem do modelo:", error.error.message);
-    if (error?.requestID) console.error("ID da requisição:", error.requestID);
-    return "<!-- Erro ao gerar conteúdo -->";
-  }
-}
 
 
 async function countTokensManual(systemPrompt) {
@@ -240,236 +68,239 @@ async function countTokensManual(systemPrompt) {
 export const jobs = {}; // { jobId: { status, result, error } }
 
 export const newsite = async (req, res) => {
-  /*  try { */
-  const { prompt, id_projeto, userId } = req.body;
+  try {
+    const { prompt, id_projeto, userId } = req.body;
 
-  const client = await pool.connect();
 
-  // Busca dados do site
-  const dadosSite = await client.query(
-    `SELECT id, name, html_content FROM generated_sites 
+    if (!prompt || !prompt.trim()) {
+      return res.status(400).json({ success: false, message: "Prompt não enviado" });
+    }
+
+    //================   Validação de créditos ===================
+    // Busca dados do site para fazer a validação de créditos
+
+    const dadosSite = await pool.query(
+      `SELECT id, name, html_content FROM generated_sites 
            WHERE id_projeto = $1 and status = 'ativo'
            ORDER BY created_at DESC LIMIT 1`,
-    [id_projeto]
-  );
-  const baseHTML = dadosSite.rows[0].html_content;
+      [id_projeto]
+    );
+    const baseHTML = dadosSite.rows.length > 0 ? dadosSite.rows[0].html_content : "";
+    const verificar_creditos_prompt_result = await verificar_creditos_prompt(userId, prompt, baseHTML);
 
-  const verificar_creditos_prompt_result = await verificar_creditos_prompt(userId, prompt, baseHTML);
+    if (!verificar_creditos_prompt_result.podeRodar) {
+      return res.status(400).json({ success: false, message: "Créditos insuficientes, faça a compra avusa ou compre o pacote com mais créditos" });
+    } else {
 
 
-  if (verificar_creditos_prompt_result.erro) {
-    return res.status(400).json({ success: false, message: verificar_creditos_prompt_result.mensagem });
-  }
-
-  if (!verificar_creditos_prompt_result.podeRodar) {
-    return res.status(400).json({ success: false, message: "Créditos insuficientes" });
-  } else {
-    return res.status(200).json({ success: true, message: "Créditos suficientes", verificar_creditos_prompt_result });
-  }
-
-  // Verifica plano do cliente
-  const plano = await consultaPlano(userId);
-  const isPro = plano.isPro;
-  const typedo_plano = plano.plan;
+      // Verifica plano do cliente
+      const plano = await consultaPlano(userId);
+      const isPro = plano.isPro;
+      const typedo_plano = plano.plan;
 
 
 
-  const imageFile = req.file ? `/uploads/images/${req.file.filename}` : null;
+      // Se tiver imagem faz upload
+      const imageFile = req.file ? `/uploads/images/${req.file.filename}` : null;
+      const baseURL = "https://back.sitexpres.com.br/uploads/logos/";
+      const imageURL = req.file ? `${baseURL}${req.file.filename}` : null;
 
-  const baseURL = "https://back.sitexpres.com.br/uploads/logos/";
-  const imageURL = req.file ? `${baseURL}${req.file.filename}` : null;
 
-  if (!prompt || !prompt.trim()) {
-    return res.status(400).json({ success: false, message: "Prompt não enviado" });
-  }
 
-  // Cria job
-  const jobId = uuidv4();
-  jobs[jobId] = { status: "processing", result: null, error: null };
-  res.json({ success: true, jobId });
+      // Cria job assincrono para monitorar o progresso
+      const jobId = uuidv4();
+      jobs[jobId] = { status: "processing", result: null, error: null };
+      res.json({ success: true, jobId });
 
-  (async () => {
-    let client;
-    try {
-      client = await pool.connect();
 
-      // Verifica se já existe site gerado
-      const existing = await client.query(
-        `SELECT id, name, html_content FROM generated_sites 
+      // Inicia job assincrono para gerar o site
+      (async () => {
+        let client;
+        try {
+          client = await pool.connect();
+
+          // Verifica se já existe site gerado
+          const existing = await client.query(
+            `SELECT id, name, html_content FROM generated_sites 
            WHERE id_projeto = $1 and status = 'ativo'
            ORDER BY created_at DESC LIMIT 1`,
-        [id_projeto]
-      );
+            [id_projeto]
+          );
 
 
-      //qtd sites do cliente
-      const qtde_sites = await client.query(
-        `SELECT * FROM public.sites   where  user_id =$1`,
-        [userId]
-      );
+          //qtd sites do cliente
+          const qtde_sites = await client.query(
+            `SELECT * FROM public.sites   where  user_id =$1`,
+            [userId]
+          );
 
-      //=============================
-      //Validação dos limites free  1 site 
-      //=============================
-      // Limite FREE
-
-
-
-      if (typedo_plano === 'free') {
-        const qtde_sites_projeto = existing.rows.length;
-        const qtde_sites_cliente = qtde_sites.rows.length;
-
-        if (qtde_sites_projeto == 0 && qtde_sites_cliente >= 1) {
-          jobs[jobId] = {
-            status: "error",
-            result: null,
-            error: "Limite de sites atingido"
-          };
-          return; // Não envia resposta novamente!
-        }
-      }
+          //=============================
+          //Validação dos limites free  1 site 
+          //=============================
+          // Limite FREE
 
 
 
-      // Verifica se é a primeira vez
-      const primeiraVez = existing.rows.length === 0;
-      const baseHTML = primeiraVez ? "" : existing.rows[0].html_content;
+          if (typedo_plano === 'free') {
+            const qtde_sites_projeto = existing.rows.length;
+            const qtde_sites_cliente = qtde_sites.rows.length;
 
-      // Monta prompt final
-      const fullPrompt = imageURL
-        ? `${prompt}\nUse esta URL da imagem no site: ${imageURL}`
-        : prompt;
-
-      // Caso já exista HTML salvo, peça para alterar
-      const finalPrompt = primeiraVez
-        ? fullPrompt
-        : `HTML atual:\n${baseHTML}\nFaça as alterações solicitadas: ${fullPrompt}`;
-
-      // =============================
-      // Gera HTML pela API Claude
-      // =============================
-      const html = await gerarParte(
-        finalPrompt,
-        "HTML",
-        req,
-        id_projeto,
-        baseHTML,
-        userId,
-        primeiraVez 
-      );
+            if (qtde_sites_projeto == 0 && qtde_sites_cliente >= 1) {
+              jobs[jobId] = {
+                status: "error",
+                result: null,
+                error: "Limite de sites atingido"
+              };
+              return; // Não envia resposta novamente!
+            }
+          }
 
 
 
-      // Gera nome do subdomínio via IA
-      let nomeSubdominio;
-      if (primeiraVez) {
-        nomeSubdominio = await gerarNomeSubdominio(prompt);
-        // Cria subdomínio no DirectAdmin
-        await criarSubdominioDirectAdmin(nomeSubdominio, "sitexpres.com.br");
+          // Verifica se é a primeira vez
+          const primeiraVez = existing.rows.length === 0;
+          const baseHTML = primeiraVez ? "" : existing.rows[0].html_content;
 
-        // Colocar site na tabela de sites
-        //Colunas  credits_used,status, metadata pode vim null e title pegar o mesmo do site_name
-        // Insere site na tabela 'sites' do painel admin
-        const siteUrl = `https://${nomeSubdominio}.sitexpres.com.br`;
-        const siteName = `Site de ${nomeSubdominio}`;
+          // Monta prompt final
+          const fullPrompt = imageURL
+            ? `${prompt}\nUse esta URL da imagem no site: ${imageURL}`
+            : prompt;
 
-        await client.query(
-          `INSERT INTO sites 
+          // Caso já exista HTML salvo, peça para alterar
+          const finalPrompt = primeiraVez
+            ? fullPrompt
+            : `HTML atual:\n${baseHTML}\nFaça as alterações solicitadas: ${fullPrompt}`;
+
+          // =============================
+          // Gera HTML pela API Claude
+          // =============================
+          const html = await gerar_site(
+            finalPrompt,
+            "HTML",
+            req,
+            id_projeto,
+            baseHTML,
+            userId,
+            primeiraVez
+          );
+
+
+
+          // Gera nome do subdomínio via IA
+          let nomeSubdominio;
+          if (primeiraVez) {
+            nomeSubdominio = await gerarNomeSubdominio(prompt);
+            // Cria subdomínio no DirectAdmin
+            await criarSubdominioDirectAdmin(nomeSubdominio, "sitexpres.com.br");
+
+            // Colocar site na tabela de sites
+            //Colunas  credits_used,status, metadata pode vim null e title pegar o mesmo do site_name
+            // Insere site na tabela 'sites' do painel admin
+            const siteUrl = `https://${nomeSubdominio}.sitexpres.com.br`;
+            const siteName = `Site de ${nomeSubdominio}`;
+
+            await client.query(
+              `INSERT INTO sites 
               (user_id, site_name, site_url, credits_used, status, metadata,id_projeto)
               VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-          [
-            userId,                    // user_id
-            siteName,                  // site_name (mesmo valor que vai para generated_sites)
-            siteUrl,                   // site_url (URL completa do site)
-            10,                        // credits_used (pode ajustar o valor)
-            'active',                  // status
-            JSON.stringify({           // metadata (pode adicionar info útil)
-              id_projeto: id_projeto,
-              subdominio: nomeSubdominio,
-              created_by: 'ai_generation'
-            }),
-            id_projeto
-          ]
-        );
+              [
+                userId,                    // user_id
+                siteName,                  // site_name (mesmo valor que vai para generated_sites)
+                siteUrl,                   // site_url (URL completa do site)
+                10,                        // credits_used (pode ajustar o valor)
+                'active',                  // status
+                JSON.stringify({           // metadata (pode adicionar info útil)
+                  id_projeto: id_projeto,
+                  subdominio: nomeSubdominio,
+                  created_by: 'ai_generation'
+                }),
+                id_projeto
+              ]
+            );
 
 
-      } else {
-        nomeSubdominio = existing.rows[0].name.replace("Site de ", "").toLowerCase();
-      }
+          } else {
+            nomeSubdominio = existing.rows[0].name.replace("Site de ", "").toLowerCase();
+          }
 
 
-      //  Marca todos os registros existentes como inativos
-      await client.query(
-        `UPDATE generated_sites 
+          //  Marca todos os registros existentes como inativos
+          await client.query(
+            `UPDATE generated_sites 
             SET status = 'inativo'
             WHERE id_projeto = $1`,
-        [id_projeto]
-      );
+            [id_projeto]
+          );
 
-      await client.query(
-        `UPDATE site_prompts 
+          await client.query(
+            `UPDATE site_prompts 
         SET status = 'inativo'
         WHERE id_projeto = $1`,
-        [id_projeto]
-      );
+            [id_projeto]
+          );
 
 
 
-      // Insere registro no banco
-      const insertSite = await client.query(
-        `INSERT INTO generated_sites 
+          // Insere registro no banco
+          const insertSite = await client.query(
+            `INSERT INTO generated_sites 
            (user_id, name, prompt, html_content, id_projeto, image_path,subdominio,status)
            VALUES ($1, $2, $3, $4, $5, $6 ,$7, $8)
            RETURNING id, name, prompt, html_content, created_at`,
-        [userId, `Site de ${nomeSubdominio}`, prompt, html, id_projeto, imageURL, nomeSubdominio, 'ativo']
-      );
+            [userId, `Site de ${nomeSubdominio}`, prompt, html, id_projeto, imageURL, nomeSubdominio, 'ativo']
+          );
 
-      // pega o ID recém inserido
-      const novoId = insertSite.rows[0].id;
+          // pega o ID recém inserido
+          const novoId = insertSite.rows[0].id;
 
-      await client.query(
-        `INSERT INTO site_prompts (user_id, id_projeto, prompt,id_site_gererate,status)
+          await client.query(
+            `INSERT INTO site_prompts (user_id, id_projeto, prompt,id_site_gererate,status)
            VALUES ($1, $2, $3, $4, $5)`,
-        [userId, id_projeto, prompt, novoId, 'ativo']
-      );
+            [userId, id_projeto, prompt, novoId, 'ativo']
+          );
 
-      // Envia ou atualiza HTML no subdomínio
-      await enviarHTMLSubdominio(
-        "ftp.sitexpres.com.br",
-        process.env.user_directamin,
-        process.env.pass_directamin,
-        nomeSubdominio + '.sitexpres.com.br',
-        html
-      );
+          // Envia ou atualiza HTML no subdomínio
+          await enviarHTMLSubdominio(
+            "ftp.sitexpres.com.br",
+            process.env.user_directamin,
+            process.env.pass_directamin,
+            nomeSubdominio + '.sitexpres.com.br',
+            html
+          );
 
-      //Fazendo update no github caso já esteja integrado ou já tenha repositório conectado caso não ignore e passe direto
-      const githubResult = await updateGitHubIfIntegrated(
-        userId,
-        id_projeto,
-        html,
-        "Atualização do site via SiteXpress"
-      );
+          //Fazendo update no github caso já esteja integrado ou já tenha repositório conectado caso não ignore e passe direto
+          const githubResult = await updateGitHubIfIntegrated(
+            userId,
+            id_projeto,
+            html,
+            "Atualização do site via SiteXpress"
+          );
 
-      if (githubResult.updated) {
-        console.log("GitHub atualizado:", githubResult.repoUrl);
-      }
-      //-------------
+          if (githubResult.updated) {
+            console.log("GitHub atualizado:", githubResult.repoUrl);
+          }
+          //-------------
 
 
-      jobs[jobId] = { status: "done", result: insertSite.rows[0], error: null };
+          jobs[jobId] = { status: "done", result: insertSite.rows[0], error: null };
 
-    } catch (error) {
-      console.error(error);
-      jobs[jobId] = { status: "error", result: null, error: error.message };
-    } finally {
-      if (client) client.release();
+        } catch (error) {
+          console.error(error);
+          jobs[jobId] = { status: "error", result: null, error: error.message };
+        } finally {
+          if (client) client.release();
+        }
+      })();
+
     }
-  })();
 
-  /*   } catch (error) {
-      console.error(error);
-      res.status(500).json({ success: false, message: "Erro ao criar job" });
-    } */
+  } catch (error) {
+    //console.error(error);
+    console.error("ERRO NO NEW SITE:", error);
+
+    res.status(500).json({ success: false, message: "Erro ao criar job" });
+  }
+
 };
 
 
