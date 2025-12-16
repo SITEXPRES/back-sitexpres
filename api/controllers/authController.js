@@ -16,8 +16,10 @@ export const register = async (req, res) => {
 
     const password_hash = await bcrypt.hash(password, 10);
     const result = await pool.query(
-      "INSERT INTO users (name, email, password_hash, credits) VALUES ($1, $2, $3, $4) RETURNING id, name, email, credits",
-      [name, email, password_hash, process.env.QTD_CREDIT_FREE]
+      `INSERT INTO users (name, email, password_hash)
+      VALUES ($1, $2, $3)
+      RETURNING id, name, email, credits`,
+      [name, email, password_hash]
     );
 
     const user = result.rows[0];
@@ -83,7 +85,7 @@ export const login = async (req, res) => {
           uf: user.uf,
           cep: user.cep,
           telefone: user.telefone
-         
+
         }
 
       }
