@@ -11,6 +11,7 @@ import githubIntegrationRoutes from "./routes/githubIntegrationRoutes.js";
 import notafiscalRoutes from "./routes/notaRoutes.js";
 import transactionsRoutes from "./routes/transactionsRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
+import hospedagemRoutes from "./routes/hospedagemRoutes.js";
  
 import path from "path";
 import { fileURLToPath } from "url";
@@ -48,6 +49,7 @@ app.use("/api/pix-inter", interRoutes);
 app.use("/api/notafiscal", notafiscalRoutes);
 app.use("/api/transactions", transactionsRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/hospedagem", hospedagemRoutes);
  
  
 
