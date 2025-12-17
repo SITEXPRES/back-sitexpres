@@ -168,7 +168,7 @@ export const creat_hospedagem = async (req, res) => {
             domain: dominio,
             package: pacote || 'packagesitexpress',
             ip: '143.208.8.36',
-            notify: 'yes'
+            notify: 'not'
         });
 
         // Se não usar pacote, definir limites manualmente
