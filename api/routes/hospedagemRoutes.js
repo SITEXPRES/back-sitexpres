@@ -4,7 +4,8 @@ import {
   creat_hospedagem,
   listar_hospedagens,
   suspender_hospedagem,
-  deletar_hospedagem
+  deletar_hospedagem,
+  consult_db
 } from '../controllers/hospedagemController.js';
 import { authMiddleware } from '../middlewares/authMiddleware.js';
 
@@ -17,7 +18,9 @@ router.get("/teste", (req, res) => res.send("rota hospedagem ok"));
 router.post('/creat_hospedage', authMiddleware, creat_hospedagem);
 
 // Listar todas as hospedagens
-router.get('/listar', authMiddleware, listar_hospedagens);
+router.get('/listar', listar_hospedagens);
+
+router.get('/listar_unica', authMiddleware, consult_db);
 
 // Suspender hospedagem
 router.post('/suspender', authMiddleware, suspender_hospedagem);

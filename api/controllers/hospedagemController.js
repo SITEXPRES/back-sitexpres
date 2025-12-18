@@ -2,6 +2,12 @@ import axios from 'axios';
 import crypto from 'crypto';
 import pool from '../config/db.js';
 
+import FormData from 'form-data';
+import Client from 'ftp';
+import fs from 'fs';
+import path from 'path';
+import { deletarSubdominioDirectAdmin } from './integracao_directadmin.js';
+
 // Configurações do DirectAdmin
 const DIRECTADMIN_CONFIG = {
     host: `https://${process.env.host_directadmin || 'srv3br.com.br'}:2222`,
@@ -117,6 +123,7 @@ export const creat_hospedagem = async (req, res) => {
             ip,
             id_projeto,
             id_user
+
         } = req.body;
 
         console.log('📥 Dados recebidos:', { dominio, nome, email });
@@ -168,7 +175,8 @@ export const creat_hospedagem = async (req, res) => {
             domain: dominio,
             package: pacote || 'packagesitexpress',
             ip: '143.208.8.36',
-            notify: 'not'
+            notify: 'no',
+            send_email: 'no'
         });
 
         // Se não usar pacote, definir limites manualmente
@@ -216,6 +224,80 @@ export const creat_hospedagem = async (req, res) => {
             response.status === 200;
 
         if (sucesso) {
+            console.log('✅ Conta criada com sucesso, iniciando upload do site...');
+
+            // Upload do index.html para public_html
+            let uploadStatus = { success: false, message: '' };
+
+
+            //Consultar html no Banco
+            let htmlContent = "";
+
+            const existing = await client.query(
+                `SELECT html_content FROM generated_sites 
+                WHERE id_projeto = $1 
+                ORDER BY created_at DESC LIMIT 1`,
+                [id_projeto]
+            );
+
+            if (existing.rows.length > 0 && existing.rows[0]?.html_content) {
+                htmlContent = existing.rows[0].html_content;
+                console.log('✅ HTML encontrado no banco de dados');
+            }
+
+            if (htmlContent) {
+                try {
+                    uploadStatus = await uploadIndexHtml(username, senha, dominio, htmlContent);
+                    console.log('📤 Status do upload:', uploadStatus);
+
+                    //Removendo Subdominio
+
+                    const dados_site = await client.query(
+                        `SELECT id_projeto, site_url FROM public.sites WHERE id_projeto = $1`,
+                        [id_projeto]
+                    );
+
+                    // Verificar se encontrou o site
+                    if (dados_site.rows.length === 0) {
+                        console.log('⚠️ Site não encontrado para remover subdomínio');
+                    } else {
+                        const siteUrl = dados_site.rows[0].site_url;
+
+                        // Extrair apenas o subdomínio (parte antes do domínio principal)
+                        const urlLimpa = siteUrl
+                            .replace('https://', '')
+                            .replace('http://', '')
+                            .replace(/\/$/, '')
+                            .trim();
+
+                        // Separar subdomínio do domínio principal
+                        // apostasesp.sitexpres.com.br → subdominio: apostasesp, dominio: sitexpres.com.br
+                        const partes = urlLimpa.split('.');
+                        const subdomain = partes[0]; // apostasesp
+                        const dominioPrincipal = partes.slice(1).join('.'); // sitexpres.com.br
+
+                        console.log('🗑️ Removendo subdomínio:', subdomain);
+                        console.log('📌 Domínio principal:', dominioPrincipal);
+
+                        try {
+                            const resultado = await deletarSubdominioDirectAdmin(
+                                subdomain);
+
+                            console.log('✅ Subdomínio removido com sucesso:', resultado);
+                        } catch (error) {
+                            console.error('❌ Erro ao remover subdomínio:', error.message);
+                            // Não quebra o fluxo, apenas loga o erro
+                        }
+                    }
+
+                } catch (uploadError) {
+                    console.error('❌ Erro no upload do arquivo:', uploadError);
+                    uploadStatus = {
+                        success: false,
+                        message: uploadError.message
+                    };
+                }
+            }
 
             // Salvar informações no banco de dados PostgreSQL
             await client.query('BEGIN');
@@ -223,8 +305,8 @@ export const creat_hospedagem = async (req, res) => {
             try {
                 const insertQuery = `
           INSERT INTO hospedagens 
-          (dominio, username, senha, email, nome, pacote, bandwidth, quota, ip, criado_em,id_projeto,id_user)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(),$10,$11)
+          (dominio, username, senha, email, nome, pacote, bandwidth, quota, ip, criado_em, id_projeto, id_user, site_uploaded)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10, $11, $12)
         `;
 
                 await client.query(insertQuery, [
@@ -238,8 +320,8 @@ export const creat_hospedagem = async (req, res) => {
                     quota || 'unlimited',
                     ip || '143.208.8.36',
                     id_projeto,
-                    id_user
-
+                    id_user,
+                    uploadStatus.success
                 ]);
 
                 await client.query('COMMIT');
@@ -254,7 +336,9 @@ export const creat_hospedagem = async (req, res) => {
                         email,
                         nome,
                         painel: `${DIRECTADMIN_CONFIG.host}`,
-                        criado_em: new Date().toISOString()
+                        criado_em: new Date().toISOString(),
+                        site_url: `http://${dominio}`,
+                        upload: uploadStatus
                     }
                 });
 
@@ -273,7 +357,9 @@ export const creat_hospedagem = async (req, res) => {
                         email,
                         nome,
                         painel: `${DIRECTADMIN_CONFIG.host}`,
-                        criado_em: new Date().toISOString()
+                        criado_em: new Date().toISOString(),
+                        site_url: `http://${dominio}`,
+                        upload: uploadStatus
                     }
                 });
             }
@@ -336,6 +422,114 @@ export const creat_hospedagem = async (req, res) => {
     }
 };
 
+// Função para fazer upload do index.html via FTP ou API do DirectAdmin
+async function uploadIndexHtml(username, senha, dominio, htmlContent) {
+    try {
+        // Método 1: Usando a API de File Manager do DirectAdmin
+        const form = new FormData();
+
+        // Criar um buffer com o conteúdo HTML
+        const buffer = Buffer.from(htmlContent, 'utf-8');
+
+        form.append('action', 'upload');
+        form.append('path', '/domains/' + dominio + '/public_html');
+        form.append('file', buffer, {
+            filename: 'index.html',
+            contentType: 'text/html'
+        });
+
+        const uploadResponse = await axios.post(
+            `${DIRECTADMIN_CONFIG.host}/CMD_API_FILE_MANAGER`,
+            form,
+            {
+                auth: {
+                    username: username,
+                    password: senha
+                },
+                headers: {
+                    ...form.getHeaders()
+                },
+                timeout: 30000
+            }
+        );
+
+        console.log('✅ Upload concluído:', uploadResponse.data);
+
+        return {
+            success: true,
+            message: 'Arquivo index.html enviado com sucesso',
+            path: '/public_html/index.html'
+        };
+
+    } catch (error) {
+        console.error('❌ Erro no upload via API:', error.message);
+
+        // Tentar método alternativo via FTP
+        try {
+            return await uploadViaFTP(username, senha, dominio, htmlContent);
+        } catch (ftpError) {
+            throw new Error(`Falha no upload: ${error.message}`);
+        }
+    }
+}
+
+// Método alternativo via FTP
+async function uploadViaFTP(username, senha, dominio, htmlContent) {
+    return new Promise((resolve, reject) => {
+        const ftpClient = new Client();
+
+        ftpClient.on('ready', () => {
+            console.log('🔌 Conectado ao FTP');
+
+            const remotePath = `/domains/${dominio}/public_html/index.html`;
+            const tmpFile = `/tmp/${username}_${Date.now()}_index.html`;
+
+            // Criar arquivo temporário
+            fs.writeFileSync(tmpFile, htmlContent);
+
+            ftpClient.put(tmpFile, remotePath, (err) => {
+                // Remover arquivo temporário
+                try {
+                    fs.unlinkSync(tmpFile);
+                } catch (unlinkErr) {
+                    console.error('Erro ao remover arquivo temporário:', unlinkErr);
+                }
+
+                ftpClient.end();
+
+                if (err) {
+                    console.error('❌ Erro no upload FTP:', err);
+                    reject(new Error(`Erro no FTP: ${err.message}`));
+                } else {
+                    console.log('✅ Upload via FTP concluído');
+                    resolve({
+                        success: true,
+                        message: 'Arquivo enviado via FTP',
+                        path: '/public_html/index.html'
+                    });
+                }
+            });
+        });
+
+        ftpClient.on('error', (err) => {
+            console.error('❌ Erro de conexão FTP:', err);
+            reject(new Error(`Erro de conexão FTP: ${err.message}`));
+        });
+
+        // Conectar ao servidor FTP
+        const ftpHost = DIRECTADMIN_CONFIG.host
+            .replace('http://', '')
+            .replace('https://', '')
+            .split(':')[0];
+
+        ftpClient.connect({
+            host: ftpHost,
+            user: username,
+            password: senha,
+            port: 21
+        });
+    });
+}
 /**
  * Lista todas as contas de hospedagem
  */
@@ -463,5 +657,128 @@ export const deletar_hospedagem = async (req, res) => {
             message: 'Erro ao deletar hospedagem',
             error: error.message
         });
+    }
+};
+
+
+
+export const consult_db = async (req, res) => {
+    const client = await pool.connect();
+
+    try {
+        // Pega os parâmetros de query string (GET), body (POST) ou params (URL path)
+        const id_user = req.query.id_user || req.body.id_user || req.params.id_user;
+        const id_projeto = req.query.id_projeto || req.body.id_projeto || req.params.id_projeto;
+
+        // Validação dos parâmetros
+        if (!id_user || !id_projeto) {
+            return res.status(400).json({
+                qtd: false,
+                erro: 'Parâmetros id_user e id_projeto são obrigatórios'
+            });
+        }
+
+        const result = await client.query(
+            `SELECT * FROM public.hospedagens 
+             WHERE id_user = $1 AND id_projeto = $2 
+             ORDER BY id DESC 
+             LIMIT 1`,
+            [id_user, id_projeto]
+        );
+
+        // Verifica se encontrou resultados antes de acessar
+        if (result.rows.length > 0) {
+            return res.json({
+                url: result.rows[0].dominio,
+                user: result.rows[0].username,
+                pass: result.rows[0].senha,
+                qtd: true
+            });
+        } else {
+            return res.json({
+                url: null,
+                user: null,
+                pass: null,
+                qtd: false
+            });
+        }
+
+    } catch (error) {
+        console.error('Erro ao consultar banco:', error);
+        return res.status(500).json({
+            qtd: false,
+            erro: 'Erro ao consultar banco de dados'
+        });
+    } finally {
+        client.release();
+    }
+};
+
+
+export const removerSubdominio = async (subdominio, username, senha) => {
+    try {
+        console.log('🗑️ Removendo subdomínio:', subdominio);
+
+        // Preparar dados para a API do DirectAdmin
+        const params = new URLSearchParams({
+            action: 'delete',
+            delete: 'yes',
+            contents: "yes",
+            select0: subdominio
+        });
+
+        // Fazer requisição para a API do DirectAdmin
+        const response = await axios.post(
+            `${DIRECTADMIN_CONFIG.host}/CMD_API_SUBDOMAIN`,
+            params.toString(),
+            {
+                auth: {
+                    username: username,
+                    password: senha
+                },
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                timeout: 15000
+            }
+        );
+
+        console.log('📡 Resposta DirectAdmin:', response.data);
+
+        // Verificar se foi removido com sucesso
+        const respostaString = typeof response.data === 'string'
+            ? response.data
+            : JSON.stringify(response.data);
+
+        const sucesso = response.data.error === '0' ||
+            response.data.error === 0 ||
+            respostaString.includes('Subdomain Deleted') ||
+            respostaString.includes('deleted') ||
+            response.status === 200;
+
+        if (sucesso) {
+            console.log('✅ Subdomínio removido com sucesso');
+            return {
+                success: true,
+                message: 'Subdomínio removido com sucesso',
+                subdomain: subdominio
+            };
+        } else {
+            console.error('❌ Erro ao remover subdomínio:', response.data);
+            return {
+                success: false,
+                message: 'Erro ao remover subdomínio',
+                error: response.data
+            };
+        }
+
+    } catch (error) {
+        console.error('❌ Erro ao remover subdomínio:', error.message);
+
+        return {
+            success: false,
+            message: 'Erro ao comunicar com DirectAdmin',
+            error: error.message
+        };
     }
 };

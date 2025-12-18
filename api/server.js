@@ -12,7 +12,8 @@ import notafiscalRoutes from "./routes/notaRoutes.js";
 import transactionsRoutes from "./routes/transactionsRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import hospedagemRoutes from "./routes/hospedagemRoutes.js";
- 
+import emailRoutes from "./routes/emailRoutes.js";
+
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -50,8 +51,9 @@ app.use("/api/notafiscal", notafiscalRoutes);
 app.use("/api/transactions", transactionsRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/hospedagem", hospedagemRoutes);
- 
- 
+app.use("/api/email", emailRoutes);
+
+
 
 
 const __filename = fileURLToPath(import.meta.url);
