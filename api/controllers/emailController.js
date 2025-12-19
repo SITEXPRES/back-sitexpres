@@ -61,9 +61,7 @@ export const createEmail = async (req, res) => {
       domain: domain,
       user: user,
       passwd: password,
-      passwd2: password,
-      quota: quota, // Quota em MB
-      limit: sendLimit // Limite de envios por hora
+      passwd2: password,   
     });
 
     // Fazer requisição ao DirectAdmin usando as credenciais do cliente
