@@ -1,0 +1,468 @@
+import https from 'https';
+import http from 'http';
+import { URL } from 'url';
+
+// Configurações da API ResellerClub
+const RESELLER_CONFIG = {
+    baseURL: process.env.RESELLER_BASE_URL || 'https://test.httpapi.com/api',
+    authUserId: process.env.RESELLER_AUTH_USER_ID,
+    apiKey: process.env.RESELLER_API_KEY
+};
+
+/**
+ * Função auxiliar para fazer requisições HTTP/HTTPS
+ */
+const makeRequest = (url, method = 'GET', postData = null) => {
+    return new Promise((resolve, reject) => {
+        const urlObj = new URL(url);
+        const isHttps = urlObj.protocol === 'https:';
+        const client = isHttps ? https : http;
+
+        const options = {
+            hostname: urlObj.hostname,
+            port: urlObj.port || (isHttps ? 443 : 80),
+            path: urlObj.pathname + urlObj.search,
+            method: method,
+            headers: {
+                'User-Agent': 'ResellerClub-API-Client/1.0',
+                'Accept': 'application/json',
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            timeout: 30000
+        };
+
+        if (postData) {
+            options.headers['Content-Length'] = Buffer.byteLength(postData);
+        }
+
+        const req = client.request(options, (res) => {
+            let data = '';
+
+            res.on('data', (chunk) => {
+                data += chunk;
+            });
+
+            res.on('end', () => {
+                try {
+                    const jsonData = JSON.parse(data);
+                    resolve({ status: res.statusCode, data: jsonData });
+                } catch (e) {
+                    // Se não for JSON, retorna o texto puro
+                    if (data.includes('Cloudflare') || data.includes('blocked')) {
+                        reject(new Error('CLOUDFLARE_BLOCK'));
+                    } else {
+                        resolve({ status: res.statusCode, data: data });
+                    }
+                }
+            });
+        });
+
+        req.on('error', (error) => {
+            reject(error);
+        });
+
+        req.on('timeout', () => {
+            req.destroy();
+            reject(new Error('Request timeout'));
+        });
+
+        if (postData) {
+            req.write(postData);
+        }
+
+        req.end();
+    });
+};
+
+/**
+ * Verifica disponibilidade de domínios
+ */
+export const check_domain_availability = async (req, res) => {
+    try {
+        const { domainNames } = req.body;
+
+        if (!Array.isArray(domainNames) || domainNames.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Lista de domínios é obrigatória'
+            });
+        }
+
+        // pega o primeiro domínio (API não aceita vários completos sem tlds)
+        const domainFull = domainNames[0].toLowerCase().trim();
+
+        // separa nome e tld
+        const parts = domainFull.split('.');
+        const tld = parts.pop();
+        const domainName = parts.join('.');
+
+        const url =
+            `${RESELLER_CONFIG.baseURL}/domains/available.json` +
+            `?auth-userid=${RESELLER_CONFIG.authUserId}` +
+            `&api-key=${RESELLER_CONFIG.apiKey}` +
+            `&domain-name=${encodeURIComponent(domainName)}` +
+            `&tlds=${encodeURIComponent(tld)}`;
+
+        const response = await makeRequest(url);
+
+        return res.status(200).json({
+            success: true,
+            data: response.data
+        });
+
+    } catch (error) {
+        console.error('Erro ao verificar disponibilidade:', error.message);
+
+        if (error.message === 'CLOUDFLARE_BLOCK') {
+            return res.status(403).json({
+                success: false,
+                message: 'Bloqueado pelo Cloudflare. Configure o IP no painel: Settings > API > IP Whitelist',
+                details: 'Adicione o IP do servidor no painel da ResellerClub'
+            });
+        }
+
+        return res.status(500).json({
+            success: false,
+            message: 'Erro ao verificar disponibilidade',
+            error: error.message
+        });
+    }
+};
+
+
+/**
+ * Cria um novo cliente na ResellerClub
+ */
+export const create_customer_reseller = async (req, res) => {
+    try {
+        const {
+            email,
+            password,
+            name,
+            company,
+            addressLine1,
+            city,
+            state,
+            country,
+            zipCode,
+            phoneCountryCode,
+            phone,
+            langPref = 'pt'
+        } = req.body;
+
+        if (!email || !password || !name || !country || !phone) {
+            return res.status(400).json({
+                success: false,
+                message: 'Campos obrigatórios faltando (email, password, name, country, phone)'
+            });
+        }
+
+        const url = `${RESELLER_CONFIG.baseURL}/customers/signup.json?auth-userid=${RESELLER_CONFIG.authUserId}&api-key=${RESELLER_CONFIG.apiKey}&username=${encodeURIComponent(email)}&passwd=${encodeURIComponent(password)}&name=${encodeURIComponent(name)}&company=${encodeURIComponent(company || name)}&address-line-1=${encodeURIComponent(addressLine1 || '')}&city=${encodeURIComponent(city || '')}&state=${encodeURIComponent(state || '')}&country=${country}&zipcode=${encodeURIComponent(zipCode || '')}&phone-cc=${phoneCountryCode || '55'}&phone=${phone}&lang-pref=${langPref}`;
+
+        const response = await makeRequest(url, 'POST');
+
+        return res.status(200).json({
+            success: true,
+            message: 'Cliente criado com sucesso',
+            data: response.data
+        });
+
+    } catch (error) {
+        console.error('Erro ao criar cliente:', error.message);
+
+        if (error.message === 'CLOUDFLARE_BLOCK') {
+            return res.status(403).json({
+                success: false,
+                message: 'Bloqueado pelo Cloudflare. Configure o IP no painel da ResellerClub'
+            });
+        }
+
+        return res.status(500).json({
+            success: false,
+            message: 'Erro ao criar cliente',
+            error: error.message
+        });
+    }
+};
+
+
+export const get_default_contact = async (customerId) => {
+    // Busca os contatos do tipo 'Contact' vinculados a esse cliente
+    const url = `${RESELLER_CONFIG.baseURL}/contacts/search.json?auth-userid=${RESELLER_CONFIG.authUserId}&api-key=${RESELLER_CONFIG.apiKey}&customer-id=${customerId}&type=Contact`;
+
+    const response = await makeRequest(url, 'GET');
+
+    // A ResellerClub retorna um objeto onde o campo 'result' contém a lista
+    if (response.data && response.data.result && response.data.result.length > 0) {
+        // Retorna o entity.entityid do primeiro contato encontrado
+        return response.data.result[0]['entity.entityid'];
+    }
+    return null;
+};
+/**
+ * Registra/cria um novo domínio
+ */
+
+export const create_domain_reseller = async (req, res) => {
+    try {
+        const {
+            domainName,
+            years = 1,
+            customerId,
+            nameServers,
+            invoiceOption = 'NoInvoice',
+            protectPrivacy = false
+        } = req.body;
+
+        if (!domainName || !customerId) {
+            return res.status(400).json({ success: false, message: 'domainName e customerId são obrigatórios' });
+        }
+
+        // --- BUSCA OU CRIAÇÃO DO CONTACT ID ---
+        // Mudamos para 'let' para permitir a reatribuição
+        let contactId = await get_default_contact(customerId);
+
+        if (!contactId) {
+            console.log("Contato não encontrado. Tentando criar...");
+            const contactResponse = await create_contact_reseller(customerId, req.body);
+            
+            // A ResellerClub costuma retornar o ID diretamente ou em um campo numérico
+            // Se o retorno for um objeto, pegamos o ID. Se for o ID direto, usamos ele.
+            contactId = contactResponse.entityid || contactResponse;
+            
+            // Verificação extra se a criação falhou
+            if (!contactId || contactResponse.status === 'ERROR') {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'Falha ao criar contato obrigatório', 
+                    details: contactResponse 
+                });
+            }
+        }
+        // ---------------------------------------
+
+        const nsList = (nameServers && nameServers.length > 0)
+            ? nameServers
+            : ['dns1.registrar-servers.com', 'dns2.registrar-servers.com'];
+
+        let url = `${RESELLER_CONFIG.baseURL}/domains/register.json?auth-userid=${RESELLER_CONFIG.authUserId}&api-key=${RESELLER_CONFIG.apiKey}&domain-name=${encodeURIComponent(domainName)}&years=${years}&customer-id=${customerId}&reg-contact-id=${contactId}&admin-contact-id=${contactId}&tech-contact-id=${contactId}&billing-contact-id=${contactId}&invoice-option=${invoiceOption}&protect-privacy=${protectPrivacy}`;
+
+        nsList.forEach((ns) => {
+            url += `&ns=${encodeURIComponent(ns)}`;
+        });
+
+        const response = await makeRequest(url, 'POST');
+
+        // Validação de erro da API
+        if (response.data && (response.data.status === 'ERROR' || response.data.status === 'error')) {
+            return res.status(400).json({
+                success: false,
+                message: 'Erro na API do Revendedor: ' + (response.data.message || 'Erro desconhecido'),
+                details: response.data
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: 'Domínio registrado com sucesso',
+            data: response.data
+        });
+
+    } catch (error) {
+        console.error('Erro fatal no registro:', error);
+        return res.status(500).json({ success: false, message: 'Erro interno ao registrar domínio', error: error.message });
+    }
+};
+
+
+
+
+export const create_contact_reseller_controller = async (req, res) => {
+    const { customerId } = req.body;
+    const result = await create_contact_reseller(customerId, req.body);
+    return res.json(result);
+};
+
+
+
+/**
+ * Cria um novo contato
+ */
+export const create_contact_reseller = async (customerId, userData) => {
+    // A ResellerClub exige esses campos para o contato
+    const {
+        name,
+        company,
+        email,
+        addressLine1,
+        city,
+        state,
+        country,
+        zipCode,
+        phoneCountryCode,
+        phone
+    } = userData;
+
+    const url = `${RESELLER_CONFIG.baseURL}/contacts/add.json?` +
+        `auth-userid=${RESELLER_CONFIG.authUserId}` +
+        `&api-key=${RESELLER_CONFIG.apiKey}` +
+        `&customer-id=${customerId}` +
+        `&name=${encodeURIComponent(name)}` +
+        `&company=${encodeURIComponent(company || name)}` +
+        `&email=${encodeURIComponent(email)}` +
+        `&address-line-1=${encodeURIComponent(addressLine1)}` +
+        `&city=${encodeURIComponent(city)}` +
+        `&state=${encodeURIComponent(state || 'NA')}` + // Alguns países exigem, outros não
+        `&country=${country}` +
+        `&zipcode=${encodeURIComponent(zipCode)}` +
+        `&phone-cc=${phoneCountryCode || '55'}` +
+        `&phone=${phone}` +
+        `&type=Contact`; // Tipo padrão para domínios genéricos (.com, .net)
+
+    const response = await makeRequest(url, 'POST');
+
+    // Retorna o ID do novo contato criado
+    return response.data;
+};
+
+/**
+ * Obtém detalhes de um domínio
+ */
+export const get_domain_details = async (req, res) => {
+    try {
+        const { domainName } = req.params;
+
+        if (!domainName) {
+            return res.status(400).json({
+                success: false,
+                message: 'Nome do domínio é obrigatório'
+            });
+        }
+
+        const url = `${RESELLER_CONFIG.baseURL}/domains/details.json?auth-userid=${RESELLER_CONFIG.authUserId}&api-key=${RESELLER_CONFIG.apiKey}&domain-name=${encodeURIComponent(domainName)}&options=All`;
+
+        const response = await makeRequest(url);
+
+        return res.status(200).json({
+            success: true,
+            data: response.data
+        });
+
+    } catch (error) {
+        console.error('Erro ao obter detalhes:', error.message);
+
+        if (error.message === 'CLOUDFLARE_BLOCK') {
+            return res.status(403).json({
+                success: false,
+                message: 'Bloqueado pelo Cloudflare. Configure o IP no painel da ResellerClub'
+            });
+        }
+
+        return res.status(500).json({
+            success: false,
+            message: 'Erro ao obter detalhes do domínio',
+            error: error.message
+        });
+    }
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+/**
+ * Renova um domínio
+ */
+export const renew_domain_reseller = async (req, res) => {
+    try {
+        const { domainName, years = 1, invoiceOption = 'NoInvoice' } = req.body;
+
+        if (!domainName) {
+            return res.status(400).json({
+                success: false,
+                message: 'Nome do domínio é obrigatório'
+            });
+        }
+
+        const expDate = Math.floor(Date.now() / 1000);
+        const url = `${RESELLER_CONFIG.baseURL}/domains/renew.json?auth-userid=${RESELLER_CONFIG.authUserId}&api-key=${RESELLER_CONFIG.apiKey}&order-id=${encodeURIComponent(domainName)}&years=${years}&exp-date=${expDate}&invoice-option=${invoiceOption}`;
+
+        const response = await makeRequest(url, 'POST');
+
+        return res.status(200).json({
+            success: true,
+            message: 'Domínio renovado com sucesso',
+            data: response.data
+        });
+
+    } catch (error) {
+        console.error('Erro ao renovar domínio:', error.message);
+
+        if (error.message === 'CLOUDFLARE_BLOCK') {
+            return res.status(403).json({
+                success: false,
+                message: 'Bloqueado pelo Cloudflare'
+            });
+        }
+
+        return res.status(500).json({
+            success: false,
+            message: 'Erro ao renovar domínio',
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Modifica nameservers de um domínio
+ */
+export const modify_nameservers = async (req, res) => {
+    try {
+        const { domainName, nameServers } = req.body;
+
+        if (!domainName || !nameServers || nameServers.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'domainName e nameServers são obrigatórios'
+            });
+        }
+
+        let url = `${RESELLER_CONFIG.baseURL}/domains/modify-ns.json?auth-userid=${RESELLER_CONFIG.authUserId}&api-key=${RESELLER_CONFIG.apiKey}&order-id=${encodeURIComponent(domainName)}`;
+
+        nameServers.forEach((ns, index) => {
+            url += `&ns${index + 1}=${encodeURIComponent(ns)}`;
+        });
+
+        const response = await makeRequest(url, 'POST');
+
+        return res.status(200).json({
+            success: true,
+            message: 'Nameservers modificados com sucesso',
+            data: response.data
+        });
+
+    } catch (error) {
+        console.error('Erro ao modificar nameservers:', error.message);
+
+        if (error.message === 'CLOUDFLARE_BLOCK') {
+            return res.status(403).json({
+                success: false,
+                message: 'Bloqueado pelo Cloudflare'
+            });
+        }
+
+        return res.status(500).json({
+            success: false,
+            message: 'Erro ao modificar nameservers',
+            error: error.message
+        });
+    }
+};

@@ -13,6 +13,7 @@ import transactionsRoutes from "./routes/transactionsRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import hospedagemRoutes from "./routes/hospedagemRoutes.js";
 import emailRoutes from "./routes/emailRoutes.js";
+import ressellerRoutes from "./routes/ressellerRoutes.js";
 
 import path from "path";
 import { fileURLToPath } from "url";
@@ -52,6 +53,7 @@ app.use("/api/transactions", transactionsRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/hospedagem", hospedagemRoutes);
 app.use("/api/email", emailRoutes);
+app.use("/api/resseller", ressellerRoutes);
 
 
 
