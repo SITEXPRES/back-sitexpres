@@ -820,5 +820,243 @@ const criarTransacao = async ({
     }
 };
 
+const criarOrdemDominio = async ({
+    txid,
+    valor,
+    user_id,
+    reseller_customer_id,
+    domain_name,
+    domain_extension,
+    full_domain,
+    // Dados do cliente
+    customer_name,
+    customer_email,
+    customer_phone,
+    customer_company,
+    customer_address,
+    customer_city,
+    customer_state,
+    customer_country,
+    customer_zipcode,
+    status
+}) => {
+    try {
+        const result = await pool.query(
+            `
+            INSERT INTO public.domain_orders (
+                user_id,
+                reseller_customer_id,
+                domain_name,
+                domain_extension,
+                full_domain,
+                domain_price,
+                customer_name,
+                customer_email,
+                customer_phone,
+                customer_company,
+                customer_address,
+                customer_city,
+                customer_state,
+                customer_country,
+                customer_zipcode,
+                status,
+                payment_method,
+                payment_id
+            ) VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 
+                $11, $12, $13, $14, $15, $16, $17, $18
+            )
+            RETURNING *
+            `,
+            [
+                user_id,                // $1
+                reseller_customer_id,   // $2
+                domain_name,            // $3
+                domain_extension,       // $4
+                full_domain,            // $5
+                valor,                  // $6 (domain_price)
+                customer_name,          // $7
+                customer_email,         // $8
+                customer_phone,         // $9
+                customer_company,       // $10
+                customer_address,       // $11
+                customer_city,          // $12
+                customer_state,         // $13
+                customer_country,       // $14
+                customer_zipcode,       // $15
+                status,                 // $16
+                'PIX',                  // $17 (payment_method)
+                txid                    // $18 (payment_id)
+            ]
+        );
+
+        return result.rows[0];
+
+    } catch (err) {
+        console.error("Erro ao criar ordem de domínio:", err);
+        throw err;
+    }
+};
+
+
+/* -----------------------------------------
+     CONTROLLER — Pagamento para Reseller
+--------------------------------------------*/
+export const pagamentoDominio = async (req, res) => {
+    const {
+        // Dados do usuário
+        user_id,
+        reseller_customer_id,
+        
+        // Dados do domínio
+        domain_name,
+        domain_extension,
+        full_domain,
+        domain_price,
+        
+        // Dados do cliente
+        customer_name,
+        customer_email,
+        customer_phone,
+        customer_company,
+        customer_address,
+        customer_city,
+        customer_state,
+        customer_country,
+        customer_zipcode,
+        customer_cpf
+    } = req.body;
+
+    // Validação básica
+    if (!full_domain || !domain_price || !customer_name || !customer_cpf) {
+        return res.status(400).json({ 
+            erro: "Dados obrigatórios não informados" 
+        });
+    }
+
+    const valor = domain_price;
+
+    // Gerar TXID: "DOMINIO" (7) + Timestamp (13) + Random (8) = 28 chars
+    const txid = "DOMINIO" + Date.now() + Math.random().toString(36).substring(2, 10);
+
+    const payload = {
+        calendario: {
+            expiracao: 3600 // 1 hora
+        },
+        devedor: {
+            nome: customer_name,
+            cpf: customer_cpf.replace(/\D/g, '') // Remove formatação
+        },
+        valor: {
+            original: valor
+        },
+        chave: process.env.INTER_CHAVE_PIX,
+        solicitacaoPagador: `Registro de domínio: ${full_domain}`
+    };
+
+    const dataString = JSON.stringify(payload);
+
+    try {
+        const tokenObj = await gerarToken();
+        const accessToken = tokenObj.access_token;
+
+        // Salvar ordem no banco de dados
+        const ordem = await criarOrdemDominio({
+            txid,
+            valor,
+            user_id: user_id || null,
+            reseller_customer_id,
+            domain_name,
+            domain_extension,
+            full_domain,
+            customer_name,
+            customer_email,
+            customer_phone,
+            customer_company,
+            customer_address,
+            customer_city,
+            customer_state,
+            customer_country: customer_country || 'BR',
+            customer_zipcode,
+            status: "pending"
+        });
+
+        console.log("Ordem de domínio salva:", ordem);
+
+        const options = {
+            hostname: "cdpj.partners.bancointer.com.br",
+            port: 443,
+            path: `/pix/v2/cob/${txid}`,
+            method: "PUT",
+            cert: cert,
+            key: key,
+            headers: {
+                "Authorization": `Bearer ${accessToken}`,
+                "Content-Type": "application/json",
+                "Content-Length": Buffer.byteLength(dataString),
+                "x-conta-corrente": process.env.INTER_CONTA
+            }
+        };
+
+        const request = https.request(options, (response) => {
+            let data = "";
+
+            response.on("data", (chunk) => {
+                data += chunk;
+            });
+
+            response.on("end", async () => {
+                if (response.statusCode >= 200 && response.statusCode < 300) {
+                    const pixResponse = JSON.parse(data);
+                    
+                    // Atualizar ordem com dados do PIX (opcional)
+                    // await atualizarOrdemPix(ordem.id, pixResponse);
+
+                    return res.json({
+                        sucesso: true,
+                        txid,
+                        order_id: ordem.id,
+                        full_domain: full_domain,
+                        valor: valor,
+                        pix: pixResponse
+                    });
+                } else {
+                    // Atualizar status da ordem para 'failed'
+                    await pool.query(
+                        `UPDATE domain_orders SET status = 'failed' WHERE id = $1`,
+                        [ordem.id]
+                    );
+
+                    return res.status(400).json({
+                        erro: "Erro ao criar cobrança PIX",
+                        status: response.statusCode,
+                        detalhes: data
+                    });
+                }
+            });
+        });
+
+        request.on("error", async (e) => {
+            console.error("Erro PIX:", e);
+            
+            // Atualizar status da ordem para 'failed'
+            await pool.query(
+                `UPDATE domain_orders SET status = 'failed' WHERE id = $1`,
+                [ordem.id]
+            );
+
+            res.status(500).json({ erro: e.message });
+        });
+
+        request.write(dataString);
+        request.end();
+
+    } catch (err) {
+        console.error("Erro no pagamento de domínio:", err);
+        res.status(500).json({ erro: "Erro interno ao processar pagamento" });
+    }
+};
+
+
 
 

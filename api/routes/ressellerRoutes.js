@@ -6,7 +6,8 @@ import {
   get_domain_details,
   renew_domain_reseller,
   modify_nameservers,
-  create_contact_reseller_controller
+  create_contact_reseller_controller,
+  listar_extensao
 } from "../controllers/resellerController.js";
 
 const router = express.Router();
@@ -36,5 +37,7 @@ router.put('/domains/nameservers',  modify_nameservers);
 router.post('/customers/register',  create_customer_reseller);
 
 router.post('/create-contact', create_contact_reseller_controller);
+
+router.get('/listar_extensao', listar_extensao);
 
 export default router;

@@ -8,7 +8,8 @@ import {
     ReceberRetorno,
     cadastrarWebhookInter,
     listarWebhookInter,
-    consultarPix
+    consultarPix,
+    pagamentoDominio
 } from '../controllers/InterControllers.js';
 
 const router = express.Router();
@@ -18,6 +19,8 @@ router.get("/teste", (req, res) => res.send("rota ok"));
 router.post('/pagamento/criar', criarCobranca);
 
 router.post("/pagamento/unico", criarCobrancaUnica);
+
+router.post("/pagamento/dominio", pagamentoDominio);
 
 router.get("/pagamento/tokenAvuso", criarTokenAvuso);
 
