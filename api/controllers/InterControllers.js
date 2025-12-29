@@ -828,7 +828,6 @@ const criarOrdemDominio = async ({
     domain_name,
     domain_extension,
     full_domain,
-    // Dados do cliente
     customer_name,
     customer_email,
     customer_phone,
@@ -838,9 +837,18 @@ const criarOrdemDominio = async ({
     customer_state,
     customer_country,
     customer_zipcode,
-    status
+    status,
+    id_projeto
 }) => {
     try {
+        const userId = user_id ?? null;
+        const resellerId = reseller_customer_id ?? null;
+
+        const valorFinal = Number(valor);
+        if (isNaN(valorFinal)) {
+            throw new Error("Valor inválido para domain_price");
+        }
+
         const result = await pool.query(
             `
             INSERT INTO public.domain_orders (
@@ -861,42 +869,46 @@ const criarOrdemDominio = async ({
                 customer_zipcode,
                 status,
                 payment_method,
-                payment_id
+                payment_reference,
+                id_projeto
             ) VALUES (
-                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 
-                $11, $12, $13, $14, $15, $16, $17, $18
+                $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
+                $11,$12,$13,$14,$15,$16,$17,$18,$19
             )
             RETURNING *
             `,
             [
-                user_id,                // $1
-                reseller_customer_id,   // $2
-                domain_name,            // $3
-                domain_extension,       // $4
-                full_domain,            // $5
-                valor,                  // $6 (domain_price)
-                customer_name,          // $7
-                customer_email,         // $8
-                customer_phone,         // $9
-                customer_company,       // $10
-                customer_address,       // $11
-                customer_city,          // $12
-                customer_state,         // $13
-                customer_country,       // $14
-                customer_zipcode,       // $15
-                status,                 // $16
-                'PIX',                  // $17 (payment_method)
-                txid                    // $18 (payment_id)
+                userId,            // $1
+                resellerId,        // $2
+                domain_name,       // $3
+                domain_extension,  // $4
+                full_domain,       // $5
+                valorFinal,        // $6
+                customer_name,     // $7
+                customer_email,    // $8
+                customer_phone,    // $9
+                customer_company,  // $10
+                customer_address,  // $11
+                customer_city,     // $12
+                customer_state,    // $13
+                customer_country,  // $14
+                customer_zipcode,  // $15
+                status,            // $16
+                'PIX',             // $17
+                txid,              // $18
+                id_projeto         // $19
             ]
         );
 
         return result.rows[0];
 
     } catch (err) {
-        console.error("Erro ao criar ordem de domínio:", err);
+        console.error("Erro ao criar ordem de domínio:", err.message);
         throw err;
     }
 };
+
+
 
 
 /* -----------------------------------------
@@ -907,13 +919,14 @@ export const pagamentoDominio = async (req, res) => {
         // Dados do usuário
         user_id,
         reseller_customer_id,
-        
+        id_projeto,
+
         // Dados do domínio
         domain_name,
         domain_extension,
         full_domain,
         domain_price,
-        
+
         // Dados do cliente
         customer_name,
         customer_email,
@@ -929,8 +942,8 @@ export const pagamentoDominio = async (req, res) => {
 
     // Validação básica
     if (!full_domain || !domain_price || !customer_name || !customer_cpf) {
-        return res.status(400).json({ 
-            erro: "Dados obrigatórios não informados" 
+        return res.status(400).json({
+            erro: "Dados obrigatórios não informados"
         });
     }
 
@@ -960,12 +973,17 @@ export const pagamentoDominio = async (req, res) => {
         const tokenObj = await gerarToken();
         const accessToken = tokenObj.access_token;
 
+        const resellerId =
+            reseller_customer_id && !isNaN(reseller_customer_id)
+                ? Number(reseller_customer_id)
+                : null;
+
         // Salvar ordem no banco de dados
         const ordem = await criarOrdemDominio({
             txid,
-            valor,
+            valor: valor, // ✅ nome correto
             user_id: user_id || null,
-            reseller_customer_id,
+            reseller_customer_id: resellerId,
             domain_name,
             domain_extension,
             full_domain,
@@ -978,7 +996,9 @@ export const pagamentoDominio = async (req, res) => {
             customer_state,
             customer_country: customer_country || 'BR',
             customer_zipcode,
-            status: "pending"
+            status: "pending",
+            payment_method: "pix",
+            id_projeto
         });
 
         console.log("Ordem de domínio salva:", ordem);
@@ -1008,7 +1028,7 @@ export const pagamentoDominio = async (req, res) => {
             response.on("end", async () => {
                 if (response.statusCode >= 200 && response.statusCode < 300) {
                     const pixResponse = JSON.parse(data);
-                    
+
                     // Atualizar ordem com dados do PIX (opcional)
                     // await atualizarOrdemPix(ordem.id, pixResponse);
 
@@ -1038,7 +1058,7 @@ export const pagamentoDominio = async (req, res) => {
 
         request.on("error", async (e) => {
             console.error("Erro PIX:", e);
-            
+
             // Atualizar status da ordem para 'failed'
             await pool.query(
                 `UPDATE domain_orders SET status = 'failed' WHERE id = $1`,
@@ -1052,11 +1072,195 @@ export const pagamentoDominio = async (req, res) => {
         request.end();
 
     } catch (err) {
-        console.error("Erro no pagamento de domínio:", err);
-        res.status(500).json({ erro: "Erro interno ao processar pagamento" });
+        console.error("Erro no pagamento de domínio:");
+        console.error(err.message);
+        console.error(err.stack);
+
+        res.status(500).json({
+            erro: "Erro interno ao processar pagamento",
+            message: err.message
+        });
     }
+
 };
 
 
 
+export const consultarPix_dominio = async (req, res) => {
+    try {
+        var { txid } = req.body;
+        console.log("==> Consultando cobrança PIX...", txid);
+
+        if (!txid) {
+            return res.status(400).json({ error: "TXID é obrigatório para consultar a cobrança." });
+        }
+
+        // 1. Gera token com escopo necessário
+        const tokenData = await gerarToken();
+        const token = tokenData.access_token;
+
+        if (!token) {
+            return res.status(500).json({ error: "Token não gerado ao consultar PIX." });
+        }
+
+        // 2. Consulta no Banco Inter
+        const options = {
+            hostname: "cdpj.partners.bancointer.com.br",
+            port: 443,
+            path: `/pix/v2/cob/${encodeURIComponent(txid)}`,
+            method: "GET",
+            cert,
+            key,
+            headers: {
+                "Authorization": `Bearer ${token}`,
+                "Content-Type": "application/json",
+                "x-conta-corrente": CONTA_CORRENTE
+            }
+        };
+
+        const respostaInter = await new Promise((resolve, reject) => {
+            const req = https.request(options, (res) => {
+                let data = "";
+                res.on("data", chunk => data += chunk);
+                res.on("end", () => {
+                    if (res.statusCode === 404) {
+                        resolve({ status: "NAO_ENCONTRADA" });
+                        return;
+                    }
+                    if (res.statusCode >= 400) {
+                        reject(new Error(`Erro HTTP ${res.statusCode}`));
+                        return;
+                    }
+                    try {
+                        resolve(JSON.parse(data));
+                    } catch (e) {
+                        resolve({ status: "ERRO_PARSE" });
+                    }
+                });
+            });
+            req.on("error", reject);
+            req.end();
+        });
+
+        // 3. Se NÃO estiver CONCLUIDA → só retorna o status (não faz nada no banco)
+        if (respostaInter.status !== "CONCLUIDA") {
+            console.log(`Pix ${txid} ainda não pago. Status: ${respostaInter.status || 'não encontrado'}`);
+            return res.json({
+                pago: false,
+                status: respostaInter.status || 'não encontrado',
+                mensagem: "Aguardando pagamento..."
+            });
+        }
+
+
+        // 4. AQUI O PAGAMENTO ESTÁ CONCLUÍDO NO INTER!
+        console.log(`PAGAMENTO CONFIRMADO no Inter! Valor: ${respostaInter.valor?.original}`);
+
+        // 5. Busca a transação no seu banco
+        const result = await pool.query(
+            `SELECT * FROM public.domain_orders WHERE payment_reference = $1`,
+            [txid]
+        );
+
+        if (result.rows.length === 0) {
+            console.error("Transação não encontrada no banco com txid:", txid);
+            return res.json({
+                pago: true,
+                status: "CONCLUIDA",
+                erro: "Transação não encontrada no sistema"
+            });
+        }
+
+        const transacao = result.rows[0];
+
+        // 6. Se já estiver completed → evita duplicar
+        if (transacao.status === 'completed') {
+            console.log(`Pagamento ${txid} já foi processado antes.`);
+            return res.json({
+                pago: true,
+                status: "CONCLUIDA",
+                jaProcessado: true,
+                mensagem: "Pagamento já creditado!",
+                redirect: `https://sitexpres.com.br/sucesso?order=${txid}`
+            });
+        }
+
+        // 7. Se ainda estiver pending → PROCESSA!
+        if (transacao.status === 'pending') {
+            console.log("Pagamento processado com sucesso!");
+
+            // Adiciona créditos
+            await pool.query(
+                `UPDATE public.domain_orders SET status = 'completed' WHERE id = $1`,
+                [transacao.id]
+            );
+
+
+            //Consultar dados do usuário para nota fiscal
+            const result_user = await pool.query(
+                `SELECT * FROM public.users WHERE id = $1`,
+                [transacao.user_id]
+            );
+
+            // ENVIA NOTA FISCAL
+            var notaFiscal = await gerandonotafiscal({
+                valor_servico: transacao.domain_price,
+                cnpj_cpf: result_user.rows[0].cnpj_cpf,
+                razao_social: result_user.rows[0].razao_social || result_user.rows[0].name,
+                endereco: result_user.rows[0].endereco,
+                bairro: result_user.rows[0].bairro,
+                cod_municipio: result_user.rows[0].cod_municipio,
+                uf: result_user.rows[0].uf,
+                cep: result_user.rows[0].cep,
+                telefone: result_user.rows[0].telefone,
+                email: result_user.rows[0].email
+            });
+
+            console.log("Retorno NF:", notaFiscal);
+
+            // Converte o JSON da resposta
+            const responseNF = JSON.parse(notaFiscal.resposta_nf);
+
+            // Separa somente o link
+            const linkNF = responseNF.message?.split("||")[1] || null;
+
+            console.log("Link da Nota Fiscal:", linkNF);
+
+            // Salva o link no banco
+            await pool.query(
+                `UPDATE public.domain_orders SET link_nota = $1 WHERE id = $2`,
+                [linkNF, transacao.id]
+            );
+
+
+            console.log("Criando Hospedagem");
+
+
+
+            return res.json({
+                pago: true,
+                status: "CONCLUIDA",
+                mensagem: "Pagamento processado com sucesso!",
+                domain: transacao.full_domain,
+                RetornoNotaFiscal: notaFiscal
+
+            });
+        }
+
+        // Caso raro (ex: cancelled)
+        /*  return res.json({
+             pago: true,
+             status: "CONCLUIDA",
+             mensagem: `Transação com status ${transacao.status} (não processada)`
+         }); */
+    } catch (error) {
+        console.error("Erro ao consultar PIX:", error);
+        return res.status(500).json({
+            pago: false,
+            status: "ERRO",
+            mensagem: "Erro interno ao consultar PIX",
+            erro: error.message
+        });
+    }
+};
 

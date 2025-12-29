@@ -125,6 +125,208 @@ export async function createOrder(req, res) {
   }
 }
 
+const criarOrdemDominio = async ({
+  txid,
+  valor,
+  user_id,
+  reseller_customer_id,
+  domain_name,
+  domain_extension,
+  full_domain,
+  customer_name,
+  customer_email,
+  customer_phone,
+  customer_company,
+  customer_address,
+  customer_city,
+  customer_state,
+  customer_country,
+  customer_zipcode,
+  status,
+  id_projeto
+}) => {
+  try {
+    const userId = user_id ?? null;
+    const resellerId = reseller_customer_id ?? null;
+
+    const valorFinal = Number(valor);
+    if (isNaN(valorFinal)) {
+      throw new Error("Valor inválido para domain_price");
+    }
+
+    const result = await pool.query(
+      `
+            INSERT INTO public.domain_orders (
+                user_id,
+                reseller_customer_id,
+                domain_name,
+                domain_extension,
+                full_domain,
+                domain_price,
+                customer_name,
+                customer_email,
+                customer_phone,
+                customer_company,
+                customer_address,
+                customer_city,
+                customer_state,
+                customer_country,
+                customer_zipcode,
+                status,
+                payment_method,
+                payment_reference,
+                id_projeto
+            ) VALUES (
+                $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
+                $11,$12,$13,$14,$15,$16,$17,$18,$19
+            )
+            RETURNING *
+            `,
+      [
+        userId,            // $1
+        resellerId,        // $2
+        domain_name,       // $3
+        domain_extension,  // $4
+        full_domain,       // $5
+        valorFinal,        // $6
+        customer_name,     // $7
+        customer_email,    // $8
+        customer_phone,    // $9
+        customer_company,  // $10
+        customer_address,  // $11
+        customer_city,     // $12
+        customer_state,    // $13
+        customer_country,  // $14
+        customer_zipcode,  // $15
+        status,            // $16
+        'PAYPAL',          // $17
+        txid,              // $18
+        id_projeto         // $19
+      ]
+    );
+
+    return result.rows[0];
+
+  } catch (err) {
+    console.error("Erro ao criar ordem de domínio:", err.message);
+    throw err;
+  }
+};
+
+export async function createOrder_dominio(req, res) {
+  const {
+    // Dados do usuário
+    user_id,
+    reseller_customer_id,
+    id_projeto,
+
+    // Dados do domínio
+    domain_name,
+    domain_extension,
+    full_domain,
+    domain_price,
+
+    // Dados do cliente
+    customer_name,
+    customer_email,
+    customer_phone,
+    customer_company,
+    customer_address,
+    customer_city,
+    customer_state,
+    customer_country,
+    customer_zipcode,
+    customer_cpf
+  } = req.body;
+
+  // Validação básica
+  if (!full_domain || !domain_price || !customer_name || !customer_email) {
+    return res.status(400).json({
+      erro: "Dados obrigatórios não informados"
+    });
+  }
+
+  try {
+    const request = new checkoutNodeJssdk.orders.OrdersCreateRequest();
+    request.prefer("return=representation");
+
+    request.requestBody({
+      intent: "CAPTURE",
+      purchase_units: [
+        {
+          amount: {
+            currency_code: "BRL",
+            value: domain_price.toString()
+          },
+          description: `Registro de domínio: ${full_domain}`
+        }
+      ],
+      application_context: {
+        brand_name: "sitexpres.com.br",
+        landing_page: "BILLING",
+        shipping_preference: "NO_SHIPPING",
+        user_action: "PAY_NOW",
+        return_url: "https://back.sitexpres.com.br/api/paypal/dominio/sucesso",
+        cancel_url: "https://back.sitexpres.com.br/api/paypal/dominio/cancelado"
+      }
+    });
+
+    const response = await client.execute(request);
+
+    const payment_id = response.result.id;
+    const approve_url = response.result.links.find(l => l.rel === "approve")?.href || '';
+
+    const resellerId =
+      reseller_customer_id && !isNaN(reseller_customer_id)
+        ? Number(reseller_customer_id)
+        : null;
+
+    // Salvar ordem no banco de dados
+    const ordem = await criarOrdemDominio({
+      txid: payment_id, // Usando o PayPal Order ID como txid
+      valor: domain_price,
+      user_id: user_id || null,
+      reseller_customer_id: resellerId,
+      domain_name,
+      domain_extension,
+      full_domain,
+      customer_name,
+      customer_email,
+      customer_phone,
+      customer_company,
+      customer_address,
+      customer_city,
+      customer_state,
+      customer_country: customer_country || 'BR',
+      customer_zipcode,
+      status: "pending",
+      payment_method: "paypal",
+      id_projeto
+    });
+
+    console.log("Ordem de domínio PayPal salva:", ordem);
+
+    return res.json({
+      sucesso: true,
+      order_id: ordem.id,
+      payment_id: payment_id,
+      full_domain: full_domain,
+      valor: domain_price,
+      approve_url: approve_url
+    });
+
+  } catch (err) {
+    console.error("ERRO PAYPAL ORDER DOMÍNIO:", err.response?.result || err);
+    console.error(err.stack);
+
+    return res.status(500).json({
+      erro: "Erro ao criar pedido PayPal",
+      message: err.message,
+      details: err.response?.result || err.message
+    });
+  }
+}
+
 export async function captureOrder(req, res) {
   try {
     const { token } = req.query;

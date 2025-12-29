@@ -131,6 +131,23 @@ export const check_domain_availability = async (req, res) => {
 };
 
 
+//Função para criar Customer e depois registrar o domínio.
+export const function_master_creat = async (req, res) => {
+
+    var data_customer = await create_customer_reseller(req, res);
+    var data_domain = await create_domain_reseller(req, res);
+
+    return res.status(200).json({
+        success: true,
+        message: 'Cliente e domínio criados com sucesso',
+        data: {
+            customer: data_customer,
+            domain: data_domain
+        }
+    });
+};
+
+
 /**
  * Cria um novo cliente na ResellerClub
  */
@@ -205,124 +222,124 @@ export const get_default_contact = async (customerId) => {
  */
 
 export const create_domain_reseller = async (req, res) => {
-  try {
-    /* ===============================
-       1️⃣ NORMALIZAÇÃO DO BODY
-    =============================== */
-    const body = req.body || {};
+    try {
+        /* ===============================
+           1️⃣ NORMALIZAÇÃO DO BODY
+        =============================== */
+        const body = req.body || {};
 
-    const domainName = body.domainName;
-    const years = body.years || 1;
+        const domainName = body.domainName;
+        const years = body.years || 1;
 
-    // Aceita customerId OU customer-id
-    const customerId = body.customerId || body['customer-id'];
+        // Aceita customerId OU customer-id
+        const customerId = body.customerId || body['customer-id'];
 
-    const nameServers = body.nameServers;
-    const invoiceOption = body.invoiceOption || 'NoInvoice';
-    const protectPrivacy = body.protectPrivacy || false;
+        const nameServers = body.nameServers;
+        const invoiceOption = body.invoiceOption || 'NoInvoice';
+        const protectPrivacy = body.protectPrivacy || false;
 
-    if (!domainName || !customerId) {
-      return res.status(400).json({
-        success: false,
-        message: 'domainName e customerId são obrigatórios',
-        recebido: body
-      });
-    }
+        if (!domainName || !customerId) {
+            return res.status(400).json({
+                success: false,
+                message: 'domainName e customerId são obrigatórios',
+                recebido: body
+            });
+        }
 
-    /* ===============================
-       2️⃣ BUSCA OU CRIAÇÃO DO CONTATO
-    =============================== */
-    let contactId = await get_default_contact(customerId);
+        /* ===============================
+           2️⃣ BUSCA OU CRIAÇÃO DO CONTATO
+        =============================== */
+        let contactId = await get_default_contact(customerId);
 
-    if (!contactId) {
-      console.log('Contato não encontrado. Criando novo contato...');
+        if (!contactId) {
+            console.log('Contato não encontrado. Criando novo contato...');
 
-      const contactResponse = await create_contact_reseller(customerId, body);
+            const contactResponse = await create_contact_reseller(customerId, body);
 
-      console.log('Contato criado:', contactResponse);
+            console.log('Contato criado:', contactResponse);
 
-      if (!contactResponse || contactResponse.status === 'ERROR') {
-        return res.status(400).json({
-          success: false,
-          message: 'Falha ao criar contato obrigatório',
-          details: contactResponse
+            if (!contactResponse || contactResponse.status === 'ERROR') {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Falha ao criar contato obrigatório',
+                    details: contactResponse
+                });
+            }
+
+            contactId = contactResponse.entityid || contactResponse;
+
+            if (!contactId) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Contato criado, mas ID não retornado pela API',
+                    details: contactResponse
+                });
+            }
+        }
+
+        /* ===============================
+           3️⃣ NAMESERVERS
+        =============================== */
+        const nsList =
+            Array.isArray(nameServers) && nameServers.length > 0
+                ? nameServers
+                : ['dns1.registrar-servers.com', 'dns2.registrar-servers.com'];
+
+        /* ===============================
+           4️⃣ MONTA URL DE REGISTRO
+        =============================== */
+        let url =
+            `${RESELLER_CONFIG.baseURL}/domains/register.json` +
+            `?auth-userid=${RESELLER_CONFIG.authUserId}` +
+            `&api-key=${RESELLER_CONFIG.apiKey}` +
+            `&domain-name=${encodeURIComponent(domainName)}` +
+            `&years=${years}` +
+            `&customer-id=${customerId}` +
+            `&reg-contact-id=${contactId}` +
+            `&admin-contact-id=${contactId}` +
+            `&tech-contact-id=${contactId}` +
+            `&billing-contact-id=${contactId}` +
+            `&invoice-option=${invoiceOption}` +
+            `&protect-privacy=${protectPrivacy}`;
+
+        nsList.forEach(ns => {
+            url += `&ns=${encodeURIComponent(ns)}`;
         });
-      }
 
-      contactId = contactResponse.entityid || contactResponse;
+        /* ===============================
+           5️⃣ CHAMADA À API
+        =============================== */
+        const response = await makeRequest(url, 'POST');
 
-      if (!contactId) {
-        return res.status(400).json({
-          success: false,
-          message: 'Contato criado, mas ID não retornado pela API',
-          details: contactResponse
+        if (
+            response?.data?.status === 'ERROR' ||
+            response?.data?.status === 'error'
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: 'Erro na API do Revendedor',
+                details: response.data
+            });
+        }
+
+        /* ===============================
+           6️⃣ SUCESSO
+        =============================== */
+        return res.status(200).json({
+            success: true,
+            message: 'Domínio registrado com sucesso',
+            data: response.data
         });
-      }
+
+    } catch (error) {
+        console.error('Erro fatal no registro de domínio:', error);
+
+        return res.status(500).json({
+            success: false,
+            message: 'Erro interno ao registrar domínio',
+            error: error.message
+        });
     }
-
-    /* ===============================
-       3️⃣ NAMESERVERS
-    =============================== */
-    const nsList =
-      Array.isArray(nameServers) && nameServers.length > 0
-        ? nameServers
-        : ['dns1.registrar-servers.com', 'dns2.registrar-servers.com'];
-
-    /* ===============================
-       4️⃣ MONTA URL DE REGISTRO
-    =============================== */
-    let url =
-      `${RESELLER_CONFIG.baseURL}/domains/register.json` +
-      `?auth-userid=${RESELLER_CONFIG.authUserId}` +
-      `&api-key=${RESELLER_CONFIG.apiKey}` +
-      `&domain-name=${encodeURIComponent(domainName)}` +
-      `&years=${years}` +
-      `&customer-id=${customerId}` +
-      `&reg-contact-id=${contactId}` +
-      `&admin-contact-id=${contactId}` +
-      `&tech-contact-id=${contactId}` +
-      `&billing-contact-id=${contactId}` +
-      `&invoice-option=${invoiceOption}` +
-      `&protect-privacy=${protectPrivacy}`;
-
-    nsList.forEach(ns => {
-      url += `&ns=${encodeURIComponent(ns)}`;
-    });
-
-    /* ===============================
-       5️⃣ CHAMADA À API
-    =============================== */
-    const response = await makeRequest(url, 'POST');
-
-    if (
-      response?.data?.status === 'ERROR' ||
-      response?.data?.status === 'error'
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: 'Erro na API do Revendedor',
-        details: response.data
-      });
-    }
-
-    /* ===============================
-       6️⃣ SUCESSO
-    =============================== */
-    return res.status(200).json({
-      success: true,
-      message: 'Domínio registrado com sucesso',
-      data: response.data
-    });
-
-  } catch (error) {
-    console.error('Erro fatal no registro de domínio:', error);
-
-    return res.status(500).json({
-      success: false,
-      message: 'Erro interno ao registrar domínio',
-      error: error.message
-    });
-  }
 };
 
 
@@ -339,49 +356,49 @@ export const create_contact_reseller_controller = async (req, res) => {
  * Cria um novo contato
  */
 export const create_contact_reseller = async (customerId, userData) => {
-  const {
-    name,
-    company,
-    email,
-    addressLine1,
-    city,
-    state,
-    country,
-    zipCode,
-    phoneCountryCode,
-    phone
-  } = userData;
+    const {
+        name,
+        company,
+        email,
+        addressLine1,
+        city,
+        state,
+        country,
+        zipCode,
+        phoneCountryCode,
+        phone
+    } = userData;
 
-  if (!customerId) {
-    throw new Error('customerId não informado para criação de contato');
-  }
+    if (!customerId) {
+        throw new Error('customerId não informado para criação de contato');
+    }
 
-  // Normalizações exigidas pela ResellerClub
-  const cityNormalized = city
-    ? city.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    : 'NA';
+    // Normalizações exigidas pela ResellerClub
+    const cityNormalized = city
+        ? city.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        : 'NA';
 
-  const telno = `${phoneCountryCode || '55'}${phone}`;
+    const telno = `${phoneCountryCode || '55'}${phone}`;
 
-  const url =
-    `${RESELLER_CONFIG.baseURL}/contacts/add.json` +
-    `?auth-userid=${RESELLER_CONFIG.authUserId}` +
-    `&api-key=${RESELLER_CONFIG.apiKey}` +
-    `&customer-id=${customerId}` +
-    `&name=${encodeURIComponent(name)}` +
-    `&company=${encodeURIComponent(company || name)}` +
-    `&emailaddr=${encodeURIComponent(email)}` +
-    `&address-line-1=${encodeURIComponent(addressLine1)}` +
-    `&city=${encodeURIComponent(cityNormalized)}` +
-    `&state=${encodeURIComponent(state || 'NA')}` +
-    `&country=${country}` +
-    `&zipcode=${encodeURIComponent(zipCode)}` +
-    `&telno=${encodeURIComponent(telno)}` +
-    `&type=Contact`;
+    const url =
+        `${RESELLER_CONFIG.baseURL}/contacts/add.json` +
+        `?auth-userid=${RESELLER_CONFIG.authUserId}` +
+        `&api-key=${RESELLER_CONFIG.apiKey}` +
+        `&customer-id=${customerId}` +
+        `&name=${encodeURIComponent(name)}` +
+        `&company=${encodeURIComponent(company || name)}` +
+        `&emailaddr=${encodeURIComponent(email)}` +
+        `&address-line-1=${encodeURIComponent(addressLine1)}` +
+        `&city=${encodeURIComponent(cityNormalized)}` +
+        `&state=${encodeURIComponent(state || 'NA')}` +
+        `&country=${country}` +
+        `&zipcode=${encodeURIComponent(zipCode)}` +
+        `&telno=${encodeURIComponent(telno)}` +
+        `&type=Contact`;
 
-  const response = await makeRequest(url, 'POST');
+    const response = await makeRequest(url, 'POST');
 
-  return response.data;
+    return response.data;
 };
 
 
@@ -425,14 +442,6 @@ export const get_domain_details = async (req, res) => {
         });
     }
 };
-
-
-
-
-
-
-
-
 
 
 
@@ -536,10 +545,10 @@ export const listar_extensao = async (req, res) => {
         return res.status(200).json(result.rows);
     } catch (error) {
         console.error('Erro ao listar extensões:', error);
-        
+
         // Retorna um erro amigável para o front-end
-        return res.status(500).json({ 
-            error: 'Erro interno ao buscar extensões de domínio.' 
+        return res.status(500).json({
+            error: 'Erro interno ao buscar extensões de domínio.'
         });
     }
 };

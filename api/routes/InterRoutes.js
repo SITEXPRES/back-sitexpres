@@ -9,7 +9,8 @@ import {
     cadastrarWebhookInter,
     listarWebhookInter,
     consultarPix,
-    pagamentoDominio
+    pagamentoDominio,
+    consultarPix_dominio
 } from '../controllers/InterControllers.js';
 
 const router = express.Router();
@@ -31,6 +32,8 @@ router.post("/pagamento/webhook", cadastrarWebhookInter);
 router.get("/pagamento/webhook", listarWebhookInter);
 
 router.post("/pagamento/consultar", consultarPix);
+
+router.post("/pagamento/consultar_dominio", consultarPix_dominio);
 
 
 export default router;

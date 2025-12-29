@@ -3,6 +3,7 @@ import { authMiddleware } from "../middlewares/authMiddleware.js";
 import { upload } from "../middlewares/upload.js";
 import {
   createOrder,
+  createOrder_dominio,
   createProduct,
   createSubscriptionPlan,
   createSubscription,
@@ -19,6 +20,8 @@ router.get("/", createOrder);
 router.get("/teste", (req, res) => res.send("rota ok"));
 
 router.post('/pagamento/criar', createOrder);
+router.post('/pagamento/dominio', createOrder_dominio);
+
 
 router.post('/assinatura/criar', createSubscription);
 

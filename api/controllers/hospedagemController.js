@@ -60,6 +60,14 @@ const gerarSenha = (nome, email) => {
     return `${maiuscula}${minuscula}${numero}${especial}`;
 };
 
+function normalizarUsername(texto) {
+    return texto
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]/gi, '')
+        .toLowerCase();
+}
+
 /**
  * Verifica se o username já existe no DirectAdmin
  * @param {string} username - Username para verificar
@@ -92,18 +100,20 @@ const usernameExiste = async (username) => {
  * @returns {Promise<string>}
  */
 const gerarUsernameUnico = async (nomeBase) => {
-    let username = gerarUsername(nomeBase);
-    let tentativas = 0;
-    const maxTentativas = 10;
+    const base = normalizarUsername(nomeBase).substring(0, 12);
 
-    while (await usernameExiste(username) && tentativas < maxTentativas) {
-        const sufixo = Math.floor(Math.random() * 999);
-        username = `${gerarUsername(nomeBase).substring(0, 13)}${sufixo}`;
-        tentativas++;
+    let username = base;
+    let contador = 1;
+
+    while (await usernameExiste(username)) {
+        const sufixo = String(contador).padStart(2, '0');
+        username = `${base.substring(0, 14 - sufixo.length)}${sufixo}`;
+        contador++;
     }
 
     return username;
 };
+
 
 /**
  * Cria uma nova conta de hospedagem no DirectAdmin
@@ -151,7 +161,8 @@ export const creat_hospedagem = async (req, res) => {
         }
 
         // Gera username único e senha
-        const username = await gerarUsernameUnico(nome);
+        const sufixo = Math.floor(Math.random() * 999) + 1;
+        const username = `${await gerarUsernameUnico(nome)}${sufixo}`;
         const senha = gerarSenha(nome, email);
 
         console.log('🔑 Credenciais geradas:', { username, senha: '***' });
@@ -350,6 +361,7 @@ export const creat_hospedagem = async (req, res) => {
                     success: true,
                     message: 'Hospedagem criada com sucesso (erro ao salvar no banco)',
                     warning: 'Dados não foram salvos no banco de dados',
+                    error: dbError,
                     data: {
                         dominio,
                         username,
