@@ -434,6 +434,200 @@ export const creat_hospedagem = async (req, res) => {
     }
 };
 
+
+export const createHospedagem_funcao = async ({
+    dominio,
+    nome,
+    email,
+    bandwidth,
+    quota,
+    ip,
+    id_projeto,
+    id_user
+}) => {
+    const client = await pool.connect();
+
+    try {
+        // ======================
+        // Validações
+        // ======================
+        if (!dominio) {
+            return { success: false, message: 'Domínio é obrigatório' };
+        }
+
+        if (!nome) {
+            return { success: false, message: 'Nome é obrigatório' };
+        }
+
+        if (!email) {
+            return { success: false, message: 'Email é obrigatório' };
+        }
+
+        // ======================
+        // Geração de credenciais
+        // ======================
+        const sufixo = Math.floor(Math.random() * 999) + 1;
+        const username = `${await gerarUsernameUnico(nome)}${sufixo}`;
+        const senha = gerarSenha(nome, email);
+
+        const pacote = process.env.DIRECTADMIN_PACK;
+
+        // ======================
+        // Parâmetros DirectAdmin
+        // ======================
+        const params = new URLSearchParams({
+            action: 'create',
+            add: 'Submit',
+            username,
+            email,
+            passwd: senha,
+            passwd2: senha,
+            domain: dominio,
+            package: pacote || 'packagesitexpress',
+            ip: ip || '143.208.8.36',
+            notify: 'no',
+            send_email: 'no'
+        });
+
+        if (!pacote) {
+            params.append('bandwidth', bandwidth || 'unlimited');
+            params.append('quota', quota || 'unlimited');
+            params.append('vdomains', 'unlimited');
+            params.append('nsubdomains', 'unlimited');
+            params.append('nemails', 'unlimited');
+            params.append('mysql', 'unlimited');
+            params.append('ftp', 'unlimited');
+        }
+
+        // ======================
+        // Criação da conta
+        // ======================
+        const response = await axios.post(
+            `${DIRECTADMIN_CONFIG.host}/CMD_API_ACCOUNT_USER`,
+            params.toString(),
+            {
+                auth: {
+                    username: DIRECTADMIN_CONFIG.username,
+                    password: DIRECTADMIN_CONFIG.password
+                },
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                timeout: 30000
+            }
+        );
+
+        const respostaString =
+            typeof response.data === 'string'
+                ? response.data
+                : JSON.stringify(response.data);
+
+        const sucesso =
+            response.data?.error === '0' ||
+            response.data?.error === 0 ||
+            respostaString.includes('Account Created') ||
+            response.status === 200;
+
+        if (!sucesso) {
+            return {
+                success: false,
+                message: 'Erro ao criar hospedagem no DirectAdmin',
+                error: respostaString
+            };
+        }
+
+        // ======================
+        // Buscar HTML no banco
+        // ======================
+        let htmlContent = '';
+
+        const existing = await client.query(
+            `SELECT html_content 
+             FROM generated_sites 
+             WHERE id_projeto = $1 
+             ORDER BY created_at DESC 
+             LIMIT 1`,
+            [id_projeto]
+        );
+
+        if (existing.rows.length > 0) {
+            htmlContent = existing.rows[0].html_content;
+        }
+
+        // ======================
+        // Upload do site
+        // ======================
+        let uploadStatus = { success: false };
+
+        if (htmlContent) {
+            uploadStatus = await uploadIndexHtml(
+                username,
+                senha,
+                dominio,
+                htmlContent
+            );
+        }
+
+        // ======================
+        // Salvar no banco
+        // ======================
+        await client.query('BEGIN');
+
+        await client.query(
+            `
+            INSERT INTO hospedagens
+            (dominio, username, senha, email, nome, pacote, bandwidth, quota, ip, criado_em, id_projeto, id_user, site_uploaded)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW(),$10,$11,$12)
+            `,
+            [
+                dominio,
+                username,
+                senha,
+                email,
+                nome,
+                pacote || 'packagesitexpress',
+                bandwidth || 'unlimited',
+                quota || 'unlimited',
+                ip || '143.208.8.36',
+                id_projeto,
+                id_user,
+                uploadStatus.success
+            ]
+        );
+
+        await client.query('COMMIT');
+
+        // ======================
+        // Retorno final
+        // ======================
+        return {
+            success: true,
+            message: 'Hospedagem criada com sucesso',
+            data: {
+                dominio,
+                username,
+                senha,
+                email,
+                nome,
+                painel: DIRECTADMIN_CONFIG.host,
+                site_url: `http://${dominio}`,
+                upload: uploadStatus
+            }
+        };
+
+    } catch (error) {
+        await client.query('ROLLBACK');
+
+        return {
+            success: false,
+            message: 'Erro interno ao criar hospedagem',
+            error: error.message
+        };
+    } finally {
+        client.release();
+    }
+};
+
+
+
 // Função para fazer upload do index.html via FTP ou API do DirectAdmin
 async function uploadIndexHtml(username, senha, dominio, htmlContent) {
     try {

@@ -3,6 +3,7 @@ import https from "https";
 import { console } from "inspector";
 import pool from "../config/db.js";
 import { gerandonotafiscal } from "../services/notafiscalService.js";
+import { createCustomerReseller_funcao, create_domain_reseller_funcao } from "./resellerController.js";
 
 const cert = fs.readFileSync("certificados/inter.crt");
 const key = fs.readFileSync("certificados/inter.key");
@@ -1095,6 +1096,8 @@ export const consultarPix_dominio = async (req, res) => {
             return res.status(400).json({ error: "TXID é obrigatório para consultar a cobrança." });
         }
 
+        txid = 'SITEXPRES1765223615757cp4pwcnk';
+
         // 1. Gera token com escopo necessário
         const tokenData = await gerarToken();
         const token = tokenData.access_token;
@@ -1143,15 +1146,16 @@ export const consultarPix_dominio = async (req, res) => {
         });
 
         // 3. Se NÃO estiver CONCLUIDA → só retorna o status (não faz nada no banco)
+        /*     
         if (respostaInter.status !== "CONCLUIDA") {
-            console.log(`Pix ${txid} ainda não pago. Status: ${respostaInter.status || 'não encontrado'}`);
-            return res.json({
-                pago: false,
-                status: respostaInter.status || 'não encontrado',
-                mensagem: "Aguardando pagamento..."
-            });
-        }
-
+                console.log(`Pix ${txid} ainda não pago. Status: ${respostaInter.status || 'não encontrado'}`);
+                return res.json({
+                    pago: false,
+                    status: respostaInter.status || 'não encontrado',
+                    mensagem: "Aguardando pagamento..."
+                });
+            }
+        */
 
         // 4. AQUI O PAGAMENTO ESTÁ CONCLUÍDO NO INTER!
         console.log(`PAGAMENTO CONFIRMADO no Inter! Valor: ${respostaInter.valor?.original}`);
@@ -1202,21 +1206,23 @@ export const consultarPix_dominio = async (req, res) => {
                 [transacao.user_id]
             );
 
-            // ENVIA NOTA FISCAL
-            var notaFiscal = await gerandonotafiscal({
-                valor_servico: transacao.domain_price,
-                cnpj_cpf: result_user.rows[0].cnpj_cpf,
-                razao_social: result_user.rows[0].razao_social || result_user.rows[0].name,
-                endereco: result_user.rows[0].endereco,
-                bairro: result_user.rows[0].bairro,
-                cod_municipio: result_user.rows[0].cod_municipio,
-                uf: result_user.rows[0].uf,
-                cep: result_user.rows[0].cep,
-                telefone: result_user.rows[0].telefone,
-                email: result_user.rows[0].email
-            });
 
-            console.log("Retorno NF:", notaFiscal);
+
+            // ENVIA NOTA FISCAL
+            /*     var notaFiscal = await gerandonotafiscal({
+                    valor_servico: transacao.domain_price,
+                    cnpj_cpf: result_user.rows[0].cnpj_cpf,
+                    razao_social: result_user.rows[0].razao_social || result_user.rows[0].name,
+                    endereco: result_user.rows[0].endereco,
+                    bairro: result_user.rows[0].bairro,
+                    cod_municipio: result_user.rows[0].cod_municipio,
+                    uf: result_user.rows[0].uf,
+                    cep: result_user.rows[0].cep,
+                    telefone: result_user.rows[0].telefone,
+                    email: result_user.rows[0].email
+                }); */
+
+            /* console.log("Retorno NF:", notaFiscal);
 
             // Converte o JSON da resposta
             const responseNF = JSON.parse(notaFiscal.resposta_nf);
@@ -1224,7 +1230,9 @@ export const consultarPix_dominio = async (req, res) => {
             // Separa somente o link
             const linkNF = responseNF.message?.split("||")[1] || null;
 
-            console.log("Link da Nota Fiscal:", linkNF);
+            console.log("Link da Nota Fiscal:", linkNF); */
+
+            var linkNF = 'as'
 
             // Salva o link no banco
             await pool.query(
@@ -1233,8 +1241,33 @@ export const consultarPix_dominio = async (req, res) => {
             );
 
 
-            console.log("Criando Hospedagem");
+            //###############
+            // Criando cliente no resseller
+            //###############
+            var data_customer = await createCustomerReseller_funcao({
+                email: result_user.rows[0].email,
+                password: result_user.rows[0].password,
+                name: result_user.rows[0].name,
+                company: result_user.rows[0].company,
+                addressLine1: result_user.rows[0].endereco,
+                city: result_user.rows[0].bairro,
+                state: result_user.rows[0].uf,
+                country: 'BR',
+                zipCode: result_user.rows[0].cep,
+                phoneCountryCode: '55',
+                phone: result_user.rows[0].telefone,
+                langPref: result_user.rows[0].langPref || 'pt'
+            });
 
+            //###############
+            // Ativando Dominio no resseller
+            //###############
+            var data_customer = await create_domain_reseller_funcao({
+               domainName: transacao.full_domain,
+               customerId: data_customer.data
+            });
+
+           
 
 
             return res.json({
@@ -1242,7 +1275,9 @@ export const consultarPix_dominio = async (req, res) => {
                 status: "CONCLUIDA",
                 mensagem: "Pagamento processado com sucesso!",
                 domain: transacao.full_domain,
-                RetornoNotaFiscal: notaFiscal
+                data_customer: data_customer,
+                //RetornoNotaFiscal: 'notaFiscal',
+           
 
             });
         }

@@ -6,6 +6,7 @@ import 'dotenv/config';
 import pool from "../config/db.js";
 import fs from 'fs/promises';
 import path from 'path';
+import { createHospedagem_funcao } from './hospedagemController.js';
 
 // ==================== FUNÇÕES AUXILIARES ====================
 
@@ -378,8 +379,102 @@ export async function paymentSuccess(req, res) {
     );
 
     if (payment.rows.length === 0) {
-      console.error("Pagamento não encontrado para o token:", token);
-      return res.status(404).send("Pagamento não encontrado");
+
+      // verificando ordem de pagamento para registro de domínio
+      const payment_dominio = await pool.query(
+        `SELECT * FROM public.domain_orders where payment_reference = $1`,
+        [token]
+      );
+
+      if (payment_dominio.rows.length === 0) {
+        console.error("Pagamento não encontrado para o token:", token);
+        return res.status(404).send("Pagamento não encontrado");
+      } else {
+        if (payment_dominio.rows[0].status === 'completed') {
+          console.log(`Pagamento ${token} já foi processado antes.`);
+          return res.json({
+            pago: true,
+            status: "CONCLUIDA",
+            jaProcessado: true,
+            mensagem: "Pagamento já creditado!",
+            redirect: `https://sitexpres.com.br/sucesso?order=${token}`
+          });
+        } else {
+          console.log("Pagamento processado com sucesso!");
+
+          var transacao = payment_dominio.rows[0];
+          // Adiciona créditos
+          await pool.query(
+            `UPDATE public.domain_orders SET status = 'completed' WHERE id = $1`,
+            [transacao.id]
+          );
+
+
+          //Consultar dados do usuário para nota fiscal
+          const result_user = await pool.query(
+            `SELECT * FROM public.users WHERE id = $1`,
+            [transacao.user_id]
+          );
+
+          // ENVIA NOTA FISCAL
+          var notaFiscal = await gerandonotafiscal({
+            valor_servico: transacao.domain_price,
+            cnpj_cpf: result_user.rows[0].cnpj_cpf,
+            razao_social: result_user.rows[0].razao_social || result_user.rows[0].name,
+            endereco: result_user.rows[0].endereco,
+            bairro: result_user.rows[0].bairro,
+            cod_municipio: result_user.rows[0].cod_municipio,
+            uf: result_user.rows[0].uf,
+            cep: result_user.rows[0].cep,
+            telefone: result_user.rows[0].telefone,
+            email: result_user.rows[0].email
+          });
+
+          console.log("Retorno NF:", notaFiscal);
+
+          // Converte o JSON da resposta
+          const responseNF = JSON.parse(notaFiscal.resposta_nf);
+
+          // Separa somente o link
+          const linkNF = responseNF.message?.split("||")[1] || null;
+
+          console.log("Link da Nota Fiscal:", linkNF);
+
+          // Salva o link no banco
+          await pool.query(
+            `UPDATE public.domain_orders SET link_nota = $1 WHERE id = $2`,
+            [linkNF, transacao.id]
+          );
+
+
+          console.log("Criando Hospedagem");
+
+          var hospedagem_retorno = await createHospedagem_funcao({
+            dominio: transacao.full_domain,
+            nome: transacao.customer_name,
+            email: transacao.customer_email,
+            bandwidth: transacao.bandwidth,
+            quota: transacao.quota,
+            ip: transacao.ip || '143.208.8.36',
+            id_projeto: transacao.id_projeto,
+            id_user: transacao.user_id
+          });
+
+
+          return res.json({
+            pago: true,
+            status: "CONCLUIDA",
+            mensagem: "Pagamento processado com sucesso!",
+            domain: transacao.full_domain,
+            RetornoNotaFiscal: notaFiscal,
+            hospedagem: hospedagem_retorno
+
+          });
+        }
+      }
+
+
+
     } else {
 
       // Check if transaction is pending before adding credits
