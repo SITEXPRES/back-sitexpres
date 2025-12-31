@@ -259,14 +259,36 @@ export const newsite = async (req, res) => {
             [userId, id_projeto, prompt, novoId, 'ativo']
           );
 
-          // Envia ou atualiza HTML no subdomínio
-          await enviarHTMLSubdominio(
-            "ftp.sitexpres.com.br",
-            process.env.user_directamin,
-            process.env.pass_directamin,
-            nomeSubdominio + '.sitexpres.com.br',
-            html
+
+
+          const existe_hospedagem = await client.query(
+            `SELECT * FROM hospedagens where id_projeto = $1`,
+            [id_projeto]
           );
+
+          if (existe_hospedagem.rows.length > 0) {
+            var username = existe_hospedagem.rows[0].username;
+            var password = existe_hospedagem.rows[0].senha;
+            var dominio_hospedagem = existe_hospedagem.rows[0].dominio;
+
+            await enviarHTMLSubdominio(
+              "ftp.sitexpres.com.br",
+              username,
+              password,
+              dominio_hospedagem,
+              html
+            );
+          } else {
+            await enviarHTMLSubdominio(
+              "ftp.sitexpres.com.br",
+              process.env.user_directamin,
+              process.env.pass_directamin,
+              nomeSubdominio + '.sitexpres.com.br',
+              html
+            );
+          }
+
+
 
           //Fazendo update no github caso já esteja integrado ou já tenha repositório conectado caso não ignore e passe direto
           const githubResult = await updateGitHubIfIntegrated(

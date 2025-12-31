@@ -1209,20 +1209,20 @@ export const consultarPix_dominio = async (req, res) => {
 
 
             // ENVIA NOTA FISCAL
-            /*     var notaFiscal = await gerandonotafiscal({
-                    valor_servico: transacao.domain_price,
-                    cnpj_cpf: result_user.rows[0].cnpj_cpf,
-                    razao_social: result_user.rows[0].razao_social || result_user.rows[0].name,
-                    endereco: result_user.rows[0].endereco,
-                    bairro: result_user.rows[0].bairro,
-                    cod_municipio: result_user.rows[0].cod_municipio,
-                    uf: result_user.rows[0].uf,
-                    cep: result_user.rows[0].cep,
-                    telefone: result_user.rows[0].telefone,
-                    email: result_user.rows[0].email
-                }); */
+            var notaFiscal = await gerandonotafiscal({
+                valor_servico: transacao.domain_price,
+                cnpj_cpf: result_user.rows[0].cnpj_cpf,
+                razao_social: result_user.rows[0].razao_social || result_user.rows[0].name,
+                endereco: result_user.rows[0].endereco,
+                bairro: result_user.rows[0].bairro,
+                cod_municipio: result_user.rows[0].cod_municipio,
+                uf: result_user.rows[0].uf,
+                cep: result_user.rows[0].cep,
+                telefone: result_user.rows[0].telefone,
+                email: result_user.rows[0].email
+            });
 
-            /* console.log("Retorno NF:", notaFiscal);
+            console.log("Retorno NF:", notaFiscal);
 
             // Converte o JSON da resposta
             const responseNF = JSON.parse(notaFiscal.resposta_nf);
@@ -1230,9 +1230,9 @@ export const consultarPix_dominio = async (req, res) => {
             // Separa somente o link
             const linkNF = responseNF.message?.split("||")[1] || null;
 
-            console.log("Link da Nota Fiscal:", linkNF); */
+            console.log("Link da Nota Fiscal:", linkNF);
 
-            var linkNF = 'as'
+
 
             // Salva o link no banco
             await pool.query(
@@ -1259,7 +1259,7 @@ export const consultarPix_dominio = async (req, res) => {
                 langPref: result_user.rows[0].langPref || 'pt'
             });
 
-       
+
 
             //###############
             // Ativando Dominio no resseller
@@ -1334,15 +1334,13 @@ export const consultarPix_dominio = async (req, res) => {
             );
 
 
-
-
             return res.json({
                 pago: true,
                 status: "CONCLUIDA",
                 mensagem: "Pagamento processado com sucesso!",
                 domain: transacao.full_domain,
                 data_customer: data_customer,
-                //RetornoNotaFiscal: 'notaFiscal',
+                RetornoNotaFiscal: linkNF
 
 
             });

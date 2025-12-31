@@ -1,6 +1,7 @@
 import https from 'https';
 import http from 'http';
 import { URL } from 'url';
+import axios from 'axios';
 import pool from "../config/db.js";
 
 // Configurações da API ResellerClub
@@ -129,9 +130,6 @@ export const check_domain_availability = async (req, res) => {
         });
     }
 };
-
-
-
 
 
 /**
@@ -280,7 +278,6 @@ export const createCustomerReseller_funcao = async ({
         throw error;
     }
 };
-
 
 
 export const get_default_contact = async (customerId) => {
@@ -448,15 +445,22 @@ export const create_domain_reseller_funcao = async (
 
         if (!contactId) {
             console.log('Contato não encontrado. Criando novo contato...');
-            console.log(contactData)
-            console.log(customerId)
+            console.log(contactData);
+
+            if (!contactData) {
+                throw new Error('contactData não informado para criação do contato');
+            }
+
+            if (!contactData.email) {
+                throw new Error('Email obrigatório ausente em contactData');
+            }
 
             const contactResponse = await create_contact_reseller(customerId, contactData);
 
-            console.log('Contato criado:', contactResponse);
-
             if (!contactResponse || contactResponse.status === 'ERROR') {
-                throw new Error('Falha ao criar contato obrigatório' + contactResponse);
+                throw new Error(
+                    `Falha ao criar contato obrigatório: ${JSON.stringify(contactResponse)}`
+                );
             }
 
             contactId = contactResponse.entityid || contactResponse;
@@ -504,7 +508,9 @@ export const create_domain_reseller_funcao = async (
             response?.data?.status === 'ERROR' ||
             response?.data?.status === 'error'
         ) {
-            throw new Error(`Erro na API do Revendedor: ${JSON.stringify(response.data)}`);
+            throw new Error(
+                `Erro na API do Revendedor: ${JSON.stringify(response.data)}`
+            );
         }
 
         /* ===============================
@@ -541,13 +547,11 @@ export const create_contact_reseller_controller = async (req, res) => {
  */
 export const create_contact_reseller = async (customerId, userData) => {
     if (!customerId) {
-        throw new Error('customerId não informado para criação de contato');
+        throw new Error('customerId não informado');
     }
 
-    // garante que o customerId seja número
-    const customerIdNumber = Number(customerId);
-    if (Number.isNaN(customerIdNumber)) {
-        throw new Error('customerId inválido (não é número)');
+    if (!userData) {
+        throw new Error('userData não informado');
     }
 
     const {
@@ -563,39 +567,37 @@ export const create_contact_reseller = async (customerId, userData) => {
         phone
     } = userData;
 
-    // validações obrigatórias exigidas pela ResellerClub
     if (!name || !email || !addressLine1 || !city || !country || !zipCode || !phone) {
         throw new Error('Campos obrigatórios ausentes para criação do contato');
     }
 
-    // normaliza cidade (remove acentos)
     const cityNormalized = city
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '');
 
-    const telno = `${phoneCountryCode || '55'}${phone}`;
-
     const params = new URLSearchParams({
         'auth-userid': RESELLER_CONFIG.authUserId,
         'api-key': RESELLER_CONFIG.apiKey,
-        'customer-id': customerIdNumber,
+        'customer-id': String(customerId),
+        'type': 'Contact',
+
+        // 👇 CAMPOS EXATOS DA DOCUMENTAÇÃO
         'name': name,
         'company': company || name,
-        'emailaddr': email, // ⚠️ campo EXATO exigido pela API
+        'email': email,
         'address-line-1': addressLine1,
         'city': cityNormalized,
         'state': state || 'NA',
         'country': country,
         'zipcode': zipCode,
-        'telno': telno,
-        'type': 'Contact'
+        'phone-cc': phoneCountryCode || '55',
+        'phone': phone
     });
 
     const url = `${RESELLER_CONFIG.baseURL}/contacts/add.json?${params.toString()}`;
 
     const response = await makeRequest(url, 'POST');
 
-    // tratamento explícito de erro da API
     if (!response?.data || response.data.status === 'ERROR') {
         throw new Error(
             `Erro ao criar contato: ${response?.data?.message || 'Erro desconhecido'}`
@@ -604,6 +606,8 @@ export const create_contact_reseller = async (customerId, userData) => {
 
     return response.data;
 };
+
+
 
 
 

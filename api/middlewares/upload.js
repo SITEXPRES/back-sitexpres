@@ -16,4 +16,21 @@ const storage = multer.diskStorage({
   },
 });
 
-export const upload = multer({ storage });
+// Validação de tipo de arquivo
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = /jpeg|jpg|png|gif|webp|svg/;
+  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+  const mimetype = allowedTypes.test(file.mimetype);
+
+  if (mimetype && extname) {
+    return cb(null, true);
+  } else {
+    cb(new Error("Apenas imagens são permitidas (jpeg, jpg, png, gif, webp, svg)"));
+  }
+};
+
+export const upload = multer({ 
+  storage,
+  fileFilter,
+  limits: { fileSize: 20 * 1024 * 1024 } // Limite de 20MB (opcional)
+});
