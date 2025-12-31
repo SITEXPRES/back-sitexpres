@@ -1259,15 +1259,81 @@ export const consultarPix_dominio = async (req, res) => {
                 langPref: result_user.rows[0].langPref || 'pt'
             });
 
+       
+
             //###############
             // Ativando Dominio no resseller
             //###############
-            var data_customer = await create_domain_reseller_funcao({
-               domainName: transacao.full_domain,
-               customerId: data_customer.data
-            });
+            const estadosBR = {
+                AC: 'Acre',
+                AL: 'Alagoas',
+                AP: 'Amapa',
+                AM: 'Amazonas',
+                BA: 'Bahia',
+                CE: 'Ceara',
+                DF: 'Distrito Federal',
+                ES: 'Espirito Santo',
+                GO: 'Goias',
+                MA: 'Maranhao',
+                MT: 'Mato Grosso',
+                MS: 'Mato Grosso do Sul',
+                MG: 'Minas Gerais',
+                PA: 'Para',
+                PB: 'Paraiba',
+                PR: 'Parana',
+                PE: 'Pernambuco',
+                PI: 'Piaui',
+                RJ: 'Rio de Janeiro',
+                RN: 'Rio Grande do Norte',
+                RS: 'Rio Grande do Sul',
+                RO: 'Rondonia',
+                RR: 'Roraima',
+                SC: 'Santa Catarina',
+                SP: 'Sao Paulo',
+                SE: 'Sergipe',
+                TO: 'Tocantins'
+            };
 
-           
+            // 🔒 Blindagem dos dados do usuário
+            const user = result_user?.rows?.[0];
+
+            if (!user) {
+                throw new Error('Usuário não encontrado para criação do contato');
+            }
+
+            // 🔧 Normalizações
+            const uf = user.uf?.toUpperCase?.();
+            const stateNormalized = estadosBR[uf] || 'NA';
+
+            const phone = String(user.telefone || '').replace(/\D/g, '');
+            const safePhone = phone.length >= 10 ? phone : '11999999999';
+
+            const cityNormalized = user.bairro
+                ? user.bairro.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                : 'NA';
+
+            const zipCodeNormalized = String(user.cep || '').replace(/\D/g, '') || '00000000';
+
+            var data_customer = await create_domain_reseller_funcao(
+                transacao.full_domain,
+                data_customer.data,
+                {
+                    contactData: {
+                        name: user.name || 'Contato Default',
+                        email: user.email,
+                        phone: safePhone,
+                        phoneCountryCode: '55',
+                        company: user.company || 'Empresa default',
+                        addressLine1: user.endereco || 'Endereco nao informado',
+                        city: cityNormalized,
+                        state: stateNormalized,
+                        country: 'BR',
+                        zipCode: zipCodeNormalized
+                    }
+                }
+            );
+
+
 
 
             return res.json({
@@ -1277,7 +1343,7 @@ export const consultarPix_dominio = async (req, res) => {
                 domain: transacao.full_domain,
                 data_customer: data_customer,
                 //RetornoNotaFiscal: 'notaFiscal',
-           
+
 
             });
         }

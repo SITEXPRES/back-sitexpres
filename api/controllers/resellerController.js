@@ -235,6 +235,31 @@ export const createCustomerReseller_funcao = async ({
 
         // 🚀 Requisição
         const response = await makeRequest(url, 'POST');
+        console.error('Resposta da ResellerClub:', response.data);
+
+        let customerId;
+
+
+        // 🔥 Caso 1: veio direto "32780175"
+        if (
+            typeof response.data === 'string' ||
+            typeof response.data === 'number'
+        ) {
+            customerId = Number(response.data);
+        }
+
+        // 🔥 Caso 2: veio objeto padrão
+        else if (response.data?.customerid) {
+            customerId = Number(response.data.customerid);
+        }
+
+        if (!customerId || Number.isNaN(customerId)) {
+            console.log('Resposta da ResellerClub:', response.data);
+            throw new Error('ID do cliente inválido retornado pela ResellerClub');
+        }
+
+
+
 
         // ✅ Retorno padrão
         return {
@@ -423,13 +448,15 @@ export const create_domain_reseller_funcao = async (
 
         if (!contactId) {
             console.log('Contato não encontrado. Criando novo contato...');
+            console.log(contactData)
+            console.log(customerId)
 
             const contactResponse = await create_contact_reseller(customerId, contactData);
 
             console.log('Contato criado:', contactResponse);
 
             if (!contactResponse || contactResponse.status === 'ERROR') {
-                throw new Error('Falha ao criar contato obrigatório');
+                throw new Error('Falha ao criar contato obrigatório' + contactResponse);
             }
 
             contactId = contactResponse.entityid || contactResponse;
@@ -513,6 +540,16 @@ export const create_contact_reseller_controller = async (req, res) => {
  * Cria um novo contato
  */
 export const create_contact_reseller = async (customerId, userData) => {
+    if (!customerId) {
+        throw new Error('customerId não informado para criação de contato');
+    }
+
+    // garante que o customerId seja número
+    const customerIdNumber = Number(customerId);
+    if (Number.isNaN(customerIdNumber)) {
+        throw new Error('customerId inválido (não é número)');
+    }
+
     const {
         name,
         company,
@@ -526,37 +563,48 @@ export const create_contact_reseller = async (customerId, userData) => {
         phone
     } = userData;
 
-    if (!customerId) {
-        throw new Error('customerId não informado para criação de contato');
+    // validações obrigatórias exigidas pela ResellerClub
+    if (!name || !email || !addressLine1 || !city || !country || !zipCode || !phone) {
+        throw new Error('Campos obrigatórios ausentes para criação do contato');
     }
 
-    // Normalizações exigidas pela ResellerClub
+    // normaliza cidade (remove acentos)
     const cityNormalized = city
-        ? city.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-        : 'NA';
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
 
     const telno = `${phoneCountryCode || '55'}${phone}`;
 
-    const url =
-        `${RESELLER_CONFIG.baseURL}/contacts/add.json` +
-        `?auth-userid=${RESELLER_CONFIG.authUserId}` +
-        `&api-key=${RESELLER_CONFIG.apiKey}` +
-        `&customer-id=${customerId}` +
-        `&name=${encodeURIComponent(name)}` +
-        `&company=${encodeURIComponent(company || name)}` +
-        `&emailaddr=${encodeURIComponent(email)}` +
-        `&address-line-1=${encodeURIComponent(addressLine1)}` +
-        `&city=${encodeURIComponent(cityNormalized)}` +
-        `&state=${encodeURIComponent(state || 'NA')}` +
-        `&country=${country}` +
-        `&zipcode=${encodeURIComponent(zipCode)}` +
-        `&telno=${encodeURIComponent(telno)}` +
-        `&type=Contact`;
+    const params = new URLSearchParams({
+        'auth-userid': RESELLER_CONFIG.authUserId,
+        'api-key': RESELLER_CONFIG.apiKey,
+        'customer-id': customerIdNumber,
+        'name': name,
+        'company': company || name,
+        'emailaddr': email, // ⚠️ campo EXATO exigido pela API
+        'address-line-1': addressLine1,
+        'city': cityNormalized,
+        'state': state || 'NA',
+        'country': country,
+        'zipcode': zipCode,
+        'telno': telno,
+        'type': 'Contact'
+    });
+
+    const url = `${RESELLER_CONFIG.baseURL}/contacts/add.json?${params.toString()}`;
 
     const response = await makeRequest(url, 'POST');
 
+    // tratamento explícito de erro da API
+    if (!response?.data || response.data.status === 'ERROR') {
+        throw new Error(
+            `Erro ao criar contato: ${response?.data?.message || 'Erro desconhecido'}`
+        );
+    }
+
     return response.data;
 };
+
 
 
 /**
