@@ -116,8 +116,11 @@ export const newsite = async (req, res) => {
       // Inicia job assincrono para gerar o site
       (async () => {
         let client;
+
         try {
           client = await pool.connect();
+
+
 
           // Verifica se já existe site gerado
           const existing = await client.query(
@@ -310,7 +313,13 @@ export const newsite = async (req, res) => {
           console.error(error);
           jobs[jobId] = { status: "error", result: null, error: error.message };
         } finally {
-          if (client) client.release();
+          if (client) {
+            try {
+              client.release();
+            } catch (ignored) {
+              // ignore
+            }
+          }
         }
       })();
 
