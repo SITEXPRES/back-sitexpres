@@ -11,47 +11,46 @@ dotenv.config();
 import { updateGitHubIfIntegrated } from "./updateGitHubOnSiteChange.js";
 import { uso_creditos, verificar_creditos_prompt } from "./creditosController.js";
 import { consultaPlano } from "./planoController.js";
-import { console, url } from "inspector";
-import { escape } from "querystring";
+// ⚠️ REMOVIDO: import { console, url } from "inspector" — esse import sobrescrevia o console global e suprimia os logs no terminal!
 
 const anthropic = new Anthropic({
-    apiKey: process.env.CLAUDE_API_KEY,
+  apiKey: process.env.CLAUDE_API_KEY,
 });
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const USE_GEMINI = false;
 
 
-export async function gerar_site(prompt, parte, req, id_projeto, baseHTML = "", userId, primeiraVez) {
-    const agora = new Date();
-    const ano = agora.getFullYear();
+// max_tokens esperado — usado pra calcular % de progresso
+const MAX_TOKENS_HAIKU = 30000;
 
-    function limparRetorno(codigo) {
-        // Remove ```html, ```css, ```js e ```
-        codigo = codigo.replace(/```(?:html|css|js)?\n?/gi, "");
-        codigo = codigo.replace(/```/g, "");
-        return codigo.trim();
-    }
+export async function gerar_site(prompt, parte, req, id_projeto, baseHTML = "", userId, primeiraVez, onProgress = null) {
+  const agora = new Date();
+  const ano = agora.getFullYear();
+  const inicioGeracao = Date.now();
 
-    if (primeiraVez) {
-        // PRIMEIRA VEZ → gerar HTML novo do zero
-        console.log("Gerando HTML pela primeira vez...");
-    } else {
-        // SEGUNDA VEZ OU MAIS → modificar o HTML existente
-        console.log("Alterando HTML existente...");
-    }
+  function limparRetorno(codigo) {
+    // Remove ```html, ```css, ```js e ```
+    codigo = codigo.replace(/```(?:html|css|js)?\n?/gi, "");
+    codigo = codigo.replace(/```/g, "");
+    return codigo.trim();
+  }
 
-    try {
-        // 🔹 Detecta se é criação inicial ou edição
-        const isEditing = baseHTML && baseHTML.trim().length > 0;
+  const modoLabel = primeiraVez ? 'CRIAÇÃO' : 'EDIÇÃO';
+  console.log(`[${new Date().toISOString()}] [GERAR_SITE] 🚀 Iniciando geração de HTML | modo=${modoLabel} | id_projeto=${id_projeto} | userId=${userId}`);
+  console.log(`[${new Date().toISOString()}] [GERAR_SITE] 📝 Tamanho do prompt: ${prompt?.length ?? 0} chars | baseHTML: ${baseHTML?.length ?? 0} chars`);
 
-        // =========================================================
-        // 🎨 PROMPT PARA CRIAÇÃO (PRIMEIRA VEZ)
-        // =========================================================
+  try {
+    // 🔹 Detecta se é criação inicial ou edição
+    const isEditing = baseHTML && baseHTML.trim().length > 0;
 
-        // =========================================================
-        // 🎨 PROMPT PARA CRIAÇÃO DE SITES PREMIUM - VERSÃO 2.0
-        // =========================================================
-        const systemPromptCriacao = `
+    // =========================================================
+    // 🎨 PROMPT PARA CRIAÇÃO (PRIMEIRA VEZ)
+    // =========================================================
+
+    // =========================================================
+    // 🎨 PROMPT PARA CRIAÇÃO DE SITES PREMIUM - VERSÃO 2.0
+    // =========================================================
+    const systemPromptCriacao = `
 Você é um designer e desenvolvedor web SÊNIOR especializado em criar interfaces PREMIUM comparáveis ao Lovable, Webflow e Framer.
 Seu objetivo é gerar HTML standalone que pareça um produto profissional de $10,000+.
 
@@ -890,10 +889,10 @@ GERE O HTML COMPLETO AGORA.
 
 
 
-        // =========================================================
-        // ✏️ PROMPT PARA EDIÇÃO (QUANDO JÁ EXISTE HTML)
-        // =========================================================
-        const systemPromptEdicao = `
+    // =========================================================
+    // ✏️ PROMPT PARA EDIÇÃO (QUANDO JÁ EXISTE HTML)
+    // =========================================================
+    const systemPromptEdicao = `
                 Você é um desenvolvedor web especialista em EDITAR e MANTER sites premium existentes.
 
                 ⚠️ RETORNE APENAS O HTML COMPLETO ATUALIZADO (sem markdown, sem explicações, sem \`\`\`html).
@@ -967,71 +966,109 @@ GERE O HTML COMPLETO AGORA.
                 Retorne o HTML COMPLETO atualizado (do <!DOCTYPE html> até </html>).
                 `;
 
-        // =========================================================
-        // 🎯 SELECIONA O PROMPT CORRETO
-        // =========================================================
-        const systemPrompt = isEditing ? systemPromptEdicao : systemPromptCriacao;
+    // =========================================================
+    // 🎯 SELECIONA O PROMPT CORRETO
+    // =========================================================
+    const systemPrompt = isEditing ? systemPromptEdicao : systemPromptCriacao;
 
-        let html = "";
+    let html = "";
 
-        // ✅ Seleciona modelo de IA
-        if (USE_GEMINI) {
-            const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
-            const result = await model.generateContent(systemPrompt);
-            html = result.response.text();
-            return limparRetorno(html);
-        } else {
-            // Claude API
-            const stream = await anthropic.messages.stream({
-                model: "claude-sonnet-4-5-20250929",
-                max_tokens: 60000,
-                system: systemPrompt, // Instruções gerais curtas
-                messages: [{
-                    role: "user",
-                    content: systemPrompt
-                }]
-            });
+    // max_tokens esperado (usado para estimar % de progresso: 1 token ≈ 4 chars)
+    const expectedChars = MAX_TOKENS_HAIKU * 4;
 
+    // ✅ Seleciona modelo de IA
+    if (USE_GEMINI) {
+      console.log(`[${new Date().toISOString()}] [GERAR_SITE] 🧠 Usando Gemini 2.5 Pro...`);
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
+      if (onProgress) onProgress(10);
+      const result = await model.generateContent(systemPrompt);
+      html = result.response.text();
+      if (onProgress) onProgress(100);
+      const tempoTotal = ((Date.now() - inicioGeracao) / 1000).toFixed(1);
+      console.log(`[${new Date().toISOString()}] [GERAR_SITE] ✅ Gemini concluído em ${tempoTotal}s | HTML: ${html?.length ?? 0} chars`);
+      return limparRetorno(html);
+    } else {
+      // Claude Haiku — mais rápido e econômico
+      const MODELO = "claude-haiku-4-5-20251001";
+      console.log(`[${new Date().toISOString()}] [GERAR_SITE] 🧠 Chamando Claude API (streaming) | modelo: ${MODELO} | max_tokens: ${MAX_TOKENS_HAIKU}`);
+      const tStream = Date.now();
 
-            let html = "";
+      const stream = await anthropic.messages.stream({
+        model: MODELO,
+        max_tokens: MAX_TOKENS_HAIKU,
+        system: systemPrompt,
+        messages: [{
+          role: "user",
+          content: systemPrompt
+        }]
+      });
 
-            // ===========================================
-            // 2. LÊ O STREAM (gerando o HTML)
-            // ===========================================
-            for await (const event of stream) {
-                if (event.type === "content_block_delta" && event.delta?.text) {
-                    html += event.delta.text;
-                }
-            }
+      console.log(`[${new Date().toISOString()}] [GERAR_SITE] 📡 Stream iniciado. Aguardando chunks da IA...`);
+      if (onProgress) onProgress(5); // sinaliza que o stream começou
 
-            // ===========================================
-            // 3. APÓS terminar o stream, pega o usage real
-            // ===========================================
-            const finalMessage = await stream.finalMessage();
+      let html = "";
+      let chunkCount = 0;
+      let lastLogChunk = 0;
+      let lastReportedPercent = 0;
 
-            const inputTokens = finalMessage.usage?.input_tokens ?? 0;
-            const outputTokens = finalMessage.usage?.output_tokens ?? 0;
+      // ===========================================
+      // 2. LÊ O STREAM (gerando o HTML)
+      // ===========================================
+      for await (const event of stream) {
+        if (event.type === "content_block_delta" && event.delta?.text) {
+          html += event.delta.text;
+          chunkCount++;
 
-            console.log("============== TOKEN USAGE REAL ==============");
-            console.log("Tokens de entrada:", inputTokens);
-            console.log("Tokens de saída:", outputTokens);
-            console.log("Total:", inputTokens + outputTokens);
-            console.log("===============================================");
+          // Estima percentual: quantos chars já chegaram vs total esperado (max 99 durante stream)
+          const percent = Math.min(Math.round((html.length / expectedChars) * 90) + 5, 99);
 
-            await uso_creditos(userId, inputTokens + outputTokens, inputTokens + outputTokens, id_projeto);
+          // Notifica o caller a cada vez que o % muda (evita chamadas desnecessárias)
+          if (onProgress && percent !== lastReportedPercent) {
+            onProgress(percent);
+            lastReportedPercent = percent;
+          }
 
-            // ===========================================
-            // 4. Retorna HTML pronto
-            // ===========================================
-            console.log("##==> HTML FINAL GERADO ENVIANDO PARA DIRECT ADMIN");
-            return limparRetorno(html);
+          // Loga progresso a cada 20 chunks para não poluir o terminal
+          if (chunkCount - lastLogChunk >= 20) {
+            const elapsed = ((Date.now() - tStream) / 1000).toFixed(1);
+            console.log(`[${new Date().toISOString()}] [GERAR_SITE] ⏳ Streaming... chunk #${chunkCount} | ${percent}% | HTML: ${html.length} chars | tempo: ${elapsed}s`);
+            lastLogChunk = chunkCount;
+          }
         }
+      }
 
+      const streamTime = ((Date.now() - tStream) / 1000).toFixed(1);
+      console.log(`[${new Date().toISOString()}] [GERAR_SITE] ✅ Stream concluído em ${streamTime}s | total chunks: ${chunkCount} | HTML: ${html.length} chars`);
 
-    } catch (error) {
-        console.error("Erro ao gerar parte do site:", error);
-        if (error?.error?.message) console.error("Mensagem do modelo:", error.error.message);
-        if (error?.requestID) console.error("ID da requisição:", error.requestID);
-        return "<!-- Erro ao gerar conteúdo -->" + error;
+      // ===========================================
+      // 3. APÓS terminar o stream, pega o usage real
+      // ===========================================
+      const finalMessage = await stream.finalMessage();
+
+      const inputTokens = finalMessage.usage?.input_tokens ?? 0;
+      const outputTokens = finalMessage.usage?.output_tokens ?? 0;
+
+      console.log(`[${new Date().toISOString()}] [GERAR_SITE] 📊 TOKEN USAGE: entrada=${inputTokens} | saída=${outputTokens} | total=${inputTokens + outputTokens}`);
+
+      await uso_creditos(userId, inputTokens + outputTokens, inputTokens + outputTokens, id_projeto);
+
+      if (onProgress) onProgress(100); // 100% apenas quando tudo terminou
+      const tempoTotal = ((Date.now() - inicioGeracao) / 1000).toFixed(1);
+      console.log(`[${new Date().toISOString()}] [GERAR_SITE] 🎉 HTML gerado com sucesso em ${tempoTotal}s. Enviando para o DirectAdmin...`);
+      return limparRetorno(html);
     }
+
+
+  } catch (error) {
+    // Loga o erro com detalhes
+    console.error(`[${new Date().toISOString()}] [GERAR_SITE] ❌ ERRO ao chamar a API da IA:`, error?.message ?? error);
+    if (error?.status) console.error(`[GERAR_SITE] Status HTTP:`, error.status);
+    if (error?.error?.message) console.error(`[GERAR_SITE] Mensagem do modelo:`, error.error.message);
+    if (error?.error?.type) console.error(`[GERAR_SITE] Tipo do erro:`, error.error.type);
+    if (error?.request_id || error?.requestID) console.error(`[GERAR_SITE] Request ID:`, error.request_id ?? error.requestID);
+
+    // ⚠️ IMPORTANTE: relança o erro para que o caller (siteController) o capture
+    // e marque o job como "error" — assim o conteúdo de erro NÃO é salvo como HTML do site
+    throw error;
+  }
 }
