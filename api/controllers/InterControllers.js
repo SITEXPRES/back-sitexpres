@@ -315,6 +315,19 @@ export const consultarPix = async (req, res) => {
                 [transacao.user_id]
             );
 
+            // Se tiver outra assinatura ativa, define como false
+            await pool.query(
+                `UPDATE public.user_subscriptions SET is_ative = false WHERE user_id = $1 AND is_ative = true`,
+                [transacao.user_id]
+            );
+
+            //Colocando usuário como premium
+            await pool.query(
+                `INSERT INTO public.user_subscriptions (user_id, plan, is_ative) 
+         VALUES ($1, 'premium', true)`,
+                [transacao.user_id]
+            );
+
             // ENVIA NOTA FISCAL
             var notaFiscal = await gerandonotafiscal({
                 valor_servico: transacao.monetary_value,
