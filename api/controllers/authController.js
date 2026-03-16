@@ -41,7 +41,12 @@ export const register = async (req, res) => {
     const texto_email_editado = texto_email.replace(/{{user_name}}/g, firstName);
 
     // Envia o e-mail
-    await sendMail(user.email, 'Bem vindo(a)!', texto_email_editado);
+    try {
+      await sendMail(user.email, 'Bem vindo(a)!', texto_email_editado);
+    } catch (emailError) {
+      console.error("❌ Erro ao enviar e-mail de boas-vindas:", emailError.message);
+      // Não interrompe o fluxo de cadastro
+    }
 
 
     res.json({ success: true, token, user });
@@ -162,7 +167,12 @@ export const resetpasswd = async (req, res) => {
     const texto_email_editado = texto_email.replace(/\[link_reset\]/g, link_recover);
 
     // Envia o e-mail
-    await sendMail(user.email, 'Recuperação de Senha', texto_email_editado);
+    try {
+      await sendMail(user.email, 'Recuperação de Senha', texto_email_editado);
+    } catch (emailError) {
+      console.error("❌ Erro ao enviar e-mail de recuperação:", emailError.message);
+      // Não interrompe o fluxo de recuperação, mas o link já está gerado no banco se necessário
+    }
 
     res.json({
       success: true,
@@ -281,6 +291,61 @@ export const verifyToken = async (req, res) => {
     return res.status(401).json({
       success: false,
       message: 'Token inválido ou expirado'
+    });
+  }
+};
+
+
+export const deleteAccount = async (req, res) => {
+  try {
+    const userId = req.userId; // vem do middleware de autenticação
+
+    // Salvar dados antes de deletar (para o painel admin)
+    const userResult = await pool.query(
+      "SELECT name, email FROM users WHERE id = $1",
+      [userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Usuário não encontrado.",
+      });
+    }
+
+    const user = userResult.rows[0];
+
+    // Captura o IP real (considerando o trust proxy e cabeçalhos de encaminhamento)
+    let ip = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.ip || req.socket.remoteAddress;
+    
+    // Se vier do x-forwarded-for, pode ser uma lista. Pega o primeiro (IP original do cliente)
+    if (ip && ip.includes(',')) {
+      ip = ip.split(',')[0].trim();
+    }
+
+    // Limpa prefixo IPv6 para IPv4
+    if (ip && ip.includes('::ffff:')) {
+      ip = ip.split(':').pop();
+    }
+    
+    await pool.query(
+      "INSERT INTO deleted_accounts (user_id, name, email, ip_address) VALUES ($1, $2, $3, $4)",
+      [userId, user.name, user.email, ip]
+    );
+
+    // Deletar o usuário
+    await pool.query("DELETE FROM users WHERE id = $1", [userId]);
+
+    res.json({
+      success: true,
+      message: "Conta excluída com sucesso!",
+    });
+
+  } catch (error) {
+    console.error("❌ Erro em deleteAccount:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erro ao excluir conta.",
     });
   }
 };

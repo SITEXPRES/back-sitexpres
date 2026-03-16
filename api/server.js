@@ -19,6 +19,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 const app = express();
+app.set('trust proxy', true);
 
 // Middlewares globais
 app.use(express.json());
