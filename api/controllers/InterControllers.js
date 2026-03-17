@@ -317,13 +317,13 @@ export const consultarPix = async (req, res) => {
 
             // Se tiver outra assinatura ativa, define como false
             await pool.query(
-                `UPDATE public.user_subscriptions SET is_ative = false WHERE user_id = $1 AND is_ative = true`,
+                `UPDATE public.user_subscriptions SET is_active = false WHERE user_id = $1 AND is_active = true`,
                 [transacao.user_id]
             );
 
             //Colocando usuário como premium
             await pool.query(
-                `INSERT INTO public.user_subscriptions (user_id, plan, is_ative) 
+                `INSERT INTO public.user_subscriptions (user_id, plan, is_active) 
          VALUES ($1, 'premium', true)`,
                 [transacao.user_id]
             );
@@ -362,6 +362,45 @@ export const consultarPix = async (req, res) => {
 
 
             console.log(`Créditos adicionados e transação ${txid} marcada como completed!`);
+
+            // -----------------------------------------------------------------
+            // NOVA LÓGICA: REGISTRAR PRÓXIMO CICLO (Fatura Pendente)
+            // -----------------------------------------------------------------
+            try {
+                const valorAtual = parseFloat(transacao.monetary_value);
+                const isDev = process.env.DEV_MODE === 'true';
+
+                // Registrar próximo ciclo apenas se for valor cheio (>= 29.90) ou se for DEV
+                if (valorAtual >= 29.90 || isDev) {
+                    console.log(`Registrando próximo ciclo para valor: ${valorAtual} (Dev: ${isDev})`);
+                    
+                    const nextCycleDate = new Date();
+                    nextCycleDate.setMonth(nextCycleDate.getMonth() + 1);
+
+                    const txidNext = `PENDING-REG-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+
+                    await pool.query(
+                        `INSERT INTO public.transactions (
+                            user_id, type, status, description, credits, monetary_value, payment_method, payment_id, value, created_at
+                        ) VALUES ($1, 'purchase_credits', 'pending', $2, $3, $4, 'PIX', $5, $6, $7)`,
+                        [
+                            transacao.user_id,                               // $1
+                            'Mensalidade Sitexpress - Próximo Ciclo',        // $2
+                            50,                                              // $3
+                            29.90,                                           // $4
+                            txidNext,                                        // $5
+                            29.90,                                           // $6
+                            nextCycleDate                                    // $7
+                        ]
+                    );
+                    console.log(`Próxima fatura (pendente) registrada para o usuário ${transacao.user_id} com data: ${nextCycleDate.toISOString()}`);
+                } else {
+                    console.log(`Pagamento de R$ ${valorAtual} não gera próximo ciclo automático (não é premium ou dev).`);
+                }
+            } catch (nextCycleError) {
+                console.error("Erro ao registrar próxima fatura:", nextCycleError);
+            }
+            // -----------------------------------------------------------------
 
             return res.json({
                 pago: true,
@@ -707,22 +746,32 @@ export const criarCobrancaUnica = async (req, res) => {
 
     //---------------   
     //Salvado Transacao no banco de dados 
-
+    const { existingTxId } = req.body;
     var ID_user = req.body.userid || "00";
-    const transacao = await criarTransacao({
-        ID_user,
-        txid,
-        valor,
-        qtd_creditos,
-        nome,
-        cpf,
-        descricao: 'Compra via pix Sitexpress IA e WebHosting',
-        chave: process.env.INTER_CHAVE_PIX,
-        expiracao: 3600,
-        status: "pending"
-    });
 
-    console.log("Transacao salva no banco de dados:", transacao);
+    if (existingTxId) {
+        // Se já existe um registro (ex: fatura registrada pelo back), atualiza ele
+        console.log(`Atualizando transação existente ${existingTxId} com novo txid ${txid}`);
+        await pool.query(
+            `UPDATE public.transactions SET payment_id = $1, status = 'pending', updated_at = NOW() WHERE payment_id = $2 OR id::text = $2`,
+            [txid, existingTxId]
+        );
+    } else {
+        // Senão cria uma nova
+        const transacao = await criarTransacao({
+            ID_user,
+            txid,
+            valor,
+            qtd_creditos,
+            nome,
+            cpf,
+            descricao: 'Compra via pix Sitexpress IA e WebHosting',
+            chave: process.env.INTER_CHAVE_PIX,
+            expiracao: 3600,
+            status: "pending"
+        });
+        console.log("Transacao salva no banco de dados:", transacao);
+    }
     //---------------
 
     const options = {
