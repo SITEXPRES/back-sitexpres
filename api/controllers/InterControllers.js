@@ -295,6 +295,23 @@ export const consultarPix = async (req, res) => {
 
         // 7. Se ainda estiver pending → PROCESSA!
         if (transacao.status === 'pending') {
+            
+            // VERIFICA SE O USUÁRIO JÁ É PREMIUM. SE NÃO FOR, SALVA OS CRÉDITOS ATUAIS COMO FREE CREDITS
+            const checkPlan = await pool.query(
+                `SELECT plan FROM public.user_subscriptions WHERE user_id = $1 AND is_active = true`,
+                [transacao.user_id]
+            );
+            
+            const isPremium = checkPlan.rows.length > 0 && checkPlan.rows[0].plan === 'premium';
+            
+            if (!isPremium) {
+                await pool.query(
+                    `UPDATE public.users SET free_credits = credits WHERE id = $1`,
+                    [transacao.user_id]
+                );
+                console.log(`Créditos free salvos (backup) para o usuário ${transacao.user_id}`);
+            }
+
             console.log(`Adicionando ${transacao.credits} créditos ao usuário ${transacao.user_id}`);
 
             // Adiciona créditos
@@ -374,14 +391,14 @@ export const consultarPix = async (req, res) => {
                 if (valorAtual >= 29.90 || isDev) {
                     console.log(`Registrando próximo ciclo para valor: ${valorAtual} (Dev: ${isDev})`);
                     
-                    const nextCycleDate = new Date();
-                    nextCycleDate.setMonth(nextCycleDate.getMonth() + 1);
+                    const due_date = new Date();
+                    due_date.setMonth(due_date.getMonth() + 1);
 
                     const txidNext = `PENDING-REG-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
                     await pool.query(
                         `INSERT INTO public.transactions (
-                            user_id, type, status, description, credits, monetary_value, payment_method, payment_id, value, created_at
+                            user_id, type, status, description, credits, monetary_value, payment_method, payment_id, value, due_date
                         ) VALUES ($1, 'purchase_credits', 'pending', $2, $3, $4, 'PIX', $5, $6, $7)`,
                         [
                             transacao.user_id,                               // $1
@@ -390,10 +407,10 @@ export const consultarPix = async (req, res) => {
                             29.90,                                           // $4
                             txidNext,                                        // $5
                             29.90,                                           // $6
-                            nextCycleDate                                    // $7
+                            due_date                                         // $7
                         ]
                     );
-                    console.log(`Próxima fatura (pendente) registrada para o usuário ${transacao.user_id} com data: ${nextCycleDate.toISOString()}`);
+                    console.log(`Próxima fatura (pendente) registrada para o usuário ${transacao.user_id} com vencimento: ${due_date.toISOString()}`);
                 } else {
                     console.log(`Pagamento de R$ ${valorAtual} não gera próximo ciclo automático (não é premium ou dev).`);
                 }

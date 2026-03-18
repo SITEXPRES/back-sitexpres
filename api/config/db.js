@@ -158,28 +158,38 @@ const pool = {
   }),
 };
 
-// 🧪 Health check com retry na inicialização
+// 🧪 Health check com retry na inicialização (apenas se não for script CLI curto)
 (async () => {
+  const isShortScript = process.argv[1] && (
+    process.argv[1].includes("cron_notificacoes.js") || 
+    process.argv[1].includes("test_") ||
+    process.argv[1].includes("consultar_")
+  );
+  
+  if (isShortScript) return;
+
   for (let i = 1; i <= 5; i++) {
     try {
-      await pool.query("SELECT NOW() as time, version() as pg_version");
+      // Usa originalPool diretamente para um check rápido sem retries do wrapper
+      await originalPool.query("SELECT 1");
       console.log("✅ PostgreSQL conectado com sucesso!");
-      console.log(`📊 Pool: max=${poolConfig.max}, min=${poolConfig.min}`);
       return;
     } catch (err) {
-      console.error(`❌ Tentativa ${i}/5 falhou:`, err.message);
+      // Se o pool já estiver fechando/fechado, para o health check silenciosamente
+      if (err.message.includes("pool has been ended") || err.message.includes("terminating")) return;
+
+      console.error(`❌ Tentativa de conexão ${i}/5 falhou:`, err.message);
       if (i < 5) {
         await new Promise(r => setTimeout(r, 2000));
       } else {
         console.error("💀 FALHA CRÍTICA: PostgreSQL inacessível");
-        // NÃO faz process.exit() - deixa a app tentar se recuperar
       }
     }
   }
 })();
 
 // 🔍 Monitor de saúde a cada 30 segundos
-setInterval(() => {
+const monitorInterval = setInterval(() => {
   const stats = pool.getStats();
   
   // Alerta se houver problemas
@@ -197,28 +207,31 @@ setInterval(() => {
   }
 }, 30000);
 
+// Impede que o monitoramento segure o processo (permite que o script saia sozinho no cron)
+monitorInterval.unref();
+
 // 🛡️ Graceful shutdown
 process.on("SIGTERM", async () => {
   console.log("🛑 SIGTERM recebido - fechando pool...");
   try {
-    await originalPool.end();
+    if (!originalPool.ended) await originalPool.end();
     console.log("✅ Pool fechado com sucesso");
     process.exit(0);
   } catch (err) {
-    console.error("❌ Erro ao fechar pool:", err);
-    process.exit(1);
+    if (!err.message.includes('ended')) console.error("❌ Erro ao fechar pool:", err);
+    process.exit(err.message.includes('ended') ? 0 : 1);
   }
 });
 
 process.on("SIGINT", async () => {
   console.log("🛑 SIGINT recebido - fechando pool...");
   try {
-    await originalPool.end();
+    if (!originalPool.ended) await originalPool.end();
     console.log("✅ Pool fechado com sucesso");
     process.exit(0);
   } catch (err) {
-    console.error("❌ Erro ao fechar pool:", err);
-    process.exit(1);
+    if (!err.message.includes('ended')) console.error("❌ Erro ao fechar pool:", err);
+    process.exit(err.message.includes('ended') ? 0 : 1);
   }
 });
 
