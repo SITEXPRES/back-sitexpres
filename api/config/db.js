@@ -110,15 +110,15 @@ const pool = {
           }
         };
 
-        // 🔥 Auto-release de segurança: 15 segundos
+        // 🔥 Auto-release de segurança: 300 segundos (5 min)
         const timeout = setTimeout(() => {
           if (!released) {
             autoReleases++;
-            console.warn(`⚠️ AUTO-RELEASE após 15s (queries: ${queryCount}, total auto: ${autoReleases})`);
+            console.warn(`⚠️ AUTO-RELEASE após 300s (queries: ${queryCount}, total auto: ${autoReleases})`);
             released = true;
             originalRelease();
           }
-        }, 15000);
+        }, 300000);
 
         // Limpa timeout quando liberar manualmente
         const originalReleaseWithCleanup = client.release;
@@ -162,6 +162,7 @@ const pool = {
 (async () => {
   const isShortScript = process.argv[1] && (
     process.argv[1].includes("cron_notificacoes.js") || 
+    process.argv[1].includes("cron-stats.js") || 
     process.argv[1].includes("test_") ||
     process.argv[1].includes("consultar_")
   );

@@ -134,12 +134,15 @@ export const newsite = async (req, res) => {
         let client;
         const jobStartTime = Date.now();
 
+        // Variáveis que precisam sobreviver entre as fases
+        let primeiraVez, baseHTML, nomeSubdominio, finalPrompt;
+
         try {
+          // ─── FASE 1: consultas rápidas ao BD ────────────────────────────────
           logStep(jobId, '🔗 Conectando ao banco de dados...');
           client = await pool.connect();
           logStep(jobId, `✅ Conexão com BD estabelecida (${Date.now() - jobStartTime}ms)`);
 
-          // Verifica se já existe site gerado
           logStep(jobId, '🔍 Verificando se site já existe...');
           const t3 = Date.now();
           const existing = await client.query(
@@ -150,48 +153,44 @@ export const newsite = async (req, res) => {
           );
           logStep(jobId, `✅ Consulta BD concluída (${Date.now() - t3}ms) | site existente: ${existing.rows.length > 0}`);
 
-          //qtd sites do cliente
           const qtde_sites = await client.query(
-            `SELECT * FROM public.sites   where  user_id =$1`,
+            `SELECT * FROM public.sites where user_id = $1`,
             [userId]
           );
 
           //=============================
-          //Validação dos limites free  1 site 
+          // Validação dos limites free
           //=============================
           if (typedo_plano === 'free') {
-            const qtde_sites_projeto = existing.rows.length;
-            const qtde_sites_cliente = qtde_sites.rows.length;
-
-            if (qtde_sites_projeto == 0 && qtde_sites_cliente >= 1) {
+            if (existing.rows.length === 0 && qtde_sites.rows.length >= 1) {
               logStep(jobId, '❌ Limite de sites free atingido — job encerrado');
-              jobs[jobId] = {
-                status: "error",
-                result: null,
-                error: "Limite de sites atingido"
-              };
-              return; // Não envia resposta novamente!
+              jobs[jobId] = { status: "error", result: null, error: "Limite de sites atingido" };
+              client.release();
+              return;
             }
           }
 
-          // Verifica se é a primeira vez
-          const primeiraVez = existing.rows.length === 0;
-          const baseHTML = primeiraVez ? "" : existing.rows[0].html_content;
+          primeiraVez = existing.rows.length === 0;
+          baseHTML    = primeiraVez ? "" : existing.rows[0].html_content;
+          if (!primeiraVez) {
+            nomeSubdominio = existing.rows[0].name.replace("Site de ", "").toLowerCase();
+          }
           logStep(jobId, `ℹ️  Modo: ${primeiraVez ? 'CRIAÇÃO (primeira vez)' : 'EDIÇÃO (site existente)'}`);
 
-          // Monta prompt final
           const fullPrompt = imageURL
             ? `${prompt}\nUse esta URL da imagem no site: ${imageURL}`
             : prompt;
 
-          // Caso já exista HTML salvo, peça para alterar
-          const finalPrompt = primeiraVez
+          finalPrompt = primeiraVez
             ? fullPrompt
             : `HTML atual:\n${baseHTML}\nFaça as alterações solicitadas: ${fullPrompt}`;
 
-          // =============================
-          // Gera HTML pela API Claude
-          // =============================
+          // ─── LIBERA O CLIENT antes da IA (operação longa!) ──────────────────
+          client.release();
+          client = null;
+          logStep(jobId, '🔓 Conexão com BD liberada — iniciando chamada à IA...');
+
+          // ─── FASE 2: chamada à IA (sem conexão BD aberta) ───────────────────
           logStep(jobId, '🤖 Enviando prompt para a IA (Claude Haiku)... aguarde');
           const tIA = Date.now();
           const html = await gerar_site(
@@ -208,72 +207,60 @@ export const newsite = async (req, res) => {
           );
           logStep(jobId, `✅ HTML gerado pela IA (${((Date.now() - tIA) / 1000).toFixed(1)}s) | tamanho: ${html?.length ?? 0} chars`);
 
-
-
-          // Gera nome do subdomínio via IA
-          let nomeSubdominio;
+          // Gera subdomínio (apenas na criação, sem BD ainda)
           if (primeiraVez) {
             logStep(jobId, '🔤 Gerando nome do subdomínio via IA...');
             const tSub = Date.now();
             nomeSubdominio = await gerarNomeSubdominio(prompt);
             logStep(jobId, `✅ Subdomínio gerado (${Date.now() - tSub}ms): ${nomeSubdominio}`);
 
-            // Cria subdomínio no DirectAdmin
             logStep(jobId, `🌐 Criando subdomínio no DirectAdmin: ${nomeSubdominio}.sitexpres.com.br`);
             const tDA = Date.now();
             await criarSubdominioDirectAdmin(nomeSubdominio, "sitexpres.com.br");
             logStep(jobId, `✅ Subdomínio criado no DirectAdmin (${Date.now() - tDA}ms)`);
+          } else {
+            logStep(jobId, `ℹ️  Subdomínio existente recuperado: ${nomeSubdominio}`);
+          }
 
+          // ─── FASE 3: nova conexão para salvar tudo no BD ────────────────────
+          logStep(jobId, '🔗 Reconectando ao BD para salvar resultados...');
+          client = await pool.connect();
+
+          logStep(jobId, '💾 Salvando HTML no banco de dados...');
+          const tDB = Date.now();
+
+          if (primeiraVez) {
             const siteUrl = `https://${nomeSubdominio}.sitexpres.com.br`;
-            const siteName = `Site de ${nomeSubdominio}`;
-
             await client.query(
               `INSERT INTO sites 
-              (user_id, site_name, site_url, credits_used, status, metadata,id_projeto)
+              (user_id, site_name, site_url, credits_used, status, metadata, id_projeto)
               VALUES ($1, $2, $3, $4, $5, $6, $7)`,
               [
                 userId,
-                siteName,
+                `Site de ${nomeSubdominio}`,
                 siteUrl,
                 10,
                 'active',
-                JSON.stringify({
-                  id_projeto: id_projeto,
-                  subdominio: nomeSubdominio,
-                  created_by: 'ai_generation'
-                }),
+                JSON.stringify({ id_projeto, subdominio: nomeSubdominio, created_by: 'ai_generation' }),
                 id_projeto
               ]
             );
             logStep(jobId, `✅ Site inserido na tabela 'sites'`);
-
-          } else {
-            nomeSubdominio = existing.rows[0].name.replace("Site de ", "").toLowerCase();
-            logStep(jobId, `ℹ️  Subdomínio existente recuperado: ${nomeSubdominio}`);
           }
 
-          // Marca todos os registros existentes como inativos
-          logStep(jobId, '💾 Salvando HTML no banco de dados...');
-          const tDB = Date.now();
           await client.query(
-            `UPDATE generated_sites 
-            SET status = 'inativo'
-            WHERE id_projeto = $1`,
+            `UPDATE generated_sites SET status = 'inativo' WHERE id_projeto = $1`,
+            [id_projeto]
+          );
+          await client.query(
+            `UPDATE site_prompts SET status = 'inativo' WHERE id_projeto = $1`,
             [id_projeto]
           );
 
-          await client.query(
-            `UPDATE site_prompts 
-        SET status = 'inativo'
-        WHERE id_projeto = $1`,
-            [id_projeto]
-          );
-
-          // Insere registro no banco
           const insertSite = await client.query(
             `INSERT INTO generated_sites 
-           (user_id, name, prompt, html_content, id_projeto, image_path,subdominio,status)
-           VALUES ($1, $2, $3, $4, $5, $6 ,$7, $8)
+           (user_id, name, prompt, html_content, id_projeto, image_path, subdominio, status)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
            RETURNING id, name, prompt, html_content, created_at`,
             [userId, `Site de ${nomeSubdominio}`, prompt, html, id_projeto, imageURL, nomeSubdominio, 'ativo']
           );
@@ -281,7 +268,7 @@ export const newsite = async (req, res) => {
           const novoId = insertSite.rows[0].id;
 
           await client.query(
-            `INSERT INTO site_prompts (user_id, id_projeto, prompt,id_site_gererate,status)
+            `INSERT INTO site_prompts (user_id, id_projeto, prompt, id_site_gererate, status)
            VALUES ($1, $2, $3, $4, $5)`,
             [userId, id_projeto, prompt, novoId, 'ativo']
           );
@@ -292,21 +279,19 @@ export const newsite = async (req, res) => {
             [id_projeto]
           );
 
+          // Libera antes do FTP (outra operação longa)
+          client.release();
+          client = null;
+
+          // ─── FASE 4: envio via FTP ───────────────────────────────────────────
           logStep(jobId, `📤 Enviando HTML via FTP para DirectAdmin... (hospedagem customizada: ${existe_hospedagem.rows.length > 0})`);
           const tFTP = Date.now();
 
           if (existe_hospedagem.rows.length > 0) {
-            var username = existe_hospedagem.rows[0].username;
-            var password = existe_hospedagem.rows[0].senha;
-            var dominio_hospedagem = existe_hospedagem.rows[0].dominio;
-
-            await enviarHTMLSubdominio(
-              "ftp.sitexpres.com.br",
-              username,
-              password,
-              dominio_hospedagem,
-              html
-            );
+            const username          = existe_hospedagem.rows[0].username;
+            const password          = existe_hospedagem.rows[0].senha;
+            const dominio_hospedagem = existe_hospedagem.rows[0].dominio;
+            await enviarHTMLSubdominio("ftp.sitexpres.com.br", username, password, dominio_hospedagem, html);
           } else {
             await enviarHTMLSubdominio(
               "ftp.sitexpres.com.br",
@@ -321,10 +306,7 @@ export const newsite = async (req, res) => {
           // Update no github caso integrado
           logStep(jobId, '🐙 Verificando integração com GitHub...');
           const githubResult = await updateGitHubIfIntegrated(
-            userId,
-            id_projeto,
-            html,
-            "Atualização do site via SiteXpress"
+            userId, id_projeto, html, "Atualização do site via SiteXpress"
           );
 
           if (githubResult.updated) {
@@ -344,16 +326,14 @@ export const newsite = async (req, res) => {
           jobs[jobId] = { status: "error", result: null, error: error.message };
         } finally {
           if (client) {
-            try {
-              client.release();
-            } catch (ignored) {
-              // ignore
-            }
+            try { client.release(); } catch (ignored) {}
           }
         }
       })();
 
     }
+
+
 
   } catch (error) {
     //console.error(error);
@@ -404,6 +384,34 @@ export const getSites = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: "Erro ao buscar sites" });
+  }
+};
+
+// Retorna os dados de analytics de um site para uso em gráficos
+export const getSiteAnalytics = async (req, res) => {
+  const { id_projeto } = req.params;
+
+  try {
+    const result = await pool.query(
+      `SELECT
+         TO_CHAR(date, 'YYYY-MM') AS mes,
+         date,
+         views_count,
+         hits,
+         files,
+         unique_visitors,
+         bounce_rate,
+         avg_session_duration
+       FROM site_analytics
+       WHERE id_projeto = $1
+       ORDER BY date ASC`,
+      [id_projeto]
+    );
+
+    res.json({ success: true, analytics: result.rows });
+  } catch (error) {
+    console.error('Erro ao buscar analytics:', error);
+    res.status(500).json({ success: false, message: 'Erro ao buscar analytics' });
   }
 };
 

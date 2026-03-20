@@ -1,5 +1,5 @@
 import express from "express";
-import { getSites, newsite, jobStatus, check_id_projeto, testecret_domin, list_don, get_dominio, getPromts, restauracao_versao, deletar_site } from "../controllers/siteController.js";
+import { getSites, newsite, jobStatus, check_id_projeto, testecret_domin, list_don, get_dominio, getPromts, restauracao_versao, deletar_site, getSiteAnalytics } from "../controllers/siteController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
 import { upload } from "../middlewares/upload.js";
 const router = express.Router();
@@ -18,5 +18,6 @@ router.post("/restauracao", authMiddleware, restauracao_versao);
 router.put("/deletar", deletar_site);
 router.get("/check_id_projeto/:id_projeto", check_id_projeto);
 router.post("/testedom", testecret_domin);
+router.get("/analytics/:id_projeto", authMiddleware, getSiteAnalytics);
 
 export default router;
