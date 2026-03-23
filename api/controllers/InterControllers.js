@@ -4,6 +4,7 @@ import { console } from "inspector";
 import pool from "../config/db.js";
 import { gerandonotafiscal } from "../services/notafiscalService.js";
 import { createCustomerReseller_funcao, create_domain_reseller_funcao } from "./resellerController.js";
+import { sendMail } from "../services/emailService.js";
 
 const cert = fs.readFileSync("certificados/inter.crt");
 const key = fs.readFileSync("certificados/inter.key");
@@ -44,7 +45,8 @@ async function gerarToken() {
             res.on("data", (chunk) => body += chunk);
             res.on("end", () => {
                 if (res.statusCode && res.statusCode >= 400) {
-                    return reject(new Error(`Erro ao gerar token (Status: ${res.statusCode}): ${body}`));
+                    console.error(`❌ Erro Inter API (Status ${res.statusCode}):`, body);
+                    return reject(new Error(`Erro ao gerar token (Status: ${res.statusCode}). Verifique se o CLIENT_ID, SECRET e Certificados estão corretos.`));
                 }
                 try {
                     resolve(JSON.parse(body));
@@ -78,6 +80,20 @@ export const ReceberRetorno = async (req, res) => {
         return res.status(200).json({ ok: true });
     } catch (error) {
         console.error("Erro ao processar webhook:", error);
+
+        // Alerta de erro para o administrador
+        try {
+            await sendMail(
+                "contato@sitexpres.com",
+                "🚨 ERRO no Webhook de Pagamento (Inter PIX)",
+                `<p>Ocorreu um erro inesperado ao receber o webhook do Banco Inter.</p>
+                 <p><b>Detalhes do erro:</b> ${error.message}</p>
+                 <p><b>Payload recebido:</b> <pre>${JSON.stringify(req.body, null, 2)}</pre></p>`
+            );
+        } catch (mailErr) {
+            console.error("Erro ao enviar alerta de e-mail Webhook:", mailErr);
+        }
+
         return res.status(500).json({ error: "Erro interno" });
     }
 };
@@ -419,6 +435,21 @@ export const consultarPix = async (req, res) => {
             }
             // -----------------------------------------------------------------
 
+            // NOTIFICAR ADMINISTRADOR (SUCESSO)
+            try {
+                await sendMail(
+                    "contato@sitexpres.com",
+                    "✅ Pagamento Confirmado (Inter PIX) e Nota Gerada",
+                    `<p>Um novo pagamento foi processado via Banco Inter (PIX)!</p>
+                     <p><b>Usuário:</b> ${result.rows[0].email}</p>
+                     <p><b>Valor:</b> R$ ${transacao.monetary_value}</p>
+                     <p><b>TXID:</b> ${txid}</p>
+                     <p><b>Link Nota Fiscal:</b> <a href="${linkNF}">${linkNF}</a></p>`
+                );
+            } catch (mailErr) {
+                console.error("Erro ao enviar email de notificação Inter:", mailErr);
+            }
+
             return res.json({
                 pago: true,
                 status: "CONCLUIDA",
@@ -437,6 +468,19 @@ export const consultarPix = async (req, res) => {
         });
     } catch (error) {
         console.error("Erro ao consultar PIX:", error);
+
+        // Alerta de erro para o administrador
+        try {
+            await sendMail(
+                "contato@sitexpres.com",
+                "🚨 ERRO no Processamento de Pagamento (Inter PIX)",
+                `<p>Ocorreu um erro ao consultar/processar o pagamento PIX <b>${req.body.txid}</b>.</p>
+                 <p><b>Detalhes do erro:</b> ${error.message}</p>`
+            );
+        } catch (mailErr) {
+            console.error("Erro ao enviar alerta de e-mail Inter:", mailErr);
+        }
+
         return res.status(500).json({
             pago: false,
             status: "ERRO",
@@ -1413,6 +1457,23 @@ export const consultarPix_dominio = async (req, res) => {
             );
 
 
+
+            // NOTIFICAR ADMINISTRADOR (SUCESSO DOMÍNIO)
+            try {
+                await sendMail(
+                    "contato@sitexpres.com",
+                    "✅ Domínio Registrado e Pago (Inter PIX)",
+                    `<p>Um novo domínio foi pago via Banco Inter (PIX)!</p>
+                     <p><b>Domínio:</b> ${transacao.full_domain}</p>
+                     <p><b>Cliente:</b> ${user.name} (${user.email})</p>
+                     <p><b>Valor:</b> R$ ${transacao.domain_price}</p>
+                     <p><b>TXID:</b> ${txid}</p>
+                     <p><b>Link Nota Fiscal:</b> <a href="${linkNF}">${linkNF}</a></p>`
+                );
+            } catch (mailErr) {
+                console.error("Erro ao enviar email de notificação Inter domínio:", mailErr);
+            }
+
             return res.json({
                 pago: true,
                 status: "CONCLUIDA",
@@ -1420,8 +1481,6 @@ export const consultarPix_dominio = async (req, res) => {
                 domain: transacao.full_domain,
                 data_customer: data_customer,
                 RetornoNotaFiscal: linkNF
-
-
             });
         }
 

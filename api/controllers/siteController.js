@@ -101,7 +101,7 @@ export const newsite = async (req, res) => {
 
     logStep(null, '🔍 Verificando créditos do usuário...');
     const t1 = Date.now();
-    
+
     // 🧪 MODO DE TESTE: Ignora verificação de créditos
     let verificar_creditos_prompt_result = { podeRodar: true };
     if (process.env.TEST_MODE_GENERATE === "true" || req.body?.test_mode === true) {
@@ -178,7 +178,7 @@ export const newsite = async (req, res) => {
           }
 
           primeiraVez = existing.rows.length === 0;
-          baseHTML    = primeiraVez ? "" : existing.rows[0].html_content;
+          baseHTML = primeiraVez ? "" : existing.rows[0].html_content;
           if (!primeiraVez) {
             nomeSubdominio = existing.rows[0].name.replace("Site de ", "").toLowerCase();
           }
@@ -214,18 +214,11 @@ export const newsite = async (req, res) => {
           );
           logStep(jobId, `✅ HTML gerado pela IA (${((Date.now() - tIA) / 1000).toFixed(1)}s) | tamanho: ${html?.length ?? 0} chars`);
 
-<<<<<<< Updated upstream
           // Gera subdomínio (apenas na criação, sem BD ainda)
-=======
-
-
-          // Gera nome do subdomínio
-          let nomeSubdominio;
->>>>>>> Stashed changes
           if (primeiraVez) {
             logStep(jobId, '🔤 Gerando nome do subdomínio...');
             const tSub = Date.now();
-            
+
             // 🧪 MODO DE TESTE: Nome genérico para subdomínio
             if (process.env.TEST_MODE_GENERATE === "true" || req.body?.test_mode === true) {
               nomeSubdominio = `teste-${Math.floor(Math.random() * 10000)}`;
@@ -309,8 +302,8 @@ export const newsite = async (req, res) => {
           const tFTP = Date.now();
 
           if (existe_hospedagem.rows.length > 0) {
-            const username          = existe_hospedagem.rows[0].username;
-            const password          = existe_hospedagem.rows[0].senha;
+            const username = existe_hospedagem.rows[0].username;
+            const password = existe_hospedagem.rows[0].senha;
             const dominio_hospedagem = existe_hospedagem.rows[0].dominio;
             await enviarHTMLSubdominio("ftp.sitexpres.com.br", username, password, dominio_hospedagem, html);
           } else {
@@ -347,7 +340,7 @@ export const newsite = async (req, res) => {
           jobs[jobId] = { status: "error", result: null, error: error.message };
         } finally {
           if (client) {
-            try { client.release(); } catch (ignored) {}
+            try { client.release(); } catch (ignored) { }
           }
         }
       })();

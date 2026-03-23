@@ -7,6 +7,8 @@ import pool from "../config/db.js";
 import fs from 'fs/promises';
 import path from 'path';
 import { createHospedagem_funcao } from './hospedagemController.js';
+import { sendMail } from '../services/emailService.js';
+import { gerandonotafiscal } from '../services/notafiscalService.js';
 
 // ==================== FUNÇÕES AUXILIARES ====================
 
@@ -554,22 +556,33 @@ export async function paymentSuccess(req, res) {
             }
           );
 
-
+          // NOTIFICAR ADMINISTRADOR (SUCESSO DOMÍNIO)
+          try {
+            await sendMail(
+              "contato@sitexpres.com",
+              "✅ Domínio Registrado e Pago (PayPal)",
+              `<p>Um novo domínio foi pago via PayPal!</p>
+               <p><b>Domínio:</b> ${transacao.full_domain}</p>
+               <p><b>Cliente:</b> ${transacao.customer_name} (${transacao.customer_email})</p>
+               <p><b>Valor:</b> R$ ${transacao.domain_price}</p>
+               <p><b>Transação:</b> ${token}</p>
+               <p><b>Link Nota Fiscal:</b> <a href="${linkNF}">${linkNF}</a></p>`
+            );
+          } catch (mailErr) {
+            console.error("Erro ao enviar email de notificação PayPal domínio:", mailErr);
+          }
 
           return res.json({
             pago: true,
             status: "CONCLUIDA",
             mensagem: "Pagamento processado com sucesso!",
             domain: transacao.full_domain,
-            RetornoNotaFiscal: notaFiscal,
-            hospedagem: hospedagem_retorno,
-            reseller: dados_reseller 
-
+            RetornoNotaFiscal: (typeof notaFiscal !== 'undefined' ? notaFiscal : null),
+            hospedagem: (typeof hospedagem_retorno !== 'undefined' ? hospedagem_retorno : null),
+            reseller: (typeof dados_reseller !== 'undefined' ? dados_reseller : null)
           });
         }
       }
-
-
 
     } else {
 
@@ -623,6 +636,94 @@ export async function paymentSuccess(req, res) {
           [linkNF, payment.rows[0].payment_id]
         );
 
+        // =================================================================
+        // PARIDADE COM INTER: LÓGICA PREMIUM E PRÓXIMO CICLO
+        // =================================================================
+        try {
+            const user_id = payment.rows[0].user_id;
+            const monetary_value = payment.rows[0].monetary_value;
+            const txid = token;
+
+            // 1. VERIFICA SE O USUÁRIO JÁ É PREMIUM. SE NÃO FOR, SALVA OS CRÉDITOS ATUAIS COMO FREE CREDITS
+            const checkPlan = await pool.query(
+                `SELECT plan FROM public.user_subscriptions WHERE user_id = $1 AND is_active = true`,
+                [user_id]
+            );
+            
+            const isPremium = checkPlan.rows.length > 0 && checkPlan.rows[0].plan === 'premium';
+            
+            if (!isPremium) {
+                await pool.query(
+                    `UPDATE public.users SET free_credits = credits WHERE id = $1`,
+                    [user_id]
+                );
+                console.log(`Créditos free salvos (backup) para o usuário ${user_id}`);
+            }
+
+            // 2. Colocar usuário como premium em user_subscriptions
+            await pool.query(
+                `UPDATE public.user_subscriptions SET is_active = false WHERE user_id = $1 AND is_active = true`,
+                [user_id]
+            );
+
+            await pool.query(
+                `INSERT INTO public.user_subscriptions (user_id, plan, is_active) 
+                 VALUES ($1, 'premium', true)`,
+                [user_id]
+            );
+
+            // 3. REGISTRAR PRÓXIMO CICLO (Fatura Pendente)
+            const valorAtual = parseFloat(monetary_value);
+            const isDev = process.env.DEV_MODE === 'true';
+
+            if (valorAtual >= 29.90 || isDev) {
+                console.log(`Registrando próximo ciclo para valor: ${valorAtual} (Dev: ${isDev})`);
+                
+                const due_date = new Date();
+                due_date.setMonth(due_date.getMonth() + 1);
+
+                const txidNext = `PENDING-REG-PAYPAL-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+
+                await pool.query(
+                    `INSERT INTO public.transactions (
+                        user_id, type, status, description, credits, monetary_value, payment_method, payment_id, value, due_date
+                    ) VALUES ($1, 'purchase_credits', 'pending', $2, $3, $4, 'PAYPAL', $5, $6, $7)`,
+                    [
+                        user_id,                                         // $1
+                        'Mensalidade Sitexpress - Próximo Ciclo',        // $2
+                        50,                                              // $3
+                        29.90,                                           // $4
+                        txidNext,                                        // $5
+                        29.90,                                           // $6
+                        due_date                                         // $7
+                    ]
+                );
+                console.log(`Próxima fatura (pendente) registrada para o usuário ${user_id}`);
+            }
+
+            // 4. NOTIFICAR ADMINISTRADOR (SUCESSO)
+            await sendMail(
+                "contato@sitexpres.com",
+                "✅ Pagamento Confirmado (PayPal) e Nota Gerada",
+                `<p>Um novo pagamento foi processado via PayPal!</p>
+                 <p><b>Usuário:</b> ${result.rows[0].name} (${result.rows[0].email})</p>
+                 <p><b>Valor:</b> R$ ${monetary_value}</p>
+                 <p><b>Transação:</b> ${token}</p>
+                 <p><b>Link Nota Fiscal:</b> <a href="${linkNF}">${linkNF}</a></p>`
+            );
+
+        } catch (parityError) {
+            console.error("Erro na lógica de paridade/notificação PayPal:", parityError);
+            // Notifica erro de paridade mas não trava o redirect de sucesso do usuário
+            await sendMail(
+                "contato@sitexpres.com",
+                "⚠️ ALERTA: Falha na Paridade/Notificação (PayPal)",
+                `<p>O pagamento <b>${token}</b> foi concluído, mas houve um erro na lógica secundária (Premium/Próximo Ciclo/E-mail).</p>
+                 <p><b>Erro:</b> ${parityError.message}</p>`
+            );
+        }
+        // =================================================================
+
       } else {
         console.log(`Pagamento ${token} já processado anteriormente. Status atual: ${payment.rows[0].status}`);
       }
@@ -633,6 +734,20 @@ export async function paymentSuccess(req, res) {
 
   } catch (err) {
     console.error("ERRO:", err);
+    
+    // Alerta de erro para o administrador
+    try {
+      await sendMail(
+        "contato@sitexpres.com",
+        "🚨 ERRO no Processamento de Pagamento (PayPal)",
+        `<p>Ocorreu um erro ao processar o pagamento PayPal <b>${req.query.token}</b>.</p>
+         <p><b>Detalhes do erro:</b> ${err.message}</p>
+         <p>Verifique o banco de dados e os logs do sistema imediatamente.</p>`
+      );
+    } catch (mailErr) {
+      console.error("Erro ao enviar e-mail de alerta:", mailErr);
+    }
+
     return res.status(500).send("Erro ao processar pagamento");
   }
 }
