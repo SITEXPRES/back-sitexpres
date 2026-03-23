@@ -268,37 +268,40 @@ class EmissorNfse
          ];
      }
   */
-    private function montarTomador(array $dadosTomador): array
-    {
-        $tipo = strtoupper($dadosTomador['tipo'] ?? 'NAO_IDENTIFICADO');
-        $isForeign = $dadosTomador['isForeign'] ?? false;
+   private function montarTomador(array $dadosTomador): array
+{
+    $tipo = strtoupper($dadosTomador['tipo'] ?? '');
+    $isForeign = $dadosTomador['isForeign'] ?? false;
 
-        $nome = $dadosTomador['nome']
-            ?? $dadosTomador['razaoSocial']
-            ?? 'Consumidor';
+    $nome = $dadosTomador['nome']
+        ?? $dadosTomador['razaoSocial']
+        ?? 'Consumidor';
 
-        // 🔥 CORREÇÃO DEFINITIVA
-        if ($isForeign) {
-            return [
-                'xNome' => $nome,
-                'email' => $dadosTomador['email'] ?? '',
-            ];
-        }
-
-        // padrão BR normal
-        if ($tipo === 'CPF' || $tipo === 'CNPJ') {
-            return [
-                $tipo => $dadosTomador['cpfCnpj'],
-                'xNome' => $nome,
-                'email' => $dadosTomador['email'] ?? '',
-            ];
-        }
-
+    // 🔥 ESTRANGEIRO (SEM LOOP)
+    if ($isForeign) {
         return [
+            'cNaoNIF' => 1, // <-- ESSENCIAL
+            'xNome'   => $nome,
+            'email'   => $dadosTomador['email'] ?? '',
+        ];
+    }
+
+    // BR normal
+    if ($tipo === 'CPF' || $tipo === 'CNPJ') {
+        return [
+            $tipo => $dadosTomador['cpfCnpj'],
             'xNome' => $nome,
             'email' => $dadosTomador['email'] ?? '',
         ];
     }
+
+    // fallback
+    return [
+        'cNaoNIF' => 1,
+        'xNome'   => $nome,
+        'email'   => $dadosTomador['email'] ?? '',
+    ];
+}
     /**
      * Salva o XML da NFS-e
      */
