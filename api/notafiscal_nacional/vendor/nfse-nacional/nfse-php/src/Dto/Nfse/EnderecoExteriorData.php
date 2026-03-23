@@ -1,0 +1,33 @@
+<?php
+
+namespace Nfse\Dto\Nfse;
+
+use Spatie\DataTransferObject\Attributes\MapFrom;
+use Spatie\DataTransferObject\DataTransferObject;
+
+class EnderecoExteriorData extends DataTransferObject
+{
+    /**
+     * Código do país (ISO2).
+     */
+    #[MapFrom('cPais')]
+    public ?string $codigoPais = null;
+
+    /**
+     * Código de endereçamento postal.
+     */
+    #[MapFrom('cEndPost')]
+    public ?string $codigoEnderecamentoPostal = null;
+
+    /**
+     * Nome da cidade.
+     */
+    #[MapFrom('xCidade')]
+    public ?string $cidade = null;
+
+    /**
+     * Estado, província ou região.
+     */
+    #[MapFrom('xEstProvReg')]
+    public ?string $estadoProvinciaRegiao = null;
+}

@@ -8,7 +8,8 @@ import fs from 'fs/promises';
 import path from 'path';
 import { createHospedagem_funcao } from './hospedagemController.js';
 import { sendMail } from '../services/emailService.js';
-import { gerandonotafiscal } from '../services/notafiscalService.js';
+import { buildStyledEmail } from '../services/emailTemplateBuilder.js';
+import { gerandonotafiscal, gerarNotaNacional } from '../services/notafiscalService.js';
 
 // ==================== FUNÇÕES AUXILIARES ====================
 
@@ -74,7 +75,6 @@ export async function createOrder(req, res) {
     var ID_user = req.body.userid || "00";
     var Url_Pagamento = response.result.links.find(l => l.rel === "approve")?.href || 'Sem URL';
 
-
     pool.query(
       `
       INSERT INTO public.transactions (
@@ -112,7 +112,6 @@ export async function createOrder(req, res) {
         valor
       ]
     );
-
 
     return res.json({
       id: response.result.id,
@@ -411,7 +410,6 @@ export async function paymentSuccess(req, res) {
             [transacao.id]
           );
 
-
           //Consultar dados do usuário para nota fiscal
           const result_user = await pool.query(
             `SELECT * FROM public.users WHERE id = $1`,
@@ -419,7 +417,7 @@ export async function paymentSuccess(req, res) {
           );
 
           // ENVIA NOTA FISCAL
-          var notaFiscal = await gerandonotafiscal({
+          var notaFiscal = await gerarNotaNacional({
             valor_servico: transacao.domain_price,
             cnpj_cpf: result_user.rows[0].cnpj_cpf,
             razao_social: result_user.rows[0].razao_social || result_user.rows[0].name,
@@ -429,25 +427,104 @@ export async function paymentSuccess(req, res) {
             uf: result_user.rows[0].uf,
             cep: result_user.rows[0].cep,
             telefone: result_user.rows[0].telefone,
-            email: result_user.rows[0].email
+            email: result_user.rows[0].email,
+            descricao: `Registro de Domínio: ${transacao.full_domain}`
           });
 
-          console.log("Retorno NF:", notaFiscal);
+          console.log("Retorno NF Nacional (Domínio):", notaFiscal);
 
-          // Converte o JSON da resposta
-          const responseNF = JSON.parse(notaFiscal.resposta_nf);
+          let linkNF = null;
+          let chaveAcesso = null;
 
-          // Separa somente o link
-          const linkNF = responseNF.message?.split("||")[1] || null;
+          if (notaFiscal.sucesso) {
+            linkNF = notaFiscal.linkConsulta;
+            chaveAcesso = notaFiscal.chaveAcesso;
+            
+            try {
+                const isForeign = (result_user.rows[0].uf === "EX" || result_user.rows[0].cep === "00000000");
+                let clientTheme = {
+                    title: "Sua Nota Fiscal foi gerada! 📄",
+                    subject: "📄 Sua Nota Fiscal foi gerada!",
+                    text1: `Sua Nota Fiscal de Serviços Eletrônica (NFS-e) para o domínio ${transacao.full_domain} foi emitida com sucesso!`,
+                    text2: "Para consultar ou baixar o PDF, <b>copie a Chave de Acesso abaixo</b> e acesse a página oficial do governo:",
+                    btn: "Consultar NFS-e"
+                };
+                if (isForeign) {
+                    clientTheme = {
+                        title: "Your Invoice has been generated! 📄",
+                        subject: "📄 Your Invoice has been generated!",
+                        text1: `Your Commercial Invoice (NFS-e) for the domain ${transacao.full_domain} has been successfully issued!`,
+                        text2: "To view or download the PDF of your invoice, <b>copy the Access Key below</b> and paste it on the official government page:",
+                        btn: "View Invoice"
+                    };
+                }
 
-          console.log("Link da Nota Fiscal:", linkNF);
+                const clientHtml = buildStyledEmail(
+                    clientTheme.title,
+                    result_user.rows[0].name,
+                    `<p class="email-text">${clientTheme.text1}</p>
+                     <p class="email-text">${clientTheme.text2}</p>
+                     <div class="chave-box">${chaveAcesso}</div>
+                     <p class="email-text"><a href="${linkNF}">${linkNF}</a></p>`,
+                    clientTheme.btn,
+                    linkNF
+                );
+
+                await sendMail(
+                    result_user.rows[0].email,
+                    clientTheme.subject,
+                    clientHtml
+                );
+            } catch (emailErr) {
+                console.error("Erro email cliente NF:", emailErr);
+            }
+          } else {
+            console.error("Falha ao gerar NF Nacional Domínio:", notaFiscal.mensagem, notaFiscal.erro);
+            try {
+                const errorMsg = typeof notaFiscal.erro === 'object' ? JSON.stringify(notaFiscal.erro) : notaFiscal.erro;
+                await sendMail(
+                    "contato@sitexpres.com",
+                    "🚨 ERRO ao Gerar Nota Fiscal (PayPal Domínio)",
+                    `<p>Erro Nota Fiscal. Transação: <b>${token}</b> (Usuário: ${result_user.rows[0].email}).</p>
+                     <p><b>Mensagem:</b> ${notaFiscal.mensagem}</p>
+                     <p><b>Detalhes do Erro:</b> ${errorMsg}</p>`
+                );
+            } catch (emailErr) {} } 
+
+        // Envia notificação ao ADM com chave
+        let isForeignAdmin = (result_user.rows[0].uf === "EX" || result_user.rows[0].cep === "00000000");
+        let subjAdmin = isForeignAdmin ? `✅ [GRINGO] ${transactionDetails.resource.description} Pago (PayPal)` : `✅ ${transactionDetails.resource.description} Pago (PayPal)`;
+        let pbodyAdmin = `<p>Um novo plano/crédito foi pago via PayPal!</p>
+             <p><b>Cliente:</b> ${result.rows[0].name} (${result.rows[0].email})</p>
+             <p><b>Descrição:</b> ${transactionDetails.resource.description}</p>
+             <p><b>Valor:</b> ${transactionDetails.resource.amount.total} ${transactionDetails.resource.amount.currency}</p>
+             <p><b>Transação:</b> ${transactionId}</p>
+             <p><b>ID Assinatura:</b> ${subscriptionId}</p>
+             ${notaFiscal.sucesso ? `<p><b>Chave da NFS-e:</b> ${chaveAcesso}</p><p><b>Link de Consulta:</b> <a href="${linkNF}">${linkNF}</a></p>` : `<p><b>Nota Fiscal:</b> Falha na geração.</p>`}`;
+             
+        if (isForeignAdmin) pbodyAdmin = `<b>⚠️ PAGAMENTO DE CLIENTE GRINGO (EXTERIOR)</b><br><br>` + pbodyAdmin;
+
+        sendMail("contato@sitexpres.com", subjAdmin, pbodyAdmin);
+
+          // Notificação Admin do Novo Domínio
+          sendMail(
+              "contato@sitexpres.com",
+              "✅ Novo Domínio Registrado e Pago (PayPal)",
+              `<p>Um novo domínio foi pago via PayPal!</p>
+               <p><b>Domínio:</b> ${transacao.full_domain}</p>
+               <p><b>Cliente:</b> ${transacao.customer_name} (${transacao.customer_email})</p>
+               <p><b>Valor:</b> R$ ${transacao.domain_price}</p>
+               <p><b>Transação:</b> ${token}</p>
+               ${notaFiscal.sucesso ? `<p><b>Chave da NFS-e:</b> ${chaveAcesso}</p><p><b>Link de Consulta:</b> <a href="${linkNF}">${linkNF}</a></p>` : `<p><b>Nota Fiscal:</b> Falha na geração.</p>`}`
+          );
+
+          console.log("Link da Nota Fiscal Domínio salva:", linkNF);
 
           // Salva o link no banco
           await pool.query(
             `UPDATE public.domain_orders SET link_nota = $1 WHERE id = $2`,
-            [linkNF, transacao.id]
+            [linkNF || chaveAcesso || 'ERRO_EMISSAO', transacao.id]
           );
-
 
           console.log("Criando Hospedagem");
 
@@ -461,8 +538,6 @@ export async function paymentSuccess(req, res) {
             id_projeto: transacao.id_projeto,
             id_user: transacao.user_id
           });
-
-
 
           //###############
           // Criando cliente no resseller
@@ -481,8 +556,6 @@ export async function paymentSuccess(req, res) {
             phone: result_user.rows[0].telefone,
             langPref: result_user.rows[0].langPref || 'pt'
           });
-
-
 
           //###############
           // Ativando Dominio no resseller
@@ -566,7 +639,7 @@ export async function paymentSuccess(req, res) {
                <p><b>Cliente:</b> ${transacao.customer_name} (${transacao.customer_email})</p>
                <p><b>Valor:</b> R$ ${transacao.domain_price}</p>
                <p><b>Transação:</b> ${token}</p>
-               <p><b>Link Nota Fiscal:</b> <a href="${linkNF}">${linkNF}</a></p>`
+               <p><b>Link de Consulta:</b> <a href="${linkNF}">${linkNF}</a></p>`
             );
           } catch (mailErr) {
             console.error("Erro ao enviar email de notificação PayPal domínio:", mailErr);
@@ -607,7 +680,7 @@ export async function paymentSuccess(req, res) {
         );
 
         // ENVIA NOTA FISCAL
-        var notaFiscal = await gerandonotafiscal({
+        var notaFiscal = await gerarNotaNacional({
           valor_servico: payment.rows[0].monetary_value,
           cnpj_cpf: result.rows[0].cnpj_cpf,
           razao_social: result.rows[0].razao_social || result.rows[0].name,
@@ -617,23 +690,85 @@ export async function paymentSuccess(req, res) {
           uf: result.rows[0].uf,
           cep: result.rows[0].cep,
           telefone: result.rows[0].telefone,
-          email: result.rows[0].email
+          email: result.rows[0].email,
+          descricao: `Compra de Créditos/Assinatura via PayPal - Transação: ${token}`
         });
 
-        console.log("Retorno NF:", notaFiscal);
+        console.log("Retorno NF Nacional (PayPal Créditos):", notaFiscal);
 
-        // Converte o JSON da resposta
-        const responseNF = JSON.parse(notaFiscal.resposta_nf);
+        let linkNF = null;
+        let chaveAcesso = null;
 
-        // Separa somente o link
-        const linkNF = responseNF.message?.split("||")[1] || null;
+        if (notaFiscal.sucesso) {
+            linkNF = notaFiscal.linkConsulta;
+            chaveAcesso = notaFiscal.chaveAcesso;
+            
+            try {
+                const isForeignCred = (result.rows[0].uf === "EX" || result.rows[0].cep === "00000000");
+                let clientThemeCred = {
+                    title: "Sua Nota Fiscal foi gerada! 📄",
+                    subject: "📄 Sua Nota Fiscal foi gerada!",
+                    text1: "Sua Nota Fiscal de Serviços Eletrônica (NFS-e) referente ao seu pagamento via PayPal foi emitida com sucesso!",
+                    text2: "Para consultar ou baixar o PDF, <b>copie a Chave de Acesso abaixo</b> e acesse a página oficial do governo:",
+                    btn: "Consultar NFS-e"
+                };
+                if (isForeignCred) {
+                    clientThemeCred = {
+                        title: "Your Invoice has been generated! 📄",
+                        subject: "📄 Your Invoice has been generated!",
+                        text1: "Your Commercial Invoice (NFS-e) for your PayPal payment has been successfully issued!",
+                        text2: "To view or download the PDF of your invoice, <b>copy the Access Key below</b> and paste it on the official government page:",
+                        btn: "View Invoice"
+                    };
+                }
 
-        console.log("Link da Nota Fiscal:", linkNF);
+                const clientHtml = buildStyledEmail(
+                    clientThemeCred.title,
+                    result.rows[0].name,
+                    `<p class="email-text">${clientThemeCred.text1}</p>
+                     <p class="email-text">${clientThemeCred.text2}</p>
+                     <div class="chave-box">${chaveAcesso}</div>
+                     <p class="email-text"><a href="${linkNF}">${linkNF}</a></p>`,
+                    clientThemeCred.btn,
+                    linkNF
+                );
+                await sendMail(result.rows[0].email, clientThemeCred.subject, clientHtml);
+
+            } catch (emailErr) {}
+        } else {
+            console.error("Falha ao gerar NF Nacional PayPal:", notaFiscal.mensagem, notaFiscal.erro);
+            try {
+                const errorMsg = typeof notaFiscal.erro === 'object' ? JSON.stringify(notaFiscal.erro) : notaFiscal.erro;
+                await sendMail(
+                    "contato@sitexpres.com",
+                    "🚨 ERRO ao Gerar Nota Fiscal (PayPal Créditos)",
+                    `<p>Erro Nota Fiscal. Transação: <b>${token}</b> (Usuário: ${result.rows[0].email}).</p>
+                     <p><b>Mensagem:</b> ${notaFiscal.mensagem}</p>
+                     <p><b>Detalhes do Erro:</b> ${errorMsg}</p>`
+                );
+            } catch (emailErr) {} } 
+
+        // Envia notificação ao ADM com chave
+        let isForeignAdminCred = (result.rows[0].uf === "EX" || result.rows[0].cep === "00000000");
+        let subjCred = isForeignAdminCred ? `✅ [GRINGO] ${transactionDetails.resource.description} Pago (PayPal)` : `✅ ${transactionDetails.resource.description} Pago (PayPal)`;
+        let pbodyCred = `<p>Um novo plano/crédito foi pago via PayPal!</p>
+             <p><b>Cliente:</b> ${result.rows[0].name} (${result.rows[0].email})</p>
+             <p><b>Descrição:</b> ${transactionDetails.resource.description}</p>
+             <p><b>Valor:</b> ${transactionDetails.resource.amount.total} ${transactionDetails.resource.amount.currency}</p>
+             <p><b>Transação:</b> ${transactionId}</p>
+             <p><b>ID Assinatura:</b> ${subscriptionId}</p>
+             ${notaFiscal.sucesso ? `<p><b>Chave da NFS-e:</b> ${chaveAcesso}</p><p><b>Link de Consulta:</b> <a href="${linkNF}">${linkNF}</a></p>` : `<p><b>Nota Fiscal:</b> Falha na geração.</p>`}`;
+             
+        if (isForeignAdminCred) pbodyCred = `<b>⚠️ PAGAMENTO DE CLIENTE GRINGO (EXTERIOR)</b><br><br>` + pbodyCred;
+
+        sendMail("contato@sitexpres.com", subjCred, pbodyCred);
+
+        console.log("Link da Nota Fiscal PayPal salva:", linkNF);
 
         // Salva o link no banco
         await pool.query(
           `UPDATE public.transactions SET nota_fiscal = $1 WHERE payment_id = $2`,
-          [linkNF, payment.rows[0].payment_id]
+          [linkNF || chaveAcesso || 'ERRO_EMISSAO', payment.rows[0].payment_id]
         );
 
         // =================================================================
@@ -709,7 +844,7 @@ export async function paymentSuccess(req, res) {
                  <p><b>Usuário:</b> ${result.rows[0].name} (${result.rows[0].email})</p>
                  <p><b>Valor:</b> R$ ${monetary_value}</p>
                  <p><b>Transação:</b> ${token}</p>
-                 <p><b>Link Nota Fiscal:</b> <a href="${linkNF}">${linkNF}</a></p>`
+                 <p><b>Link de Consulta:</b> <a href="${linkNF}">${linkNF}</a></p>`
             );
 
         } catch (parityError) {

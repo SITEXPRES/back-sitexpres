@@ -1,0 +1,21 @@
+<?php
+
+namespace Nfse\Dto\Nfse;
+
+use Spatie\DataTransferObject\Attributes\MapFrom;
+use Spatie\DataTransferObject\DataTransferObject;
+
+class DescontoData extends DataTransferObject
+{
+    /**
+     * Valor do desconto incondicionado.
+     */
+    #[MapFrom('vDescIncond')]
+    public ?float $valorDescontoIncondicionado = null;
+
+    /**
+     * Valor do desconto condicionado.
+     */
+    #[MapFrom('vDescCond')]
+    public ?float $valorDescontoCondicionado = null;
+}

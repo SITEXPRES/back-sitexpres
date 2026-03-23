@@ -1,0 +1,59 @@
+{
+    "name": "nfse-nacional/nfse-php",
+    "description": "This is my package nfse",
+    "keywords": [
+        "Nfse",
+        "nfse"
+    ],
+    "homepage": "https://github.com/nfse-nacional/nfse-php",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "a21ns1g4ts",
+            "email": "a21ns1g4ts@gmail.com",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^8.4",
+        "guzzlehttp/guzzle": "^7.9",
+        "illuminate/support": "^12.0",
+        "illuminate/translation": "^12.0",
+        "illuminate/validation": "^12.0",
+        "spatie/data-transfer-object": "^3.9"
+    },
+    "require-dev": {
+        "laravel/pint": "^1.0",
+        "pestphp/pest": "^4.0",
+        "phpstan/extension-installer": "^1.4",
+        "phpstan/phpstan": "^2.1",
+        "phpstan/phpstan-deprecation-rules": "^2.0",
+        "spatie/ray": "^1.28",
+        "spatie/typescript-transformer": "dev-main"
+    },
+    "autoload": {
+        "psr-4": {
+            "Nfse\\": "src"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Nfse\\Tests\\": "tests"
+        }
+    },
+    "scripts": {
+        "test": "vendor/bin/pest",
+        "test-coverage": "vendor/bin/pest --coverage",
+        "format": "vendor/bin/pint",
+        "phpstan": "vendor/bin/phpstan analyse --memory-limit 2G"
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true,
+            "phpstan/extension-installer": true
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}

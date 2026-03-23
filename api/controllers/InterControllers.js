@@ -2,9 +2,10 @@ import fs from "fs";
 import https from "https";
 import { console } from "inspector";
 import pool from "../config/db.js";
-import { gerandonotafiscal } from "../services/notafiscalService.js";
+import { gerandonotafiscal, gerarNotaNacional } from "../services/notafiscalService.js";
 import { createCustomerReseller_funcao, create_domain_reseller_funcao } from "./resellerController.js";
 import { sendMail } from "../services/emailService.js";
+import { buildStyledEmail } from "../services/emailTemplateBuilder.js";
 
 const cert = fs.readFileSync("certificados/inter.crt");
 const key = fs.readFileSync("certificados/inter.key");
@@ -62,11 +63,9 @@ async function gerarToken() {
     });
 }
 
-
 export const criarTokenAvuso = async () => {
     const tokenObj = await gerarToken();
     console.log(tokenObj);
-
 
     return tokenObj;
 }
@@ -362,7 +361,7 @@ export const consultarPix = async (req, res) => {
             );
 
             // ENVIA NOTA FISCAL
-            var notaFiscal = await gerandonotafiscal({
+            var notaFiscal = await gerarNotaNacional({
                 valor_servico: transacao.monetary_value,
                 cnpj_cpf: result.rows[0].cnpj_cpf,
                 razao_social: result.rows[0].razao_social || result.rows[0].name,
@@ -372,27 +371,98 @@ export const consultarPix = async (req, res) => {
                 uf: result.rows[0].uf,
                 cep: result.rows[0].cep,
                 telefone: result.rows[0].telefone,
-                email: result.rows[0].email
+                email: result.rows[0].email,
+                descricao: `Pagamento via Pix - Transação: ${txid}`
             });
 
-            console.log("Retorno NF:", notaFiscal);
+            console.log("Retorno NF Nacional:", notaFiscal);
 
-            // Converte o JSON da resposta
-            const responseNF = JSON.parse(notaFiscal.resposta_nf);
+            let linkNF = null;
+            let chaveAcesso = null;
 
-            // Separa somente o link
-            const linkNF = responseNF.message?.split("||")[1] || null;
+            if (notaFiscal.sucesso) {
+                linkNF = notaFiscal.linkConsulta;
+                chaveAcesso = notaFiscal.chaveAcesso;
+                
+                // Enviar email para o cliente com a nota fiscal
+                try {
+                    const isForeign = (result.rows[0].uf === "EX" || result.rows[0].cep === "00000000");
+                    let clientTheme = {
+                        title: "Sua Nota Fiscal foi gerada! 📄",
+                        subject: "📄 Sua Nota Fiscal foi gerada!",
+                        text1: "Sua Nota Fiscal de Serviços Eletrônica (NFS-e) foi emitida com sucesso!",
+                        text2: "Você pode consultar e baixar o PDF da sua nota no portal oficial do governo.<br>Para isso, <b>copie a Chave de Acesso abaixo</b> e cole na seguinte página:",
+                        btn: "Consultar NFS-e"
+                    };
+                    if (isForeign) {
+                        clientTheme = {
+                            title: "Your Invoice has been generated! 📄",
+                            subject: "📄 Your Invoice has been generated!",
+                            text1: "Your Commercial Invoice (NFS-e) has been successfully issued!",
+                            text2: "You can view and download the PDF of your invoice on the official government portal.<br>To do so, <b>copy the Access Key below</b> and paste it on the following page:",
+                            btn: "View Invoice"
+                        };
+                    }
 
-            console.log("Link da Nota Fiscal:", linkNF);
+                    const clientHtml = buildStyledEmail(
+                        clientTheme.title,
+                        result.rows[0].name,
+                        `<p class="email-text">${clientTheme.text1}</p>
+                         <p class="email-text">${clientTheme.text2}</p>
+                         <div class="chave-box">${chaveAcesso}</div>
+                         <p class="email-text"><a href="${linkNF}">${linkNF}</a></p>`,
+                        clientTheme.btn,
+                        linkNF
+                    );
 
-            // Salva o link no banco
+                    await sendMail(result.rows[0].email, clientTheme.subject, clientHtml);
+                } catch (emailErr) {
+                    console.error("Erro ao enviar email da nota para o cliente:", emailErr);
+                }
+
+            } else {
+                console.error("Falha ao gerar NF Nacional:", notaFiscal.mensagem, notaFiscal.erro);
+                // Notificar admin sobre falha da nota
+                try {
+                    const errorMsg = typeof notaFiscal.erro === 'object' ? JSON.stringify(notaFiscal.erro) : notaFiscal.erro;
+                    await sendMail(
+                        "contato@sitexpres.com",
+                        "🚨 ERRO ao Gerar Nota Fiscal Nacional (Inter PIX)",
+                        `<p>Ocorreu um erro ao gerar a Nota Fiscal Nacional para a transação <b>${txid}</b> (Usuário: ${result.rows[0].email}).</p>
+                         <p><b>Mensagem:</b> ${notaFiscal.mensagem}</p>
+                         <p><b>Detalhes do Erro:</b> ${errorMsg}</p>`
+                    );
+                } catch (emailErr) {
+                    console.error("Erro ao notificar admin sobre falha de NF:", emailErr);
+                }
+            }
+
+            
+            if (notaFiscal.sucesso) {
+                try {
+                    const isForeign = (result.rows[0].uf === "EX" || result.rows[0].cep === "00000000");
+                    let subjectAdmin = `✅ Novo Pix e Nota Fiscal Gerada - ${result.rows[0].name}`;
+                    let bodyAdmin = `O Pix de ${result.rows[0].name} foi confirmado!<br>
+                        Valor: R$ ${valorPagamento}<br>
+                        A nota fiscal foi emitida com sucesso!<br>
+                        Chave de Acesso: <b>${chaveAcesso}</b><br>
+                        Link de Consulta: <a href="${linkNF}">${linkNF}</a>`;
+                        
+                    if (isForeign) {
+                        subjectAdmin = `✅ [GRINGO] Novo Pix Exportação - ${result.rows[0].name}`;
+                        bodyAdmin = `<b>⚠️ PAGAMENTO DE CLIENTE GRINGO (EXTERIOR)</b><br><br>` + bodyAdmin;
+                    }
+                    
+                    await sendMail("contato@sitexpres.com", subjectAdmin, bodyAdmin);
+                } catch (emailErr) {}
+            }
+            console.log("Link da Nota Fiscal salva:", linkNF);
+
+            // Salva o link/chave no banco
             await pool.query(
                 `UPDATE public.transactions SET nota_fiscal = $1 WHERE payment_id = $2`,
-                [linkNF, txid]
+                [linkNF || chaveAcesso || 'ERRO_EMISSAO', txid]
             );
-
-
-
 
             console.log(`Créditos adicionados e transação ${txid} marcada como completed!`);
 
@@ -435,16 +505,17 @@ export const consultarPix = async (req, res) => {
             }
             // -----------------------------------------------------------------
 
-            // NOTIFICAR ADMINISTRADOR (SUCESSO)
+            // NOTIFICAR ADMINISTRADOR (SUCESSO DA VENDA GERAL)
             try {
                 await sendMail(
                     "contato@sitexpres.com",
-                    "✅ Pagamento Confirmado (Inter PIX) e Nota Gerada",
+                    "✅ Pagamento Confirmado (Inter PIX)",
                     `<p>Um novo pagamento foi processado via Banco Inter (PIX)!</p>
                      <p><b>Usuário:</b> ${result.rows[0].email}</p>
                      <p><b>Valor:</b> R$ ${transacao.monetary_value}</p>
                      <p><b>TXID:</b> ${txid}</p>
-                     <p><b>Link Nota Fiscal:</b> <a href="${linkNF}">${linkNF}</a></p>`
+                     <p><b>Status da Nota:</b> ${notaFiscal.sucesso ? 'Gerada com Sucesso' : 'Erro ao Gerar'}</p>
+                     ${notaFiscal.sucesso ? `<p><b>Chave de Acesso:</b> ${chaveAcesso}</p><p><b>Link de Consulta:</b> <a href="${linkNF}">${linkNF}</a></p>` : ''}`
                 );
             } catch (mailErr) {
                 console.error("Erro ao enviar email de notificação Inter:", mailErr);
@@ -606,8 +677,6 @@ export const criarCobranca = async (req, res) => {
             });
         }
 
-
-
         const valorNumerico = parseFloat(valor);
         const creditos = parseInt(qtd_creditos);
         const precoPorCredito = 0.85;
@@ -693,10 +762,6 @@ export const criarCobrancaUnica = async (req, res) => {
         qtd_creditos
     } = req.body;
 
-
-
-
-
     // -----------------------------
     // 🔥 ATUALIZA USUÁRIO NO BANCO
     // -----------------------------
@@ -738,11 +803,9 @@ export const criarCobrancaUnica = async (req, res) => {
         await pool.query(sqlUpdate, values);
     }
 
-
     // -----------------------------
     // fluxo do PIX
     // -----------------------------
-
 
     // Mapeia 'value' para 'valor'
     const valor = value;
@@ -787,10 +850,6 @@ export const criarCobrancaUnica = async (req, res) => {
         calendario: {
             expiracao: 3600 // 1 hora
         },
-        devedor: {
-            nome: nome,
-            cpf: cpf
-        },
         valor: {
             original: valor
         },
@@ -798,12 +857,18 @@ export const criarCobrancaUnica = async (req, res) => {
         solicitacaoPagador: "Pagamento Servico Sitexpress IA e WebHosting"
     };
 
+    const cpfLimpo = cpf ? cpf.replace(/\D/g, '') : '';
+    if (cpfLimpo.length === 11) {
+        payload.devedor = { nome: nome || 'Consumidor', cpf: cpfLimpo };
+    } else if (cpfLimpo.length === 14) {
+        payload.devedor = { nome: nome || 'Consumidor', cnpj: cpfLimpo };
+    }
+
     const dataString = JSON.stringify(payload);
 
     const tokenObj = await gerarToken();
     // console.log(tokenObj)
     const accessToken = tokenObj.access_token;
-
 
     //---------------   
     //Salvado Transacao no banco de dados 
@@ -882,7 +947,6 @@ export const criarCobrancaUnica = async (req, res) => {
     request.write(dataString);
     request.end();
 };
-
 
 // Função para criar transação no banco de dados
 const criarTransacao = async ({
@@ -1031,9 +1095,6 @@ const criarOrdemDominio = async ({
         throw err;
     }
 };
-
-
-
 
 /* -----------------------------------------
      CONTROLLER — Pagamento para Reseller
@@ -1208,8 +1269,6 @@ export const pagamentoDominio = async (req, res) => {
 
 };
 
-
-
 export const consultarPix_dominio = async (req, res) => {
     try {
         var { txid } = req.body;
@@ -1322,14 +1381,11 @@ export const consultarPix_dominio = async (req, res) => {
                 [transacao.id]
             );
 
-
             //Consultar dados do usuário para nota fiscal
             const result_user = await pool.query(
                 `SELECT * FROM public.users WHERE id = $1`,
                 [transacao.user_id]
             );
-
-
 
             // ENVIA NOTA FISCAL
             var notaFiscal = await gerandonotafiscal({
@@ -1353,16 +1409,13 @@ export const consultarPix_dominio = async (req, res) => {
             // Separa somente o link
             const linkNF = responseNF.message?.split("||")[1] || null;
 
-            console.log("Link da Nota Fiscal:", linkNF);
-
-
+            console.log("Link de Consulta:", linkNF);
 
             // Salva o link no banco
             await pool.query(
                 `UPDATE public.domain_orders SET link_nota = $1 WHERE id = $2`,
                 [linkNF, transacao.id]
             );
-
 
             //###############
             // Criando cliente no resseller
@@ -1381,8 +1434,6 @@ export const consultarPix_dominio = async (req, res) => {
                 phone: result_user.rows[0].telefone,
                 langPref: result_user.rows[0].langPref || 'pt'
             });
-
-
 
             //###############
             // Ativando Dominio no resseller
@@ -1456,8 +1507,6 @@ export const consultarPix_dominio = async (req, res) => {
                 }
             );
 
-
-
             // NOTIFICAR ADMINISTRADOR (SUCESSO DOMÍNIO)
             try {
                 await sendMail(
@@ -1468,7 +1517,7 @@ export const consultarPix_dominio = async (req, res) => {
                      <p><b>Cliente:</b> ${user.name} (${user.email})</p>
                      <p><b>Valor:</b> R$ ${transacao.domain_price}</p>
                      <p><b>TXID:</b> ${txid}</p>
-                     <p><b>Link Nota Fiscal:</b> <a href="${linkNF}">${linkNF}</a></p>`
+                     <p><b>Link de Consulta:</b> <a href="${linkNF}">${linkNF}</a></p>`
                 );
             } catch (mailErr) {
                 console.error("Erro ao enviar email de notificação Inter domínio:", mailErr);
