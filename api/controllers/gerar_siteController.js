@@ -23,6 +23,107 @@ const USE_GEMINI = false;
 // max_tokens esperado — usado pra calcular % de progresso
 const MAX_TOKENS_HAIKU = 30000;
 
+const GENERIC_HTML_TEMPLAT_PTBR = `<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Site de Teste - SiteXpress</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4f46e5',
+                        secondary: '#ec4899',
+                    }
+                }
+            }
+        }
+    </script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+        .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(10px); }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900 overflow-x-hidden">
+    <!-- Header -->
+    <header x-data="{ scrolled: false }" @scroll.window="scrolled = window.scrollY > 20" :class="scrolled ? 'glass shadow-md' : 'bg-transparent'" class="fixed w-full top-0 z-50 transition-all duration-300">
+        <nav class="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
+            <div class="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">SiteXpress Teste</div>
+            <div class="hidden md:flex space-x-8 font-medium">
+                <a href="#home" class="hover:text-primary transition-colors">Início</a>
+                <a href="#features" class="hover:text-primary transition-colors">Funcionalidades</a>
+                <a href="#contact" class="px-6 py-2 bg-primary text-white rounded-full hover:bg-opacity-90 transition-all">Contato</a>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Hero -->
+    <section id="home" class="relative min-h-screen flex items-center justify-center pt-20 overflow-hidden bg-gradient-to-br from-indigo-50 to-white">
+        <div class="absolute top-0 right-0 w-1/2 h-1/2 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+        <div class="container mx-auto px-4 text-center z-10" data-aos="fade-up">
+            <h1 class="text-5xl md:text-7xl font-extrabold mb-6 leading-tight">Crie seu site no <span class="text-primary italic">Modo Teste</span></h1>
+            <p class="text-xl text-gray-600 mb-10 max-w-2xl mx-auto">Este é um modelo de demonstração premium gerado sem consumo de tokens da API de IA. Perfeito para validar fluxos de integração.</p>
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <a href="#features" class="px-10 py-4 bg-primary text-white font-bold rounded-xl shadow-lg hover:scale-105 transition-transform">Ver Recursos</a>
+                <a href="#" class="px-10 py-4 border-2 border-gray-200 text-gray-700 font-bold rounded-xl hover:border-primary hover:text-primary transition-all">Saiba Mais</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features -->
+    <section id="features" class="py-24 bg-white">
+        <div class="container mx-auto px-4">
+            <div class="text-center mb-16" data-aos="fade-up">
+                <h2 class="text-4xl font-bold mb-4">Recursos do Modelo Genérico</h2>
+                <p class="text-gray-500">Tudo o que você precisa para testar seu ambiente</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="p-8 rounded-2xl bg-gray-50 hover:bg-white hover:shadow-xl transition-all border border-transparent hover:border-indigo-100" data-aos="fade-up" data-aos-delay="100">
+                    <div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center mb-6">
+                        <i data-lucide="zap"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-4">Geração Instantânea</h3>
+                    <p class="text-gray-600">O código HTML é retornado imediatamente, sem espera de processamento da IA.</p>
+                </div>
+                <div class="p-8 rounded-2xl bg-gray-50 hover:bg-white hover:shadow-xl transition-all border border-transparent hover:border-indigo-100" data-aos="fade-up" data-aos-delay="200">
+                    <div class="w-12 h-12 bg-pink-100 text-pink-600 rounded-lg flex items-center justify-center mb-6">
+                        <i data-lucide="shield"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-4">Custo Zero</h3>
+                    <p class="text-gray-600">Não consome créditos Claude ou Gemini, ideal para depuração de sistema.</p>
+                </div>
+                <div class="p-8 rounded-2xl bg-gray-50 hover:bg-white hover:shadow-xl transition-all border border-transparent hover:border-indigo-100" data-aos="fade-up" data-aos-delay="300">
+                    <div class="w-12 h-12 bg-green-100 text-green-600 rounded-lg flex items-center justify-center mb-6">
+                        <i data-lucide="layout"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-4">Estrutura Real</h3>
+                    <p class="text-gray-600">Usa as mesmas tecnologias (Tailwind, Alpine, AOS) do site real para fidelidade total.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-white py-12">
+        <div class="container mx-auto px-4 text-center">
+            <p class="text-gray-400">&copy; 2026 SiteXpress - Modo de Teste Ativado</p>
+        </div>
+    </footer>
+
+    <script>
+        AOS.init();
+        lucide.createIcons();
+    </script>
+</body>
+</html>`;
+
 export async function gerar_site(prompt, parte, req, id_projeto, baseHTML = "", userId, primeiraVez, onProgress = null) {
   const agora = new Date();
   const ano = agora.getFullYear();
@@ -38,6 +139,19 @@ export async function gerar_site(prompt, parte, req, id_projeto, baseHTML = "", 
   const modoLabel = primeiraVez ? 'CRIAÇÃO' : 'EDIÇÃO';
   console.log(`[${new Date().toISOString()}] [GERAR_SITE] 🚀 Iniciando geração de HTML | modo=${modoLabel} | id_projeto=${id_projeto} | userId=${userId}`);
   console.log(`[${new Date().toISOString()}] [GERAR_SITE] 📝 Tamanho do prompt: ${prompt?.length ?? 0} chars | baseHTML: ${baseHTML?.length ?? 0} chars`);
+
+  // 🧪 MODO DE TESTE (Retorna HTML genérico para economizar tokens)
+  if (process.env.TEST_MODE_GENERATE === "true" || req?.body?.test_mode === true) {
+    console.log(`[${new Date().toISOString()}] [GERAR_SITE] 🧪 MODO DE TESTE ATIVADO! Ignorando APIs de IA.`);
+    if (onProgress) {
+        onProgress(20);
+        setTimeout(() => onProgress(60), 200);
+        setTimeout(() => onProgress(100), 400);
+    }
+    // Simula um pequeno delay para não ser instantâneo demais no front
+    await new Promise(resolve => setTimeout(resolve, 500));
+    return GENERIC_HTML_TEMPLAT_PTBR;
+  }
 
   try {
     // 🔹 Detecta se é criação inicial ou edição
