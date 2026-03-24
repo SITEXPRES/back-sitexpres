@@ -129,7 +129,10 @@ export async function gerarNotaNacional(data) {
       let tipoDoc = "CPF";
       if (documentoNormalizado.length === 14) tipoDoc = "CNPJ";
       
-      const isForeign = (documentoNormalizado.length === 0 || uf === "EX" || cep === "00000000");
+      // Normaliza uf e cep antes de comparar (dados do banco podem ter espaços ou máscara)
+      const ufNorm = (uf || '').trim().toUpperCase();
+      const cepNorm = (cep || '').replace(/\D/g, '');
+      const isForeign = (documentoNormalizado.length === 0 || ufNorm === "EX" || cepNorm === "00000000");
       if (isForeign) tipoDoc = "EXT";
 
       // Preparar JSON para o PHP

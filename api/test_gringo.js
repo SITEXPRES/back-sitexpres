@@ -6,7 +6,7 @@ console.log("Iniciando teste de emissão NFS-e Nacional para GRINGO...");
 // Simulando EXATAMENTE os dados de teste que enviou para o Pix
 const payload = {
   valor_servico: 0.85,
-  cnpj_cpf: "12158115481215  ", // O banco recusa, mas pra nota fiscal vai identificar como isForeign
+  cnpj_cpf: "12158115481215", // O banco recusa, mas pra nota fiscal vai identificar como isForeign
   razao_social: "cliente gringo teste",
   endereco: "New York, United States",
   bairro: "Exterior",

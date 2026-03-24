@@ -180,7 +180,7 @@ class EmissorNfse
                     'serv' => [
                         'cServ' => [
                             'cTribNac' => $dadosServico['codigoTributacao'],
-                            'xDescServ' => $dadosServico['descricao'],
+                            'xDescServ' => $dadosServico['descricao'] . ' | Documento cliente: ' . trim($dadosTomador['cpfCnpj'] ?? ''),
 
                         ],
                         // comExt obrigatório quando há endExt (regra E0330)
@@ -268,40 +268,40 @@ class EmissorNfse
          ];
      }
   */
-   private function montarTomador(array $dadosTomador): array
-{
-    $tipo = strtoupper($dadosTomador['tipo'] ?? '');
-    $isForeign = $dadosTomador['isForeign'] ?? false;
+    private function montarTomador(array $dadosTomador): array
+    {
+        $tipo = strtoupper($dadosTomador['tipo'] ?? '');
+        $isForeign = ($dadosTomador['isForeign'] ?? false) || $tipo === 'EXT';
 
-    $nome = $dadosTomador['nome']
-        ?? $dadosTomador['razaoSocial']
-        ?? 'Consumidor';
+        $nome = $dadosTomador['nome']
+            ?? $dadosTomador['razaoSocial']
+            ?? 'Consumidor';
 
-    // 🔥 ESTRANGEIRO (SEM LOOP)
-    if ($isForeign) {
+        // 🔥 ESTRANGEIRO (SEM LOOP)
+        if ($isForeign) {
+            return [
+                'cNaoNIF' => 1, // <-- ESSENCIAL
+                'xNome' => $nome,
+                'email' => $dadosTomador['email'] ?? '',
+            ];
+        }
+
+        // BR normal
+        if ($tipo === 'CPF' || $tipo === 'CNPJ') {
+            return [
+                $tipo => $dadosTomador['cpfCnpj'],
+                'xNome' => $nome,
+                'email' => $dadosTomador['email'] ?? '',
+            ];
+        }
+
+        // fallback
         return [
-            'cNaoNIF' => 1, // <-- ESSENCIAL
-            'xNome'   => $nome,
-            'email'   => $dadosTomador['email'] ?? '',
-        ];
-    }
-
-    // BR normal
-    if ($tipo === 'CPF' || $tipo === 'CNPJ') {
-        return [
-            $tipo => $dadosTomador['cpfCnpj'],
+            'cNaoNIF' => 1,
             'xNome' => $nome,
             'email' => $dadosTomador['email'] ?? '',
         ];
     }
-
-    // fallback
-    return [
-        'cNaoNIF' => 1,
-        'xNome'   => $nome,
-        'email'   => $dadosTomador['email'] ?? '',
-    ];
-}
     /**
      * Salva o XML da NFS-e
      */
