@@ -20,7 +20,7 @@ router.post('/creat_hospedage', authMiddleware, creat_hospedagem);
 // Listar todas as hospedagens
 router.get('/listar', listar_hospedagens);
 
-router.get('/listar_unica', authMiddleware, consult_db);
+router.get('/listar_unica', consult_db);
 
 // Suspender hospedagem
 router.post('/suspender', authMiddleware, suspender_hospedagem);

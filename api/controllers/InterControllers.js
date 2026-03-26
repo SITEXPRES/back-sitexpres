@@ -6,6 +6,7 @@ import { gerandonotafiscal, gerarNotaNacional } from "../services/notafiscalServ
 import { createCustomerReseller_funcao, create_domain_reseller_funcao } from "./resellerController.js";
 import { sendMail } from "../services/emailService.js";
 import { buildStyledEmail } from "../services/emailTemplateBuilder.js";
+import { attributeCommission } from "../services/affiliateService.js";
 
 const cert = fs.readFileSync("certificados/inter.crt");
 const key = fs.readFileSync("certificados/inter.key");
@@ -497,6 +498,9 @@ export const consultarPix = async (req, res) => {
                         ]
                     );
                     console.log(`Próxima fatura (pendente) registrada para o usuário ${transacao.user_id} com vencimento: ${due_date.toISOString()}`);
+
+                    // ✅ Atribuir comissão de afiliado (10% de 29.90)
+                    await attributeCommission(transacao.user_id, transacao.monetary_value, txid);
                 } else {
                     console.log(`Pagamento de R$ ${valorAtual} não gera próximo ciclo automático (não é premium ou dev).`);
                 }

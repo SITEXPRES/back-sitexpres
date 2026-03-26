@@ -41,7 +41,6 @@ export async function deletarSubdominioDirectAdmin(subdominio, dominioPrincipal 
 
     const params = new URLSearchParams({
       action: "delete",
-       delete: 'yes',
       domain: dominioPrincipal,
       // AQUI ESTÁ O PULO DO GATO:
       select0: subdominio, // O DirectAdmin exige 'select0' para deletar, não 'subdomain'
@@ -91,7 +90,7 @@ export async function enviarHTMLSubdominio(host, usuario, senha, subdominio, htm
     // Envia o arquivo
     await client.uploadFrom(htmlStream, `${remoteDir}/index.html`);
 
-    //console.log(`✅ HTML enviado com sucesso para ${subdominio}!`);
+    console.log(`✅ HTML enviado com sucesso para ${subdominio}!`);
   } catch (err) {
     console.error("❌ Erro ao enviar HTML:", err);
     throw err;

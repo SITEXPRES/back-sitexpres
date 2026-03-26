@@ -10,6 +10,7 @@ import { createHospedagem_funcao } from './hospedagemController.js';
 import { sendMail } from '../services/emailService.js';
 import { buildStyledEmail } from '../services/emailTemplateBuilder.js';
 import { gerandonotafiscal, gerarNotaNacional } from '../services/notafiscalService.js';
+import { attributeCommission } from '../services/affiliateService.js';
 
 // ==================== FUNÇÕES AUXILIARES ====================
 
@@ -834,6 +835,9 @@ export async function paymentSuccess(req, res) {
                     ]
                 );
                 console.log(`Próxima fatura (pendente) registrada para o usuário ${user_id}`);
+
+                // ✅ Atribuir comissão de afiliado (10% de 29.90)
+                await attributeCommission(user_id, monetary_value, token);
             }
 
             // 4. NOTIFICAR ADMINISTRADOR (SUCESSO)

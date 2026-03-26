@@ -101,15 +101,8 @@ export const newsite = async (req, res) => {
 
     logStep(null, '🔍 Verificando créditos do usuário...');
     const t1 = Date.now();
-
-    // 🧪 MODO DE TESTE: Ignora verificação de créditos
-    let verificar_creditos_prompt_result = { podeRodar: true };
-    if (process.env.TEST_MODE_GENERATE === "true" || req.body?.test_mode === true) {
-      logStep(null, '🧪 MODO DE TESTE ATIVADO: Ignorando verificação de créditos');
-    } else {
-      verificar_creditos_prompt_result = await verificar_creditos_prompt(userId, prompt, baseHTML);
-      logStep(null, `✅ Créditos verificados (${Date.now() - t1}ms) | podeRodar: ${verificar_creditos_prompt_result.podeRodar}`);
-    }
+    const verificar_creditos_prompt_result = await verificar_creditos_prompt(userId, prompt, baseHTML);
+    logStep(null, `✅ Créditos verificados (${Date.now() - t1}ms) | podeRodar: ${verificar_creditos_prompt_result.podeRodar}`);
 
     if (!verificar_creditos_prompt_result.podeRodar) {
       logStep(null, '❌ Créditos insuficientes — requisição rejeitada');
@@ -178,7 +171,7 @@ export const newsite = async (req, res) => {
           }
 
           primeiraVez = existing.rows.length === 0;
-          baseHTML = primeiraVez ? "" : existing.rows[0].html_content;
+          baseHTML    = primeiraVez ? "" : existing.rows[0].html_content;
           if (!primeiraVez) {
             nomeSubdominio = existing.rows[0].name.replace("Site de ", "").toLowerCase();
           }
@@ -216,17 +209,10 @@ export const newsite = async (req, res) => {
 
           // Gera subdomínio (apenas na criação, sem BD ainda)
           if (primeiraVez) {
-            logStep(jobId, '🔤 Gerando nome do subdomínio...');
+            logStep(jobId, '🔤 Gerando nome do subdomínio via IA...');
             const tSub = Date.now();
-
-            // 🧪 MODO DE TESTE: Nome genérico para subdomínio
-            if (process.env.TEST_MODE_GENERATE === "true" || req.body?.test_mode === true) {
-              nomeSubdominio = `teste-${Math.floor(Math.random() * 10000)}`;
-              logStep(jobId, `🧪 MODO DE TESTE: Usando subdomínio genérico: ${nomeSubdominio}`);
-            } else {
-              nomeSubdominio = await gerarNomeSubdominio(prompt);
-              logStep(jobId, `✅ Subdomínio gerado via IA (${Date.now() - tSub}ms): ${nomeSubdominio}`);
-            }
+            nomeSubdominio = await gerarNomeSubdominio(prompt);
+            logStep(jobId, `✅ Subdomínio gerado (${Date.now() - tSub}ms): ${nomeSubdominio}`);
 
             logStep(jobId, `🌐 Criando subdomínio no DirectAdmin: ${nomeSubdominio}.sitexpres.com.br`);
             const tDA = Date.now();
@@ -302,8 +288,8 @@ export const newsite = async (req, res) => {
           const tFTP = Date.now();
 
           if (existe_hospedagem.rows.length > 0) {
-            const username = existe_hospedagem.rows[0].username;
-            const password = existe_hospedagem.rows[0].senha;
+            const username          = existe_hospedagem.rows[0].username;
+            const password          = existe_hospedagem.rows[0].senha;
             const dominio_hospedagem = existe_hospedagem.rows[0].dominio;
             await enviarHTMLSubdominio("ftp.sitexpres.com.br", username, password, dominio_hospedagem, html);
           } else {
@@ -340,7 +326,7 @@ export const newsite = async (req, res) => {
           jobs[jobId] = { status: "error", result: null, error: error.message };
         } finally {
           if (client) {
-            try { client.release(); } catch (ignored) { }
+            try { client.release(); } catch (ignored) {}
           }
         }
       })();

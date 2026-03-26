@@ -7,7 +7,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "seu_secret_aqui_MUDE_EM_PRODUCAO";
 
 export const register = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, affiliate_code } = req.body;
     const userExists = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
 
     if (userExists.rows.length > 0) {
@@ -23,6 +23,37 @@ export const register = async (req, res) => {
     );
 
     const user = result.rows[0];
+
+    // ✅ Lógica de Afiliado - Vínculo ao cadastrar
+    if (affiliate_code) {
+      try {
+        const affiliateLink = await pool.query(
+          "SELECT affiliate_id, id FROM affiliate_links WHERE code = $1",
+          [affiliate_code]
+        );
+
+        if (affiliateLink.rows.length > 0) {
+          const affiliateId = affiliateLink.rows[0].affiliate_id;
+          const linkId = affiliateLink.rows[0].id;
+
+          // Cria o vínculo
+          await pool.query(
+            "INSERT INTO affiliate_referrals (affiliate_id, referred_user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+            [affiliateId, user.id]
+          );
+
+          // Incrementa conversões no link
+          await pool.query(
+            "UPDATE affiliate_links SET conversions_count = conversions_count + 1 WHERE id = $1",
+            [linkId]
+          );
+          
+          console.log(`✅ Usuário ${user.id} vinculado ao afiliado ${affiliateId} via código ${affiliate_code}`);
+        }
+      } catch (afferr) {
+        console.error("❌ Erro ao vincular afiliado:", afferr.message);
+      }
+    }
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: "7d" });
 
 
@@ -145,7 +176,6 @@ export const resetpasswd = async (req, res) => {
       "INSERT INTO password_reset_tokens (user_id, token, expires_at, used) VALUES ($1, $2, NOW() + INTERVAL '1 hour', false)",
       [user.id, resetToken]
     );
-
     // Envia o e-mail para o usuário
 
     //Consulta template no banco 
