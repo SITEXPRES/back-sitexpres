@@ -66,7 +66,6 @@ export async function deletarSubdominioDirectAdmin(subdominio, dominioPrincipal 
   }
 }
 
-// Função para enviar o HTML gerado diretamente por string
 export async function enviarHTMLSubdominio(host, usuario, senha, subdominio, html) {
   if (!host || !usuario || !senha || !subdominio || !html) {
     throw new Error("Parâmetros inválidos para enviarHTMLSubdominio");
@@ -94,40 +93,6 @@ export async function enviarHTMLSubdominio(host, usuario, senha, subdominio, htm
     console.log(`✅ HTML enviado com sucesso para ${subdominio}!`);
   } catch (err) {
     console.error("❌ Erro ao enviar HTML:", err);
-    throw err;
-  } finally {
-    client.close();
-  }
-}
-
-// Nova Função: Enviar Diretório Inteiro (Vite build dist)
-export async function enviarDiretorioSubdominio(host, usuario, senha, subdominio, dirPath) {
-  if (!host || !usuario || !senha || !subdominio || !dirPath) {
-    throw new Error("Parâmetros inválidos para enviarDiretorioSubdominio");
-  }
-
-  const client = new ftp.Client();
-  client.ftp.verbose = false;
-
-  try {
-    // Conecta no FTP
-    await client.access({ host, user: usuario, password: senha, secure: false });
-
-    // Caminho remoto
-    const remoteDir = `/domains/${subdominio}/public_html`;
-
-    // Garante que o diretório exista
-    await client.ensureDir(remoteDir);
-
-    // Limpa o diretório antes de fazer upload do novo (opcional, mas recomendado para build)
-    await client.clearWorkingDir();
-
-    // Envia o diretório inteiro
-    await client.uploadFromDir(dirPath);
-
-    console.log(`✅ Diretório enviado com sucesso para ${subdominio}!`);
-  } catch (err) {
-    console.error("❌ Erro ao enviar Diretório:", err);
     throw err;
   } finally {
     client.close();

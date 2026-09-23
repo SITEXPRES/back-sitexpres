@@ -1,3 +1,4 @@
+import * as cheerio from 'cheerio';
 import pool from "../config/db.js";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import Anthropic from "@anthropic-ai/sdk";
@@ -5,7 +6,7 @@ import { v4 as uuidv4 } from "uuid";
 import fs from "fs/promises";
 import path from "path";
 import ftp from "basic-ftp";
-import { criarSubdominioDirectAdmin, enviarHTMLSubdominio, subdominioExiste, deletarSubdominioDirectAdmin } from "./integracao_directadmin.js";
+import { criarSubdominioDirectAdmin, enviarHTMLSubdominio, subdominioExiste, deletarSubdominioDirectAdmin, enviarDiretorioSubdominio } from "./integracao_directadmin.js";
 import dotenv from "dotenv";
 dotenv.config();
 import { updateGitHubIfIntegrated } from "./updateGitHubOnSiteChange.js";
@@ -74,6 +75,49 @@ function logStep(jobId, msg, data = null) {
   } else {
     console.log(`[${ts}] [JOB:${jobId ?? 'init'}] ${msg}`);
   }
+}
+
+
+// Helper: Extrair URLs do prompt e fazer fetch
+async function extractUrlsAndFetchContent(prompt, logStep, jobId) {
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const urls = prompt.match(urlRegex);
+  
+  if (!urls || urls.length === 0) return prompt;
+
+  let enrichedPrompt = prompt + '\n\n--- CONTEXTO ADICIONAL LIDO DAS URLs FORNECIDAS ---\n';
+  
+  for (const url of urls) {
+    if (logStep) logStep(jobId, `🌐 Lendo conteúdo da URL: ${url}`);
+    try {
+      const response = await axios.get(url, {
+        timeout: 8000,
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+      });
+      const html = response.data;
+      const $ = cheerio.load(html);
+      
+      // Remover scripts, styles, etc.
+      $('script, style, noscript, iframe, img, svg, video, audio').remove();
+      
+      let textContent = $('body').text();
+      // Limpar espaços vazios
+      textContent = textContent.replace(/\s+/g, ' ').trim();
+      
+      // Limitar a quantidade de texto para não estourar os tokens
+      if (textContent.length > 20000) {
+        textContent = textContent.substring(0, 20000) + '... [Conteúdo Truncado]';
+      }
+      
+      enrichedPrompt += `\nConteúdo do site ${url}:\n${textContent}\n`;
+      if (logStep) logStep(jobId, `✅ URL lida com sucesso (${textContent.length} caracteres extraídos).`);
+    } catch (e) {
+      console.error("Erro ao ler URL:", e.message);
+      if (logStep) logStep(jobId, `⚠️ Não foi possível ler a URL ${url}: ${e.message}`);
+      enrichedPrompt += `\nConteúdo do site ${url}: [Não foi possível ler: ${e.message}]\n`;
+    }
+  }
+  return enrichedPrompt;
 }
 
 export const newsite = async (req, res) => {
@@ -184,6 +228,9 @@ export const newsite = async (req, res) => {
           finalPrompt = primeiraVez
             ? fullPrompt
             : `HTML atual:\n${baseHTML}\nFaça as alterações solicitadas: ${fullPrompt}`;
+          
+          logStep(jobId, '🔎 Verificando se há URLs no prompt...');
+          finalPrompt = await extractUrlsAndFetchContent(finalPrompt, logStep, jobId);
 
           // ─── LIBERA O CLIENT antes da IA (operação longa!) ──────────────────
           client.release();
@@ -193,9 +240,9 @@ export const newsite = async (req, res) => {
           // ─── FASE 2: chamada à IA (sem conexão BD aberta) ───────────────────
           logStep(jobId, '🤖 Enviando prompt para a IA (Claude Haiku)... aguarde');
           const tIA = Date.now();
-          const html = await gerar_site(
+          const geracaoResult = await gerar_site(
             finalPrompt,
-            "HTML",
+            "REACT",
             req,
             id_projeto,
             baseHTML,
@@ -205,7 +252,21 @@ export const newsite = async (req, res) => {
               jobs[jobId].progress = percent;
             }
           );
-          logStep(jobId, `✅ HTML gerado pela IA (${((Date.now() - tIA) / 1000).toFixed(1)}s) | tamanho: ${html?.length ?? 0} chars`);
+          let html, distPath, tmpDirPath, hasError;
+          if (typeof geracaoResult === 'string') {
+            // Modo HTML Puro
+            html = geracaoResult;
+            distPath = null;
+            tmpDirPath = null;
+            hasError = false;
+          } else {
+            // Modo React Vite
+            html = geracaoResult.reactCode;
+            distPath = geracaoResult.distPath;
+            tmpDirPath = geracaoResult.tmpDirPath;
+            hasError = geracaoResult.hasError;
+          }
+          logStep(jobId, `✅ Geração e build concluídos (${((Date.now() - tIA) / 1000).toFixed(1)}s)`);
 
           // Gera subdomínio (apenas na criação, sem BD ainda)
           if (primeiraVez) {
@@ -216,7 +277,7 @@ export const newsite = async (req, res) => {
 
             logStep(jobId, `🌐 Criando subdomínio no DirectAdmin: ${nomeSubdominio}.sitexpres.com.br`);
             const tDA = Date.now();
-            await criarSubdominioDirectAdmin(nomeSubdominio, "sitexpres.com.br");
+            try { await criarSubdominioDirectAdmin(nomeSubdominio, "sitexpres.com.br"); } catch (e) { console.error("Erro DA:", e.message); }
             logStep(jobId, `✅ Subdomínio criado no DirectAdmin (${Date.now() - tDA}ms)`);
           } else {
             logStep(jobId, `ℹ️  Subdomínio existente recuperado: ${nomeSubdominio}`);
@@ -284,24 +345,71 @@ export const newsite = async (req, res) => {
           client = null;
 
           // ─── FASE 4: envio via FTP ───────────────────────────────────────────
-          logStep(jobId, `📤 Enviando HTML via FTP para DirectAdmin... (hospedagem customizada: ${existe_hospedagem.rows.length > 0})`);
+          logStep(jobId, `📤 Enviando Pasta dist via FTP para DirectAdmin... (hospedagem customizada: ${existe_hospedagem.rows.length > 0})`);
           const tFTP = Date.now();
 
           if (existe_hospedagem.rows.length > 0) {
-            const username          = existe_hospedagem.rows[0].username;
-            const password          = existe_hospedagem.rows[0].senha;
-            const dominio_hospedagem = existe_hospedagem.rows[0].dominio;
-            await enviarHTMLSubdominio("ftp.sitexpres.com.br", username, password, dominio_hospedagem, html);
+            try {
+              const username          = existe_hospedagem.rows[0].username;
+              const password          = existe_hospedagem.rows[0].senha;
+              const dominio_hospedagem = existe_hospedagem.rows[0].dominio;
+              try {
+                if (distPath) {
+                  await enviarDiretorioSubdominio("ftp.sitexpres.com.br", username, password, dominio_hospedagem, distPath);
+                } else {
+                  await enviarHTMLSubdominio("ftp.sitexpres.com.br", username, password, dominio_hospedagem, html);
+                }
+              } catch (e1) {
+                logStep(jobId, `⚠️ Falha no ftp.sitexpres.com.br. Tentando fallback para srv3br.com.br...`);
+                try {
+                  if (distPath) {
+                    await enviarDiretorioSubdominio("srv3br.com.br", username, password, dominio_hospedagem, distPath);
+                  } else {
+                    await enviarHTMLSubdominio("srv3br.com.br", username, password, dominio_hospedagem, html);
+                  }
+                  logStep(jobId, `✅ Arquivos enviados via FTP (Fallback srv3br.com.br)`);
+                } catch (e2) {
+                  logStep(jobId, `⚠️ Erro FTP Customizado (ambos servidores): ${e2.message}`);
+                  console.error("Erro FTP Customizado:", e2);
+                }
+              }
+              logStep(jobId, `✅ Diretório dist enviado via FTP (${Date.now() - tFTP}ms)`);
+            } catch (errFTP) {
+              logStep(jobId, `⚠️ Erro ao enviar FTP (Customizado): ${errFTP.message}`);
+              console.error("Erro FTP Customizado:", errFTP);
+            }
           } else {
-            await enviarHTMLSubdominio(
-              "ftp.sitexpres.com.br",
-              process.env.user_directamin,
-              process.env.pass_directamin,
-              nomeSubdominio + '.sitexpres.com.br',
-              html
-            );
+            try {
+              try {
+                if (distPath) {
+                  await enviarDiretorioSubdominio("ftp.sitexpres.com.br", process.env.user_directamin, process.env.pass_directamin, nomeSubdominio + ".sitexpres.com.br", distPath);
+                } else {
+                  await enviarHTMLSubdominio("ftp.sitexpres.com.br", process.env.user_directamin, process.env.pass_directamin, nomeSubdominio + ".sitexpres.com.br", html);
+                }
+              } catch (e1) {
+                logStep(jobId, `⚠️ Falha no ftp.sitexpres.com.br. Tentando fallback para srv3br.com.br...`);
+                try {
+                  if (distPath) {
+                    await enviarDiretorioSubdominio("srv3br.com.br", process.env.user_directamin, process.env.pass_directamin, nomeSubdominio + ".sitexpres.com.br", distPath);
+                  } else {
+                    await enviarHTMLSubdominio("srv3br.com.br", process.env.user_directamin, process.env.pass_directamin, nomeSubdominio + ".sitexpres.com.br", html);
+                  }
+                  logStep(jobId, `✅ Arquivos enviados via FTP (Fallback srv3br.com.br)`);
+                } catch (e2) {
+                  logStep(jobId, `⚠️ Erro FTP DirectAdmin (ambos servidores): ${e2.message} (Preview continuará funcionando)`);
+                  console.error("Erro FTP DirectAdmin:", e2);
+                }
+              }
+              logStep(jobId, `✅ Diretório dist enviado via FTP (${Date.now() - tFTP}ms)`);
+            } catch (errFTP) {
+              logStep(jobId, `⚠️ Erro ao enviar FTP (DirectAdmin): ${errFTP.message} (Preview continuará funcionando)`);
+              console.error("Erro FTP DirectAdmin:", errFTP);
+            }
           }
-          logStep(jobId, `✅ HTML enviado via FTP (${Date.now() - tFTP}ms)`);
+          
+          // Limpa a pasta temporária do build
+          if (tmpDirPath) { await fs.rm(tmpDirPath, { recursive: true, force: true }).catch(e => console.error('Erro ao deletar tmp dir:', e)); }
+          
 
           // Update no github caso integrado
           logStep(jobId, '🐙 Verificando integração com GitHub...');
