@@ -238,7 +238,18 @@ export const newsite = async (req, res) => {
           logStep(jobId, '🔓 Conexão com BD liberada — iniciando chamada à IA...');
 
           // ─── FASE 2: chamada à IA (sem conexão BD aberta) ───────────────────
-          logStep(jobId, '🤖 Enviando prompt para a IA (Claude Haiku)... aguarde');
+          let html, distPath, tmpDirPath, hasError;
+          const isTestMode = finalPrompt.includes("[teste]");
+
+          if (isTestMode) {
+            logStep(jobId, '🤖 [MODO TESTE] Pulando IA (Claude)... gerando mock');
+            html = "<html><head><title>Site Teste</title><style>body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f0f0; } h1 { color: #333; }</style></head><body><h1>Site Gerado com Sucesso (Modo Teste)</h1></body></html>";
+            distPath = null;
+            tmpDirPath = null;
+            hasError = false;
+            jobs[jobId].progress = 100;
+          } else {
+            logStep(jobId, '🤖 Enviando prompt para a IA (Claude Haiku)... aguarde');
           const tIA = Date.now();
           const geracaoResult = await gerar_site(
             finalPrompt,
@@ -252,7 +263,6 @@ export const newsite = async (req, res) => {
               jobs[jobId].progress = percent;
             }
           );
-          let html, distPath, tmpDirPath, hasError;
           if (typeof geracaoResult === 'string') {
             // Modo HTML Puro
             html = geracaoResult;
@@ -266,7 +276,8 @@ export const newsite = async (req, res) => {
             tmpDirPath = geracaoResult.tmpDirPath;
             hasError = geracaoResult.hasError;
           }
-          logStep(jobId, `✅ Geração e build concluídos (${((Date.now() - tIA) / 1000).toFixed(1)}s)`);
+            logStep(jobId, `✅ Geração e build concluídos (${((Date.now() - tIA) / 1000).toFixed(1)}s)`);
+          } // fecha if(!isTestMode)
 
           // Gera subdomínio (apenas na criação, sem BD ainda)
           if (primeiraVez) {
@@ -328,11 +339,29 @@ export const newsite = async (req, res) => {
 
           const novoId = insertSite.rows[0].id;
 
-          await client.query(
-            `INSERT INTO site_prompts (user_id, id_projeto, prompt, id_site_gererate, status)
-           VALUES ($1, $2, $3, $4, $5)`,
-            [userId, id_projeto, prompt, novoId, 'ativo']
-          );
+            // Gera a mensagem inteligente com Haiku
+            let assistantMessage = "";
+            try {
+              if (primeiraVez) {
+                 assistantMessage = "🎉 Uau! Seu site foi gerado e publicado com sucesso!";
+              } else {
+                 const aiResp = await anthropic.messages.create({
+                   model: "claude-haiku-4-5-20251001",
+                   max_tokens: 150,
+                   system: "Você é um assistente de IA amigável e empolgado. Resuma o que você acabou de fazer no site baseado no pedido do usuário. Use no máximo 15 palavras. Comece com um emoji.",
+                   messages: [{ role: "user", content: "Pedido do usuário: " + prompt }]
+                 });
+                 assistantMessage = aiResp.content[0].text;
+              }
+            } catch (err) {
+              console.error("Erro ao gerar mensagem com Haiku", err);
+            }
+
+            await client.query(
+              `INSERT INTO site_prompts (user_id, id_projeto, prompt, id_site_gererate, status, assistant_message)
+               VALUES ($1, $2, $3, $4, $5, $6)`,
+              [userId, id_projeto, prompt, novoId, 'ativo', assistantMessage]
+            );
           logStep(jobId, `✅ HTML salvo no banco (${Date.now() - tDB}ms) | id gerado: ${novoId}`);
 
           const existe_hospedagem = await client.query(

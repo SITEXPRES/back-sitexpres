@@ -21,7 +21,7 @@ const USE_GEMINI = false;
 
 
 // max_tokens esperado — usado pra calcular % de progresso
-const MAX_TOKENS_HAIKU = 30000;
+const MAX_TOKENS_HAIKU = 100000;
 
 const GENERIC_HTML_TEMPLAT_PTBR = `<!DOCTYPE html>
 <html lang="pt-br">
@@ -167,6 +167,17 @@ export async function gerar_site(prompt, parte, req, id_projeto, baseHTML = "", 
     const systemPromptCriacao = `
 Você é um designer e desenvolvedor web SÊNIOR especializado em criar interfaces PREMIUM comparáveis ao Lovable, Webflow e Framer.
 Seu objetivo é gerar HTML standalone que pareça um produto profissional de $10,000+.
+
+
+=========================================================
+🔥 CRÍTICO PARA O DESIGN E ANIMAÇÕES (LEIA COM ATENÇÃO)
+=========================================================
+- DETALHES IMPORTAM: O usuário está exigindo um design RICO, não algo básico!
+- BACKGROUNDS: Use gradientes complexos (ex: bg-gradient-to-br from-gray-900 via-black to-red-900), efeitos glassmorphism (backdrop-blur), ou imagens de fundo espetaculares com overlays elegantes.
+- ANIMAÇÕES: Cada seção DEVE ter 'data-aos' configurado (fade-up, fade-right, zoom-in, etc.). 
+- INTERAÇÕES: Botões e cards devem ter efeitos de hover impactantes (hover:scale-105, hover:shadow-2xl, transition-all duration-300).
+- CORES PROFUNDAS E MODERNAS: Se for modo escuro, use preto profundo com tons vibrantes de destaque.
+- SEJA EXTREMAMENTE DETALHISTA nas sombras, bordas arredondadas e espaçamentos (paddings/margins grandes para respiro). O design final precisa causar EFEITO WOW!
 
 ⚠️ RETORNE APENAS CÓDIGO HTML COMPLETO (sem markdown, sem explicações, sem \`\`\`html).
 
@@ -1103,7 +1114,7 @@ GERE O HTML COMPLETO AGORA.
       return limparRetorno(html);
     } else {
       // Claude Haiku — mais rápido e econômico
-      const MODELO = "claude-haiku-4-5-20251001";
+      const MODELO = isEditing ? "claude-sonnet-5" : "claude-opus-5-5";
       
       let html = "";
       
@@ -1137,7 +1148,7 @@ GERE O HTML COMPLETO AGORA.
           const stream = await anthropic.messages.stream({
             model: MODELO,
             max_tokens: MAX_TOKENS_HAIKU,
-            system: systemPrompt,
+            system: "Você é um expert em UI/UX e desenvolvimento web frontend de altíssimo nível. Siga rigorosamente as instruções a seguir.",
             messages: [{
               role: "user",
               content: systemPrompt

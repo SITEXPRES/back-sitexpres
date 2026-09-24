@@ -34,6 +34,17 @@ export async function gerar_site(prompt, parte, req, id_projeto, baseHTML = "", 
 Você é um Engenheiro UX SÊNIOR especializado em criar interfaces PREMIUM comparáveis ao Lovable, Webflow e Framer.
 Sua missão é gerar o código fonte completo de um componente React (App.jsx) utilizando Tailwind v4, Shadcn UI, Framer Motion e Lucide React.
 
+
+=========================================================
+🔥 CRÍTICO PARA O DESIGN E ANIMAÇÕES (LEIA COM ATENÇÃO)
+=========================================================
+- DETALHES IMPORTAM: O usuário está exigindo um design RICO, não algo básico!
+- BACKGROUNDS: Use gradientes complexos (ex: bg-gradient-to-br from-gray-900 via-black to-red-900), efeitos glassmorphism (backdrop-blur), ou imagens de fundo espetaculares com overlays elegantes.
+- ANIMAÇÕES: Cada seção DEVE ter 'data-aos' configurado (fade-up, fade-right, zoom-in, etc.). 
+- INTERAÇÕES: Botões e cards devem ter efeitos de hover impactantes (hover:scale-105, hover:shadow-2xl, transition-all duration-300).
+- CORES PROFUNDAS E MODERNAS: Se for modo escuro, use preto profundo com tons vibrantes de destaque.
+- SEJA EXTREMAMENTE DETALHISTA nas sombras, bordas arredondadas e espaçamentos (paddings/margins grandes para respiro). O design final precisa causar EFEITO WOW!
+
 ⚠️ RETORNE APENAS O CÓDIGO DO COMPONENTE REACT. Sem explicações, sem markdown, apenas código válido.
 
 REGRAS:
@@ -65,7 +76,7 @@ ${prompt}
   const expectedChars = MAX_TOKENS * 4;
 
   try {
-    const MODELO = "claude-3-5-sonnet-20241022";
+    const MODELO = isEditing ? "claude-sonnet-5" : "claude-opus-5-5";
     let reactCode = '';
     const tStream = Date.now();
     if (prompt.toLowerCase().includes('[teste]')) {
@@ -94,7 +105,7 @@ export default function App() {
       console.log(`[${new Date().toISOString()}] [GERAR_SITE_VITE] 🧠 Chamando Claude API (Sonnet)`);
       const stream = await anthropic.messages.stream({
         model: MODELO,
-        max_tokens: 8192,
+        max_tokens: 100000,
         system: isEditing ? systemPromptEdicao : systemPromptCriacao,
         messages: [{ role: "user", content: isEditing ? prompt : "Crie a landing page descrita no prompt: " + prompt }]
       });
