@@ -3,6 +3,7 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@octokit/rest": "^22.0.1",
+    "archiver": "^8.0.0",
     "crypto-js": "^4.2.0",
     "multer": "^2.0.2",
     "tiktoken": "^1.0.22"

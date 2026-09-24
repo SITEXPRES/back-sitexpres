@@ -5,6 +5,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { v4 as uuidv4 } from "uuid";
 import fs from "fs/promises";
 import path from "path";
+import archiver from "archiver";
 import ftp from "basic-ftp";
 import { criarSubdominioDirectAdmin, enviarHTMLSubdominio, subdominioExiste, deletarSubdominioDirectAdmin, enviarDiretorioSubdominio } from "./integracao_directadmin.js";
 import dotenv from "dotenv";
@@ -146,6 +147,11 @@ export const newsite = async (req, res) => {
     logStep(null, '🔍 Verificando créditos do usuário...');
     const t1 = Date.now();
     const verificar_creditos_prompt_result = await verificar_creditos_prompt(userId, prompt, baseHTML);
+    if (req.file) {
+      if (verificar_creditos_prompt_result.tokensDisponiveis < 100000) verificar_creditos_prompt_result.podeRodar = false;
+    } else {
+      if (verificar_creditos_prompt_result.tokensDisponiveis < 60000) verificar_creditos_prompt_result.podeRodar = false;
+    }
     logStep(null, `✅ Créditos verificados (${Date.now() - t1}ms) | podeRodar: ${verificar_creditos_prompt_result.podeRodar}`);
 
     if (!verificar_creditos_prompt_result.podeRodar) {
@@ -436,6 +442,30 @@ export const newsite = async (req, res) => {
             }
           }
           
+                    try {
+            const zipsDir = path.join(process.cwd(), 'uploads', 'zips');
+            await fs.promises.mkdir(zipsDir, { recursive: true });
+            const zipPath = path.join(zipsDir, `${id_projeto}.zip`);
+            
+            await new Promise((resolve, reject) => {
+              const output = fs.createWriteStream(zipPath);
+              const archive = archiver('zip', { zlib: { level: 9 } });
+              output.on('close', resolve);
+              archive.on('error', reject);
+              archive.pipe(output);
+              
+              if (distPath) {
+                archive.directory(distPath, false);
+              } else {
+                archive.append(html, { name: 'index.html' });
+              }
+              archive.finalize();
+            });
+            logStep(jobId, `📦 ZIP do projeto criado`);
+          } catch (zipErr) {
+            console.error('Erro ao criar zip:', zipErr);
+          }
+
           // Limpa a pasta temporária do build
           if (tmpDirPath) { await fs.rm(tmpDirPath, { recursive: true, force: true }).catch(e => console.error('Erro ao deletar tmp dir:', e)); }
           

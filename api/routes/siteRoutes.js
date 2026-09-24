@@ -20,4 +20,7 @@ router.get("/check_id_projeto/:id_projeto", check_id_projeto);
 router.post("/testedom", testecret_domin);
 router.get("/analytics/:id_projeto", authMiddleware, getSiteAnalytics);
 
+import { downloadSite } from '../controllers/downloadController.js';
+router.get('/download/:id', downloadSite);
+
 export default router;
