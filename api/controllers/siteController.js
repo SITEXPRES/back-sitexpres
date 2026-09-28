@@ -4,8 +4,11 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import Anthropic from "@anthropic-ai/sdk";
 import { v4 as uuidv4 } from "uuid";
 import fs from "fs/promises";
+import fsSync from "fs";
 import path from "path";
-import archiver from "archiver";
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const archiver = require("archiver");
 import ftp from "basic-ftp";
 import { criarSubdominioDirectAdmin, enviarHTMLSubdominio, subdominioExiste, deletarSubdominioDirectAdmin, enviarDiretorioSubdominio } from "./integracao_directadmin.js";
 import dotenv from "dotenv";
@@ -13,7 +16,8 @@ dotenv.config();
 import { updateGitHubIfIntegrated } from "./updateGitHubOnSiteChange.js";
 import { uso_creditos, verificar_creditos_prompt } from "./creditosController.js";
 import { consultaPlano } from "./planoController.js";
-import { gerar_site } from "./gerar_siteController.js";
+import { gerar_site } from "./gerar_siteController_vite.js";
+import { desatrelarHtmlSitexpress, coletarArquivosProjeto } from "../utils/siteAssetHelper.js";
 // ⚠️ REMOVIDO: import { console, url } from "inspector" — esse import sobrescrevia o console global e suprimia os logs no terminal!
 
 const anthropic = new Anthropic({
@@ -167,10 +171,9 @@ export const newsite = async (req, res) => {
       const typedo_plano = plano.plan;
       logStep(null, `✅ Plano consultado (${Date.now() - t2}ms) | plano: ${typedo_plano}`);
 
-      // Se tiver imagem faz upload
-      const imageFile = req.file ? `/uploads/images/${req.file.filename}` : null;
-      const baseURL = "https://back.sitexpres.com.br/uploads/logos/";
-      const imageURL = req.file ? `${baseURL}${req.file.filename}` : null;
+      // Imagem/Logo enviado pelo usuário (desatrelado da Sitexpres)
+      const relativeImageURL = req.file ? `./images/${req.file.filename}` : null;
+      const imageURL = relativeImageURL;
 
       // Cria job assincrono para monitorar o progresso
       const jobId = uuidv4();
@@ -227,8 +230,8 @@ export const newsite = async (req, res) => {
           }
           logStep(jobId, `ℹ️  Modo: ${primeiraVez ? 'CRIAÇÃO (primeira vez)' : 'EDIÇÃO (site existente)'}`);
 
-          const fullPrompt = imageURL
-            ? `${prompt}\nUse esta URL da imagem no site: ${imageURL}`
+          const fullPrompt = relativeImageURL
+            ? `${prompt}\n[INSTRUÇÃO DE IMAGEM/LOGO: O usuário enviou uma imagem/logo. Utilize no código HTML EXATAMENTE o caminho relativo "${relativeImageURL}" no src da tag <img> do logotipo ou banner principal (exemplo: <img src="${relativeImageURL}" alt="Logo">). NUNCA utilize links absolutos apontando para back.sitexpres.com.br nem links externos para este arquivo!]`
             : prompt;
 
           finalPrompt = primeiraVez
@@ -249,7 +252,7 @@ export const newsite = async (req, res) => {
 
           if (isTestMode) {
             logStep(jobId, '🤖 [MODO TESTE] Pulando IA (Claude)... gerando mock');
-            html = "<html><head><title>Site Teste</title><style>body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f0f0; } h1 { color: #333; }</style></head><body><h1>Site Gerado com Sucesso (Modo Teste)</h1></body></html>";
+            html = desatrelarHtmlSitexpress("<html><head><title>Site Teste</title><style>body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f0f0; } h1 { color: #333; }</style></head><body><h1>Site Gerado com Sucesso (Modo Teste)</h1></body></html>");
             distPath = null;
             tmpDirPath = null;
             hasError = false;
@@ -271,13 +274,13 @@ export const newsite = async (req, res) => {
           );
           if (typeof geracaoResult === 'string') {
             // Modo HTML Puro
-            html = geracaoResult;
+            html = desatrelarHtmlSitexpress(geracaoResult);
             distPath = null;
             tmpDirPath = null;
             hasError = false;
           } else {
             // Modo React Vite
-            html = geracaoResult.reactCode;
+            html = desatrelarHtmlSitexpress(geracaoResult.reactCode);
             distPath = geracaoResult.distPath;
             tmpDirPath = geracaoResult.tmpDirPath;
             hasError = geracaoResult.hasError;
@@ -340,7 +343,7 @@ export const newsite = async (req, res) => {
            (user_id, name, prompt, html_content, id_projeto, image_path, subdominio, status)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
            RETURNING id, name, prompt, html_content, created_at`,
-            [userId, `Site de ${nomeSubdominio}`, prompt, html, id_projeto, imageURL, nomeSubdominio, 'ativo']
+            [userId, `Site de ${nomeSubdominio}`, prompt, html, id_projeto, relativeImageURL || (existing.rows[0]?.image_path ? desatrelarHtmlSitexpress(existing.rows[0].image_path) : null), nomeSubdominio, 'ativo']
           );
 
           const novoId = insertSite.rows[0].id;
@@ -375,13 +378,31 @@ export const newsite = async (req, res) => {
             [id_projeto]
           );
 
+          // Coleta arquivos e imagens locais para subir junto na hospedagem do cliente
+          const arquivosExtras = await coletarArquivosProjeto(id_projeto, html, req.file, client);
+          logStep(jobId, `📁 Assets e imagens do projeto coletados para upload: ${arquivosExtras.length}`);
+
           // Libera antes do FTP (outra operação longa)
           client.release();
           client = null;
 
           // ─── FASE 4: envio via FTP ───────────────────────────────────────────
-          logStep(jobId, `📤 Enviando Pasta dist via FTP para DirectAdmin... (hospedagem customizada: ${existe_hospedagem.rows.length > 0})`);
+          logStep(jobId, `📤 Enviando site e assets via FTP para DirectAdmin... (hospedagem customizada: ${existe_hospedagem.rows.length > 0})`);
           const tFTP = Date.now();
+
+          // Se for build Vite, copia os assets locais para a pasta dist antes do upload
+          if (distPath && arquivosExtras.length > 0) {
+            try {
+              const imagesDist = path.join(distPath, 'images');
+              await fs.mkdir(imagesDist, { recursive: true });
+              for (const arq of arquivosExtras) {
+                await fs.copyFile(arq.localPath, path.join(imagesDist, arq.remoteName));
+              }
+              logStep(jobId, `✅ ${arquivosExtras.length} asset(s) copiado(s) para dist/images`);
+            } catch (copyErr) {
+              console.error("Erro ao copiar imagens para dist:", copyErr);
+            }
+          }
 
           if (existe_hospedagem.rows.length > 0) {
             try {
@@ -392,7 +413,7 @@ export const newsite = async (req, res) => {
                 if (distPath) {
                   await enviarDiretorioSubdominio("ftp.sitexpres.com.br", username, password, dominio_hospedagem, distPath);
                 } else {
-                  await enviarHTMLSubdominio("ftp.sitexpres.com.br", username, password, dominio_hospedagem, html);
+                  await enviarHTMLSubdominio("ftp.sitexpres.com.br", username, password, dominio_hospedagem, html, arquivosExtras);
                 }
               } catch (e1) {
                 logStep(jobId, `⚠️ Falha no ftp.sitexpres.com.br. Tentando fallback para srv3br.com.br...`);
@@ -400,7 +421,7 @@ export const newsite = async (req, res) => {
                   if (distPath) {
                     await enviarDiretorioSubdominio("srv3br.com.br", username, password, dominio_hospedagem, distPath);
                   } else {
-                    await enviarHTMLSubdominio("srv3br.com.br", username, password, dominio_hospedagem, html);
+                    await enviarHTMLSubdominio("srv3br.com.br", username, password, dominio_hospedagem, html, arquivosExtras);
                   }
                   logStep(jobId, `✅ Arquivos enviados via FTP (Fallback srv3br.com.br)`);
                 } catch (e2) {
@@ -408,7 +429,7 @@ export const newsite = async (req, res) => {
                   console.error("Erro FTP Customizado:", e2);
                 }
               }
-              logStep(jobId, `✅ Diretório dist enviado via FTP (${Date.now() - tFTP}ms)`);
+              logStep(jobId, `✅ Site e assets enviados via FTP (${Date.now() - tFTP}ms)`);
             } catch (errFTP) {
               logStep(jobId, `⚠️ Erro ao enviar FTP (Customizado): ${errFTP.message}`);
               console.error("Erro FTP Customizado:", errFTP);
@@ -419,7 +440,7 @@ export const newsite = async (req, res) => {
                 if (distPath) {
                   await enviarDiretorioSubdominio("ftp.sitexpres.com.br", process.env.user_directamin, process.env.pass_directamin, nomeSubdominio + ".sitexpres.com.br", distPath);
                 } else {
-                  await enviarHTMLSubdominio("ftp.sitexpres.com.br", process.env.user_directamin, process.env.pass_directamin, nomeSubdominio + ".sitexpres.com.br", html);
+                  await enviarHTMLSubdominio("ftp.sitexpres.com.br", process.env.user_directamin, process.env.pass_directamin, nomeSubdominio + ".sitexpres.com.br", html, arquivosExtras);
                 }
               } catch (e1) {
                 logStep(jobId, `⚠️ Falha no ftp.sitexpres.com.br. Tentando fallback para srv3br.com.br...`);
@@ -427,7 +448,7 @@ export const newsite = async (req, res) => {
                   if (distPath) {
                     await enviarDiretorioSubdominio("srv3br.com.br", process.env.user_directamin, process.env.pass_directamin, nomeSubdominio + ".sitexpres.com.br", distPath);
                   } else {
-                    await enviarHTMLSubdominio("srv3br.com.br", process.env.user_directamin, process.env.pass_directamin, nomeSubdominio + ".sitexpres.com.br", html);
+                    await enviarHTMLSubdominio("srv3br.com.br", process.env.user_directamin, process.env.pass_directamin, nomeSubdominio + ".sitexpres.com.br", html, arquivosExtras);
                   }
                   logStep(jobId, `✅ Arquivos enviados via FTP (Fallback srv3br.com.br)`);
                 } catch (e2) {
@@ -435,20 +456,20 @@ export const newsite = async (req, res) => {
                   console.error("Erro FTP DirectAdmin:", e2);
                 }
               }
-              logStep(jobId, `✅ Diretório dist enviado via FTP (${Date.now() - tFTP}ms)`);
+              logStep(jobId, `✅ Site e assets enviados via FTP (${Date.now() - tFTP}ms)`);
             } catch (errFTP) {
               logStep(jobId, `⚠️ Erro ao enviar FTP (DirectAdmin): ${errFTP.message} (Preview continuará funcionando)`);
               console.error("Erro FTP DirectAdmin:", errFTP);
             }
           }
           
-                    try {
+          try {
             const zipsDir = path.join(process.cwd(), 'uploads', 'zips');
-            await fs.promises.mkdir(zipsDir, { recursive: true });
+            await fs.mkdir(zipsDir, { recursive: true });
             const zipPath = path.join(zipsDir, `${id_projeto}.zip`);
             
             await new Promise((resolve, reject) => {
-              const output = fs.createWriteStream(zipPath);
+              const output = fsSync.createWriteStream(zipPath);
               const archive = archiver('zip', { zlib: { level: 9 } });
               output.on('close', resolve);
               archive.on('error', reject);
@@ -458,10 +479,15 @@ export const newsite = async (req, res) => {
                 archive.directory(distPath, false);
               } else {
                 archive.append(html, { name: 'index.html' });
+                if (Array.isArray(arquivosExtras)) {
+                  for (const arq of arquivosExtras) {
+                    archive.file(arq.localPath, { name: `images/${arq.remoteName}` });
+                  }
+                }
               }
               archive.finalize();
             });
-            logStep(jobId, `📦 ZIP do projeto criado`);
+            logStep(jobId, `📦 ZIP do projeto criado com arquivos locais`);
           } catch (zipErr) {
             console.error('Erro ao criar zip:', zipErr);
           }
@@ -878,12 +904,10 @@ export const restauracao_versao = async (req, res) => {
       [id_projeto]
     );
 
-    const html_new = resultado.rows[0]?.html_content || "<h5>Nenhum HTML encontrado</h5><br>erro:@$231";
+    let html_new = resultado.rows[0]?.html_content || "<h5>Nenhum HTML encontrado</h5><br>erro:@$231";
+    html_new = desatrelarHtmlSitexpress(html_new);
 
-    //##########
-    //Fazendo Updade na hospedagem ou subdomínio
-
-
+    const arquivosExtras = await coletarArquivosProjeto(id_projeto, html_new, null, pool);
 
     const dados_sites = await pool.query(
       `SELECT site_url FROM public.sites
@@ -897,7 +921,7 @@ export const restauracao_versao = async (req, res) => {
 
     if (site_url) {
       const url = new URL(site_url);
-      subdominio = url.host; // retorna apenas taskmark.sitexpres.com.br
+      subdominio = url.host;
     }
 
     console.log("Subdomínio ==> " + subdominio);
@@ -907,7 +931,8 @@ export const restauracao_versao = async (req, res) => {
       process.env.user_directamin,
       process.env.pass_directamin,
       subdominio,
-      html_new
+      html_new,
+      arquivosExtras
     );
 
     //--------------------

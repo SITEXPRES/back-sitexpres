@@ -7,6 +7,7 @@ import Client from 'ftp';
 import fs from 'fs';
 import path from 'path';
 import { deletarSubdominioDirectAdmin } from './integracao_directadmin.js';
+import { desatrelarHtmlSitexpress, coletarArquivosProjeto } from '../utils/siteAssetHelper.js';
 
 // Configurações do DirectAdmin
 const DIRECTADMIN_CONFIG = {
@@ -252,13 +253,14 @@ export const creat_hospedagem = async (req, res) => {
             );
 
             if (existing.rows.length > 0 && existing.rows[0]?.html_content) {
-                htmlContent = existing.rows[0].html_content;
+                htmlContent = desatrelarHtmlSitexpress(existing.rows[0].html_content);
                 console.log('✅ HTML encontrado no banco de dados');
             }
 
             if (htmlContent) {
                 try {
-                    uploadStatus = await uploadIndexHtml(username, senha, dominio, htmlContent);
+                    const arquivosExtras = await coletarArquivosProjeto(id_projeto, htmlContent, null, client);
+                    uploadStatus = await uploadIndexHtml(username, senha, dominio, htmlContent, arquivosExtras);
                     console.log('📤 Status do upload:', uploadStatus);
 
                     //Removendo Subdominio
@@ -548,8 +550,8 @@ export const createHospedagem_funcao = async ({
             [id_projeto]
         );
 
-        if (existing.rows.length > 0) {
-            htmlContent = existing.rows[0].html_content;
+        if (existing.rows.length > 0 && existing.rows[0]?.html_content) {
+            htmlContent = desatrelarHtmlSitexpress(existing.rows[0].html_content);
         }
 
         // ======================
@@ -558,11 +560,13 @@ export const createHospedagem_funcao = async ({
         let uploadStatus = { success: false };
 
         if (htmlContent) {
+            const arquivosExtras = await coletarArquivosProjeto(id_projeto, htmlContent, null, client);
             uploadStatus = await uploadIndexHtml(
                 username,
                 senha,
                 dominio,
-                htmlContent
+                htmlContent,
+                arquivosExtras
             );
         }
 
@@ -629,7 +633,7 @@ export const createHospedagem_funcao = async ({
 
 
 // Função para fazer upload do index.html via FTP ou API do DirectAdmin
-async function uploadIndexHtml(username, senha, dominio, htmlContent) {
+async function uploadIndexHtml(username, senha, dominio, htmlContent, arquivosExtras = []) {
     try {
         // Método 1: Usando a API de File Manager do DirectAdmin
         const form = new FormData();
@@ -661,9 +665,38 @@ async function uploadIndexHtml(username, senha, dominio, htmlContent) {
 
         console.log('✅ Upload concluído:', uploadResponse.data);
 
+        // Upload de imagens/assets extras via API se existirem
+        if (Array.isArray(arquivosExtras) && arquivosExtras.length > 0) {
+            for (const arq of arquivosExtras) {
+                try {
+                    if (!arq || !arq.localPath || !fs.existsSync(arq.localPath)) continue;
+                    const imgBuffer = fs.readFileSync(arq.localPath);
+                    const imgForm = new FormData();
+                    imgForm.append('action', 'upload');
+                    imgForm.append('path', `/domains/${dominio}/public_html/images`);
+                    imgForm.append('file', imgBuffer, {
+                        filename: arq.remoteName || path.basename(arq.localPath),
+                        contentType: 'application/octet-stream'
+                    });
+                    await axios.post(
+                        `${DIRECTADMIN_CONFIG.host}/CMD_API_FILE_MANAGER`,
+                        imgForm,
+                        {
+                            auth: { username, password: senha },
+                            headers: imgForm.getHeaders(),
+                            timeout: 30000
+                        }
+                    );
+                    console.log(`✅ Asset enviado para hospedagem: images/${arq.remoteName}`);
+                } catch (imgErr) {
+                    console.warn(`⚠️ Aviso ao enviar asset ${arq.remoteName}: ${imgErr.message}`);
+                }
+            }
+        }
+
         return {
             success: true,
-            message: 'Arquivo index.html enviado com sucesso',
+            message: 'Arquivo index.html e assets enviados com sucesso',
             path: '/public_html/index.html'
         };
 
@@ -672,7 +705,7 @@ async function uploadIndexHtml(username, senha, dominio, htmlContent) {
 
         // Tentar método alternativo via FTP
         try {
-            return await uploadViaFTP(username, senha, dominio, htmlContent);
+            return await uploadViaFTP(username, senha, dominio, htmlContent, arquivosExtras);
         } catch (ftpError) {
             throw new Error(`Falha no upload: ${error.message}`);
         }
@@ -680,7 +713,7 @@ async function uploadIndexHtml(username, senha, dominio, htmlContent) {
 }
 
 // Método alternativo via FTP
-async function uploadViaFTP(username, senha, dominio, htmlContent) {
+async function uploadViaFTP(username, senha, dominio, htmlContent, arquivosExtras = []) {
     return new Promise((resolve, reject) => {
         const ftpClient = new Client();
 

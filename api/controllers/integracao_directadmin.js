@@ -66,8 +66,10 @@ export async function deletarSubdominioDirectAdmin(subdominio, dominioPrincipal 
   }
 }
 
-// Função para enviar o HTML gerado diretamente por string
-export async function enviarHTMLSubdominio(host, usuario, senha, subdominio, html) {
+import path from "path";
+
+// Função para enviar o HTML gerado diretamente por string, incluindo imagens e assets se existirem
+export async function enviarHTMLSubdominio(host, usuario, senha, subdominio, html, arquivosExtras = []) {
   if (!host || !usuario || !senha || !subdominio || !html) {
     throw new Error("Parâmetros inválidos para enviarHTMLSubdominio");
   }
@@ -88,10 +90,29 @@ export async function enviarHTMLSubdominio(host, usuario, senha, subdominio, htm
     // Cria um stream a partir da string HTML
     const htmlStream = Readable.from([html]);
 
-    // Envia o arquivo
+    // Envia o arquivo index.html
     await client.uploadFrom(htmlStream, `${remoteDir}/index.html`);
 
     console.log(`✅ HTML enviado com sucesso para ${subdominio}!`);
+
+    // Envia arquivos extras (como imagens, logos e assets) para desatrelar da Sitexpres
+    if (Array.isArray(arquivosExtras) && arquivosExtras.length > 0) {
+      console.log(`📁 Enviando ${arquivosExtras.length} arquivo(s) extra(s) para ${subdominio}...`);
+      for (const item of arquivosExtras) {
+        if (!item || !item.localPath) continue;
+        try {
+          const subDirName = item.remoteSubdir || "images";
+          const targetDir = `${remoteDir}/${subDirName}`;
+          await client.ensureDir(targetDir);
+
+          const fileName = item.remoteName || path.basename(item.localPath);
+          await client.uploadFrom(item.localPath, `${targetDir}/${fileName}`);
+          console.log(`✅ Asset enviado via FTP: ${subDirName}/${fileName}`);
+        } catch (fileErr) {
+          console.error(`⚠️ Erro ao enviar asset (${item.localPath}):`, fileErr.message);
+        }
+      }
+    }
   } catch (err) {
     console.error("❌ Erro ao enviar HTML:", err);
     throw err;
