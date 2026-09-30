@@ -66,7 +66,7 @@ app.get("/teste.js", async (req, res) => {
       const anthropic = new Anthropic({ apiKey: process.env.CLAUDE_API_KEY });
       // Só cria uma mensagem simples para validar a chave
       const msg = await anthropic.messages.create({
-        model: "claude-3-haiku-20240307",
+        model: "claude-3-5-sonnet-20240620",
         max_tokens: 10,
         messages: [{ role: "user", content: "Diga 'ok'" }]
       });
