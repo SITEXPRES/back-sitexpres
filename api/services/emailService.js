@@ -18,14 +18,22 @@ const transporter = nodemailer.createTransport({
 export const sendMail = async (to, assunto, mensagem) => {
   /* const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`; */
 
+  const fromAddress = process.env.MAIL_FROM || process.env.EMAIL_USER;
 
   const mailOptions = {
-    from: 'Sitexpress <' + process.env.MAIL_FROM + '>',
+    from: 'Sitexpress <' + fromAddress + '>',
     to: to,
     subject: assunto,
     html: mensagem,
     text: mensagem.replace(/<[^>]*>?/gm, '') // Remove tags HTML rudimentar para fazer o texto plano
   };
 
-  await transporter.sendMail(mailOptions);
+  try {
+      console.log(`⏳ Enviando e-mail para ${to} (Assunto: ${assunto})...`);
+      const info = await transporter.sendMail(mailOptions);
+      console.log(`✅ E-mail enviado com sucesso para ${to}. ID: ${info.messageId}`);
+  } catch (err) {
+      console.error(`❌ Falha no disparo do e-mail para ${to}:`, err);
+      throw err;
+  }
 };
