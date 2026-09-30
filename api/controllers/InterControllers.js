@@ -1,9 +1,10 @@
 import fs from "fs";
 import https from "https";
-import { console } from "inspector";
 import pool from "../config/db.js";
 import { gerandonotafiscal, gerarNotaNacional } from "../services/notafiscalService.js";
 import { createCustomerReseller_funcao, create_domain_reseller_funcao } from "./resellerController.js";
+import { createHospedagem_funcao } from "./hospedagemController.js";
+import { registrarDominioBr, isDominioBr } from "../services/registroBrService.js";
 import { sendMail } from "../services/emailService.js";
 import { buildStyledEmail } from "../services/emailTemplateBuilder.js";
 import { attributeCommission } from "../services/affiliateService.js";
@@ -281,12 +282,24 @@ export const consultarPix = async (req, res) => {
         console.log(`PAGAMENTO CONFIRMADO no Inter! Valor: ${respostaInter.valor?.original}`);
 
         // 5. Busca a transação no seu banco
-        const result = await pool.query(
+        let result = await pool.query(
             `SELECT * FROM public.transactions WHERE payment_id = $1`,
             [txid]
         );
 
         if (result.rows.length === 0) {
+            // Verifica se é uma ordem de domínio
+            const resultDominio = await pool.query(
+                `SELECT * FROM public.domain_orders WHERE payment_reference = $1`,
+                [txid]
+            );
+
+            if (resultDominio.rows.length > 0) {
+                console.log(`[PIX RETORNO] TXID ${txid} identificado como ordem de domínio! Redirecionando para processamento...`);
+                req.body = { txid };
+                return await consultarPix_dominio(req, res);
+            }
+
             console.error("Transação não encontrada no banco com txid:", txid);
             return res.json({
                 pago: true,
@@ -1029,6 +1042,11 @@ const criarOrdemDominio = async ({
     customer_state,
     customer_country,
     customer_zipcode,
+    customer_cpf,
+    data_nascimento,
+    customer_number,
+    customer_complement,
+    customer_bairro,
     status,
     id_projeto
 }) => {
@@ -1041,56 +1059,68 @@ const criarOrdemDominio = async ({
             throw new Error("Valor inválido para domain_price");
         }
 
-        const result = await pool.query(
-            `
-            INSERT INTO public.domain_orders (
-                user_id,
-                reseller_customer_id,
-                domain_name,
-                domain_extension,
-                full_domain,
-                domain_price,
-                customer_name,
-                customer_email,
-                customer_phone,
-                customer_company,
-                customer_address,
-                customer_city,
-                customer_state,
-                customer_country,
-                customer_zipcode,
-                status,
-                payment_method,
-                payment_reference,
-                id_projeto
-            ) VALUES (
-                $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
-                $11,$12,$13,$14,$15,$16,$17,$18,$19
-            )
-            RETURNING *
-            `,
-            [
-                userId,            // $1
-                resellerId,        // $2
-                domain_name,       // $3
-                domain_extension,  // $4
-                full_domain,       // $5
-                valorFinal,        // $6
-                customer_name,     // $7
-                customer_email,    // $8
-                customer_phone,    // $9
-                customer_company,  // $10
-                customer_address,  // $11
-                customer_city,     // $12
-                customer_state,    // $13
-                customer_country,  // $14
-                customer_zipcode,  // $15
-                status,            // $16
-                'PIX',             // $17
-                txid,              // $18
-                id_projeto         // $19
-            ]
-        );
+        let result;
+        try {
+            result = await pool.query(
+                `
+                INSERT INTO public.domain_orders (
+                    user_id, reseller_customer_id, domain_name, domain_extension, full_domain,
+                    domain_price, customer_name, customer_email, customer_phone, customer_company,
+                    customer_address, customer_city, customer_state, customer_country, customer_zipcode,
+                    status, payment_method, payment_reference, id_projeto,
+                    cpf_cnpj, data_nascimento, customer_number, customer_complement, customer_bairro
+                ) VALUES (
+                    $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
+                    $11,$12,$13,$14,$15,$16,$17,$18,$19,
+                    $20,$21,$22,$23,$24
+                )
+                RETURNING *
+                `,
+                [
+                    userId, resellerId, domain_name, domain_extension, full_domain,
+                    valorFinal, customer_name, customer_email, customer_phone, customer_company,
+                    customer_address, customer_city, customer_state, customer_country, customer_zipcode,
+                    status, 'PIX', txid, id_projeto,
+                    customer_cpf || null, data_nascimento || null, customer_number || null, customer_complement || null, customer_bairro || null
+                ]
+            );
+        } catch (insertErr) {
+            // Fallback para caso colunas extras ainda não existam no banco
+            result = await pool.query(
+                `
+                INSERT INTO public.domain_orders (
+                    user_id, reseller_customer_id, domain_name, domain_extension, full_domain,
+                    domain_price, customer_name, customer_email, customer_phone, customer_company,
+                    customer_address, customer_city, customer_state, customer_country, customer_zipcode,
+                    status, payment_method, payment_reference, id_projeto
+                ) VALUES (
+                    $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
+                    $11,$12,$13,$14,$15,$16,$17,$18,$19
+                )
+                RETURNING *
+                `,
+                [
+                    userId, resellerId, domain_name, domain_extension, full_domain,
+                    valorFinal, customer_name, customer_email, customer_phone, customer_company,
+                    customer_address, customer_city, customer_state, customer_country, customer_zipcode,
+                    status, 'PIX', txid, id_projeto
+                ]
+            );
+        }
+
+        // Se o usuário estiver logado, aproveita para complementar seus dados
+        if (userId) {
+            try {
+                await pool.query(
+                    `UPDATE public.users 
+                     SET cnpj_cpf = COALESCE(cnpj_cpf, $1),
+                         data_nascimento = COALESCE(data_nascimento, $2),
+                         numero = COALESCE(numero, $3)
+                     WHERE id = $4`,
+                    [customer_cpf || null, data_nascimento || null, customer_number || null, userId]
+                );
+            } catch (uErr) {}
+        }
 
         return result.rows[0];
 
@@ -1126,16 +1156,26 @@ export const pagamentoDominio = async (req, res) => {
         customer_state,
         customer_country,
         customer_zipcode,
-        customer_cpf
+        customer_cpf,
+        cpf_cnpj,
+        data_nascimento,
+        birthdate,
+        customer_number,
+        numero,
+        customer_complement,
+        complemento,
+        customer_bairro,
+        bairro
     } = req.body;
 
     // Validação básica
-    if (!full_domain || !domain_price || !customer_name || !customer_cpf) {
+    if (!full_domain || !domain_price || !customer_name || (!customer_cpf && !cpf_cnpj)) {
         return res.status(400).json({
-            erro: "Dados obrigatórios não informados"
+            erro: "Dados obrigatórios não informados (full_domain, domain_price, customer_name, customer_cpf)"
         });
     }
 
+    const docTitular = (customer_cpf || cpf_cnpj || '').replace(/\D/g, '');
     const valor = domain_price;
 
     // Gerar TXID: "DOMINIO" (7) + Timestamp (13) + Random (8) = 28 chars
@@ -1147,7 +1187,7 @@ export const pagamentoDominio = async (req, res) => {
         },
         devedor: {
             nome: customer_name,
-            cpf: customer_cpf.replace(/\D/g, '') // Remove formatação
+            cpf: docTitular
         },
         valor: {
             original: valor
@@ -1185,6 +1225,11 @@ export const pagamentoDominio = async (req, res) => {
             customer_state,
             customer_country: customer_country || 'BR',
             customer_zipcode,
+            customer_cpf: docTitular,
+            data_nascimento: data_nascimento || birthdate || null,
+            customer_number: customer_number || numero || null,
+            customer_complement: customer_complement || complemento || null,
+            customer_bairro: customer_bairro || bairro || null,
             status: "pending",
             payment_method: "pix",
             id_projeto
@@ -1261,16 +1306,12 @@ export const pagamentoDominio = async (req, res) => {
         request.end();
 
     } catch (err) {
-        console.error("Erro no pagamento de domínio:");
-        console.error(err.message);
-        console.error(err.stack);
-
+        console.error("Erro no pagamento de domínio:", err.message);
         res.status(500).json({
             erro: "Erro interno ao processar pagamento",
             message: err.message
         });
     }
-
 };
 
 export const consultarPix_dominio = async (req, res) => {
@@ -1281,8 +1322,6 @@ export const consultarPix_dominio = async (req, res) => {
         if (!txid) {
             return res.status(400).json({ error: "TXID é obrigatório para consultar a cobrança." });
         }
-
-        txid = 'SITEXPRES1765223615757cp4pwcnk';
 
         // 1. Gera token com escopo necessário
         const tokenData = await gerarToken();
@@ -1379,137 +1418,197 @@ export const consultarPix_dominio = async (req, res) => {
         if (transacao.status === 'pending') {
             console.log("Pagamento processado com sucesso!");
 
-            // Adiciona créditos
+            // Atualiza status para completed
             await pool.query(
                 `UPDATE public.domain_orders SET status = 'completed' WHERE id = $1`,
                 [transacao.id]
             );
 
-            //Consultar dados do usuário para nota fiscal
+            // Consultar dados do usuário para nota fiscal e registro
             const result_user = await pool.query(
                 `SELECT * FROM public.users WHERE id = $1`,
                 [transacao.user_id]
             );
-
-            // ENVIA NOTA FISCAL
-            var notaFiscal = await gerandonotafiscal({
-                valor_servico: transacao.domain_price,
-                cnpj_cpf: result_user.rows[0].cnpj_cpf,
-                razao_social: result_user.rows[0].razao_social || result_user.rows[0].name,
-                endereco: result_user.rows[0].endereco,
-                bairro: result_user.rows[0].bairro,
-                cod_municipio: result_user.rows[0].cod_municipio,
-                uf: result_user.rows[0].uf,
-                cep: result_user.rows[0].cep,
-                telefone: result_user.rows[0].telefone,
-                email: result_user.rows[0].email
-            });
-
-            console.log("Retorno NF:", notaFiscal);
-
-            // Converte o JSON da resposta
-            const responseNF = JSON.parse(notaFiscal.resposta_nf);
-
-            // Separa somente o link
-            const linkNF = responseNF.message?.split("||")[1] || null;
-
-            console.log("Link de Consulta:", linkNF);
-
-            // Salva o link no banco
-            await pool.query(
-                `UPDATE public.domain_orders SET link_nota = $1 WHERE id = $2`,
-                [linkNF, transacao.id]
-            );
-
-            //###############
-            // Criando cliente no resseller
-            //###############
-            var data_customer = await createCustomerReseller_funcao({
-                email: result_user.rows[0].email,
-                password: result_user.rows[0].password,
-                name: result_user.rows[0].name,
-                company: result_user.rows[0].company,
-                addressLine1: result_user.rows[0].endereco,
-                city: result_user.rows[0].bairro,
-                state: result_user.rows[0].uf,
-                country: 'BR',
-                zipCode: result_user.rows[0].cep,
-                phoneCountryCode: '55',
-                phone: result_user.rows[0].telefone,
-                langPref: result_user.rows[0].langPref || 'pt'
-            });
-
-            //###############
-            // Ativando Dominio no resseller
-            //###############
-            const estadosBR = {
-                AC: 'Acre',
-                AL: 'Alagoas',
-                AP: 'Amapa',
-                AM: 'Amazonas',
-                BA: 'Bahia',
-                CE: 'Ceara',
-                DF: 'Distrito Federal',
-                ES: 'Espirito Santo',
-                GO: 'Goias',
-                MA: 'Maranhao',
-                MT: 'Mato Grosso',
-                MS: 'Mato Grosso do Sul',
-                MG: 'Minas Gerais',
-                PA: 'Para',
-                PB: 'Paraiba',
-                PR: 'Parana',
-                PE: 'Pernambuco',
-                PI: 'Piaui',
-                RJ: 'Rio de Janeiro',
-                RN: 'Rio Grande do Norte',
-                RS: 'Rio Grande do Sul',
-                RO: 'Rondonia',
-                RR: 'Roraima',
-                SC: 'Santa Catarina',
-                SP: 'Sao Paulo',
-                SE: 'Sergipe',
-                TO: 'Tocantins'
-            };
-
-            // 🔒 Blindagem dos dados do usuário
             const user = result_user?.rows?.[0];
 
-            if (!user) {
-                throw new Error('Usuário não encontrado para criação do contato');
+            // ENVIA NOTA FISCAL
+            let linkNF = null;
+            try {
+                var notaFiscal = await gerandonotafiscal({
+                    valor_servico: transacao.domain_price,
+                    cnpj_cpf: user?.cnpj_cpf || transacao.customer_cpf,
+                    razao_social: user?.razao_social || user?.name || transacao.customer_name,
+                    endereco: user?.endereco || transacao.customer_address,
+                    bairro: user?.bairro || transacao.customer_bairro,
+                    cod_municipio: user?.cod_municipio,
+                    uf: user?.uf || transacao.customer_state,
+                    cep: user?.cep || transacao.customer_zipcode,
+                    telefone: user?.telefone || transacao.customer_phone,
+                    email: user?.email || transacao.customer_email
+                });
+
+                console.log("Retorno NF:", notaFiscal);
+
+                const responseNF = JSON.parse(notaFiscal.resposta_nf);
+                linkNF = responseNF.message?.split("||")[1] || null;
+                console.log("Link de Consulta:", linkNF);
+
+                // Salva o link no banco
+                await pool.query(
+                    `UPDATE public.domain_orders SET link_nota = $1 WHERE id = $2`,
+                    [linkNF, transacao.id]
+                );
+            } catch (nfErr) {
+                console.error("Erro ao emitir Nota Fiscal:", nfErr.message);
             }
 
-            // 🔧 Normalizações
-            const uf = user.uf?.toUpperCase?.();
-            const stateNormalized = estadosBR[uf] || 'NA';
+            // Criar hospedagem para o domínio
+            try {
+                console.log("Criando Hospedagem para o domínio:", transacao.full_domain);
+                await createHospedagem_funcao({
+                    dominio: transacao.full_domain,
+                    nome: transacao.customer_name || user?.name,
+                    email: transacao.customer_email || user?.email,
+                    bandwidth: transacao.bandwidth,
+                    quota: transacao.quota,
+                    ip: transacao.ip || '143.208.8.36',
+                    id_projeto: transacao.id_projeto,
+                    id_user: transacao.user_id
+                });
+            } catch (hospErr) {
+                console.error("Erro ao criar hospedagem do domínio:", hospErr.message);
+            }
 
-            const phone = String(user.telefone || '').replace(/\D/g, '');
-            const safePhone = phone.length >= 10 ? phone : '11999999999';
+            let dados_reseller = null;
+            let dados_registro_br = null;
 
-            const cityNormalized = user.bairro
-                ? user.bairro.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-                : 'NA';
+            // 🌐 REGISTRO DE DOMÍNIO:
+            // Se for domínio .com.br (ou qualquer .br), registra fora via API Registro.br / Cloux!
+            if (isDominioBr(transacao.full_domain)) {
+                console.log(`[REGISTRO.BR CLOUX] Domínio .br detectado: ${transacao.full_domain}. Registrando na API Registro.br / Cloux...`);
 
-            const zipCodeNormalized = String(user.cep || '').replace(/\D/g, '') || '00000000';
+                const dadosParaRegistro = {
+                    dominio: transacao.full_domain,
+                    nome: transacao.customer_name || user?.name,
+                    email: transacao.customer_email || user?.email,
+                    cpf_cnpj: transacao.cpf_cnpj || transacao.customer_cpf || user?.cnpj_cpf,
+                    data_nascimento: transacao.data_nascimento || user?.data_nascimento,
+                    telefone: transacao.customer_phone || user?.telefone,
+                    endereco: transacao.customer_address || user?.endereco,
+                    numero: transacao.customer_number || user?.numero,
+                    complemento: transacao.customer_complement || user?.complemento,
+                    bairro: transacao.customer_bairro || user?.bairro,
+                    cidade: transacao.customer_city || user?.cidade,
+                    estado: transacao.customer_state || user?.uf,
+                    cep: transacao.customer_zipcode || user?.cep
+                };
 
-            var data_customer = await create_domain_reseller_funcao(
-                transacao.full_domain,
-                data_customer.data,
-                {
-                    contactData: {
-                        name: user.name || 'Contato Default',
-                        email: user.email,
-                        phone: safePhone,
-                        phoneCountryCode: '55',
-                        company: user.company || 'Empresa default',
-                        addressLine1: user.endereco || 'Endereco nao informado',
-                        city: cityNormalized,
-                        state: stateNormalized,
-                        country: 'BR',
-                        zipCode: zipCodeNormalized
-                    }
+                dados_registro_br = await registrarDominioBr(dadosParaRegistro);
+
+                try {
+                    await pool.query(
+                        `UPDATE public.domain_orders 
+                         SET registro_retorno = $1, 
+                             registro_status = $2, 
+                             ticket_registro = $3 
+                         WHERE id = $4`,
+                        [
+                            JSON.stringify(dados_registro_br),
+                            dados_registro_br.success ? 'REGISTRADO' : 'ERRO_REGISTRO',
+                            dados_registro_br.ticket || null,
+                            transacao.id
+                        ]
+                    );
+                } catch (errDb) {
+                    console.error("Erro ao salvar retorno do Registro.br no banco:", errDb.message);
                 }
-            );
+
+                if (dados_registro_br.success) {
+                    try {
+                        await sendMail(
+                            "contato@sitexpres.com",
+                            `✅ Domínio .BR Registrado com Sucesso (Inter PIX): ${transacao.full_domain}`,
+                            `<p>O domínio <b>${transacao.full_domain}</b> foi registrado no Registro.br via Cloux!</p>
+                             <p><b>Cliente:</b> ${transacao.customer_name} (${transacao.customer_email})</p>
+                             <p><b>Ticket / ID:</b> ${dados_registro_br.ticket || 'Gerado'}</p>
+                             <p><b>Mensagem:</b> ${dados_registro_br.message}</p>
+                             <p><b>TXID:</b> ${txid}</p>`
+                        );
+                    } catch (e) {}
+                } else {
+                    try {
+                        await sendMail(
+                            "contato@sitexpres.com",
+                            `🚨 ATENÇÃO: Falha no Registro do Domínio .BR (${transacao.full_domain})`,
+                            `<p>O pagamento do domínio <b>${transacao.full_domain}</b> foi confirmado via Inter PIX, mas o registro no Registro.br retornou erro:</p>
+                             <p><b>Erro:</b> ${dados_registro_br.error || 'Erro desconhecido'}</p>
+                             <p><b>Erros de Validação:</b> ${JSON.stringify(dados_registro_br.erros || {})}</p>
+                             <p><b>Cliente:</b> ${transacao.customer_name} (${transacao.customer_email})</p>
+                             <p><b>Documento informado:</b> ${dadosParaRegistro.cpf_cnpj || 'Não informado'}</p>
+                             <p><b>Data de Nascimento:</b> ${dadosParaRegistro.data_nascimento || 'Não informada (obrigatória para CPF)'}</p>`
+                        );
+                    } catch (e) {}
+                }
+            } else {
+                // Domínio internacional (.com, .net, etc.) -> ResellerClub
+                try {
+                    if (!user) {
+                        throw new Error('Usuário não encontrado para criação do contato');
+                    }
+
+                    var data_customer = await createCustomerReseller_funcao({
+                        email: user.email,
+                        password: user.password || 'Mudar@123456',
+                        name: user.name,
+                        company: user.company || 'Sitexpres',
+                        addressLine1: user.endereco || transacao.customer_address || 'Endereco',
+                        city: user.bairro || transacao.customer_city || 'Sao Paulo',
+                        state: user.uf || transacao.customer_state || 'SP',
+                        country: 'BR',
+                        zipCode: user.cep || transacao.customer_zipcode || '01001000',
+                        phoneCountryCode: '55',
+                        phone: user.telefone || transacao.customer_phone || '11999999999',
+                        langPref: user.langPref || 'pt'
+                    });
+
+                    const estadosBR = {
+                        AC: 'Acre', AL: 'Alagoas', AP: 'Amapa', AM: 'Amazonas', BA: 'Bahia', CE: 'Ceara',
+                        DF: 'Distrito Federal', ES: 'Espirito Santo', GO: 'Goias', MA: 'Maranhao', MT: 'Mato Grosso',
+                        MS: 'Mato Grosso do Sul', MG: 'Minas Gerais', PA: 'Para', PB: 'Paraiba', PR: 'Parana',
+                        PE: 'Pernambuco', PI: 'Piaui', RJ: 'Rio de Janeiro', RN: 'Rio Grande do Norte',
+                        RS: 'Rio Grande do Sul', RO: 'Rondonia', RR: 'Roraima', SC: 'Santa Catarina',
+                        SP: 'Sao Paulo', SE: 'Sergipe', TO: 'Tocantins'
+                    };
+
+                    const uf = user.uf?.toUpperCase?.();
+                    const stateNormalized = estadosBR[uf] || 'NA';
+                    const phone = String(user.telefone || '').replace(/\D/g, '');
+                    const safePhone = phone.length >= 10 ? phone : '11999999999';
+                    const cityNormalized = user.bairro ? user.bairro.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : 'NA';
+                    const zipCodeNormalized = String(user.cep || '').replace(/\D/g, '') || '00000000';
+
+                    dados_reseller = await create_domain_reseller_funcao(
+                        transacao.full_domain,
+                        data_customer.data,
+                        {
+                            contactData: {
+                                name: user.name || 'Contato Default',
+                                email: user.email,
+                                phone: safePhone,
+                                phoneCountryCode: '55',
+                                company: user.company || 'Empresa default',
+                                addressLine1: user.endereco || 'Endereco nao informado',
+                                city: cityNormalized,
+                                state: stateNormalized,
+                                country: 'BR',
+                                zipCode: zipCodeNormalized
+                            }
+                        }
+                    );
+                } catch (errReseller) {
+                    console.error("Erro ao registrar domínio no ResellerClub:", errReseller.message);
+                }
+            }
 
             // NOTIFICAR ADMINISTRADOR (SUCESSO DOMÍNIO)
             try {
@@ -1518,7 +1617,8 @@ export const consultarPix_dominio = async (req, res) => {
                     "✅ Domínio Registrado e Pago (Inter PIX)",
                     `<p>Um novo domínio foi pago via Banco Inter (PIX)!</p>
                      <p><b>Domínio:</b> ${transacao.full_domain}</p>
-                     <p><b>Cliente:</b> ${user.name} (${user.email})</p>
+                     <p><b>Tipo:</b> ${isDominioBr(transacao.full_domain) ? 'Registro.br (Cloux)' : 'Internacional (ResellerClub)'}</p>
+                     <p><b>Cliente:</b> ${user?.name || transacao.customer_name} (${user?.email || transacao.customer_email})</p>
                      <p><b>Valor:</b> R$ ${transacao.domain_price}</p>
                      <p><b>TXID:</b> ${txid}</p>
                      <p><b>Link de Consulta:</b> <a href="${linkNF}">${linkNF}</a></p>`
@@ -1532,7 +1632,8 @@ export const consultarPix_dominio = async (req, res) => {
                 status: "CONCLUIDA",
                 mensagem: "Pagamento processado com sucesso!",
                 domain: transacao.full_domain,
-                data_customer: data_customer,
+                tipo_registro: isDominioBr(transacao.full_domain) ? 'registro.br' : 'resellerclub',
+                registro: dados_registro_br || dados_reseller,
                 RetornoNotaFiscal: linkNF
             });
         }

@@ -1,0 +1,1 @@
+[2026-09-28T21:56:23.719Z] [CONSULTAR_DISPONIBILIDADE] [159ms] ❌ FALHA: {"timestamp":"2026-09-28T21:56:23.719Z","acao":"CONSULTAR_DISPONIBILIDADE","tempoMs":"159ms","payload":{"dominio":"google.com.br"},"resultado":{"message":"getaddrinfo ENOTFOUND painel.cloux.com.br"},"erro":"getaddrinfo ENOTFOUND painel.cloux.com.br"}

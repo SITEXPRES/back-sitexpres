@@ -3,6 +3,7 @@ import http from 'http';
 import { URL } from 'url';
 import axios from 'axios';
 import pool from "../config/db.js";
+import { consultarDisponibilidadeBr, isDominioBr } from '../services/registroBrService.js';
 
 // Configurações da API ResellerClub
 const RESELLER_CONFIG = {
@@ -92,6 +93,25 @@ export const check_domain_availability = async (req, res) => {
 
         // pega o primeiro domínio (API não aceita vários completos sem tlds)
         const domainFull = domainNames[0].toLowerCase().trim();
+
+        // 🌐 Se for domínio .br, consulta diretamente na API Cloux / Registro.br (100% grátis e preciso)
+        if (isDominioBr(domainFull)) {
+            const consultaBr = await consultarDisponibilidadeBr(domainFull);
+            const disponivel = Boolean(consultaBr?.disponivel);
+
+            return res.status(200).json({
+                success: true,
+                data: {
+                    [domainFull]: {
+                        status: disponivel ? 'available' : 'regthroughothers',
+                        classkey: 'domcero_br'
+                    }
+                },
+                disponivel: disponivel,
+                origem: 'registro.br',
+                detalhes: consultaBr
+            });
+        }
 
         // separa nome e tld
         const parts = domainFull.split('.');
@@ -761,3 +781,29 @@ export const listar_extensao = async (req, res) => {
         });
     }
 };
+
+/**
+ * Endpoint direto para consulta de disponibilidade de domínios .br via API Registro.br / Cloux
+ */
+export const consultar_dominio_br = async (req, res) => {
+    try {
+        const dominio = req.query.dominio || req.body.dominio || req.body.domain;
+        if (!dominio) {
+            return res.status(400).json({
+                success: false,
+                message: 'O parâmetro domínio é obrigatório para consulta.'
+            });
+        }
+
+        const resultado = await consultarDisponibilidadeBr(dominio);
+        return res.status(resultado.code || 200).json(resultado);
+    } catch (error) {
+        console.error('Erro ao consultar domínio .br:', error.message);
+        return res.status(500).json({
+            success: false,
+            message: 'Erro interno ao consultar disponibilidade do domínio .br',
+            error: error.message
+        });
+    }
+};
+

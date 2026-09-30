@@ -9,6 +9,7 @@ import {
   createSubscription,
   getSubscriptionStatus,
   cancelSubscription,
+  paymentSuccess,
   webhook
 } from '../controllers/paypalController.js';
 
@@ -22,6 +23,11 @@ router.get("/teste", (req, res) => res.send("rota ok"));
 router.post('/pagamento/criar', createOrder);
 router.post('/pagamento/dominio', createOrder_dominio);
 
+// Retornos de sucesso PayPal (Redirecionamento ou chamada frontend)
+router.get('/dominio/sucesso', paymentSuccess);
+router.post('/dominio/sucesso', paymentSuccess);
+router.get('/pagamento/sucesso', paymentSuccess);
+router.post('/pagamento/sucesso', paymentSuccess);
 
 router.post('/assinatura/criar', createSubscription);
 
