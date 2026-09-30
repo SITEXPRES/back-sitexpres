@@ -12,7 +12,9 @@ const transporter = nodemailer.createTransport({
   },
   tls: {
     rejectUnauthorized: false
-  }
+  },
+  logger: true,
+  debug: true
 });
 
 export const sendMail = async (to, assunto, mensagem) => {
@@ -21,7 +23,7 @@ export const sendMail = async (to, assunto, mensagem) => {
   const fromAddress = process.env.MAIL_FROM || process.env.EMAIL_USER;
 
   const mailOptions = {
-    from: 'Sitexpress <' + fromAddress + '>',
+    from: '"Sitexpress" <' + fromAddress + '>',
     to: to,
     subject: assunto,
     html: mensagem,
