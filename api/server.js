@@ -41,6 +41,46 @@ app.get("/dbtest", async (req, res) => {
   }
 });
 
+// Endpoint de teste geral solicitado pelo usuário
+app.get("/teste.js", async (req, res) => {
+  try {
+    const response = { banco: {}, claude: {} };
+
+    // Testar banco e pegar quantidades
+    try {
+      const usersQuery = await pool.query("SELECT COUNT(*) FROM users");
+      const sitesQuery = await pool.query("SELECT COUNT(*) FROM generated_sites");
+      
+      response.banco = {
+        status: "✅ Conectado com sucesso",
+        qtd_users: parseInt(usersQuery.rows[0].count),
+        qtd_sites: parseInt(sitesQuery.rows[0].count)
+      };
+    } catch (err) {
+      response.banco = { status: "❌ Erro ao conectar no banco", detalhe: err.message };
+    }
+
+    // Testar Claude
+    try {
+      const { Anthropic } = await import('@anthropic-ai/sdk');
+      const anthropic = new Anthropic({ apiKey: process.env.CLAUDE_API_KEY });
+      // Só cria uma mensagem simples para validar a chave
+      const msg = await anthropic.messages.create({
+        model: "claude-3-haiku-20240307",
+        max_tokens: 10,
+        messages: [{ role: "user", content: "Diga 'ok'" }]
+      });
+      response.claude = { status: "✅ Conectado com sucesso", resposta: msg.content[0].text };
+    } catch (err) {
+      response.claude = { status: "❌ Erro ao conectar no Claude", detalhe: err.message };
+    }
+
+    res.json(response);
+  } catch (err) {
+    res.status(500).json({ erro_critico: err.message });
+  }
+});
+
 // Rotas principais
 app.use("/api/reset-password", authRoutes);
 app.use("/api/auth", authRoutes);
