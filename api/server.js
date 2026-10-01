@@ -109,6 +109,18 @@ app.get("/", (req, res) => {
   res.send("awaiting command");
 });
 
+app.get("/api/health", (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    system: {
+      uptimeSeconds: process.uptime(),
+      nodeVersion: process.version,
+      memoryUsage: process.memoryUsage()
+    }
+  });
+});
+
 app.get('/teste-lento', async (req, res) => {
   console.log("🔹 Requisição recebida em /teste-lento");
 
