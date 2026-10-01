@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="scroll-smooth">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CloudX | Hospedagem de Sites, VPS e Cloud de Alta Performance no Brasil</title>
+<meta name="description" content="Hospedagem de sites, WordPress, VPS e Cloud com NVMe, SSL grátis, 99,99% de uptime e suporte humano 24/7. Migração gratuita. Seu site mais rápido com a CloudX.">
+<meta name="keywords" content="hospedagem de sites, hospedagem wordpress, servidor vps, cloud server, registro de domínio, hospedagem brasil, email profissional, revenda de hospedagem, cloudx">
+<link rel="canonical" href="https://cloudx.com.br">
+<link rel="icon" type="image/webp" href="https://back.sitexpres.com.br/uploads/logos/1790274392975.webp">
+<meta property="og:title" content="CloudX | Hospedagem que acelera seu negócio">
+<meta property="og:description" content="Infraestrutura NVMe, SSL grátis, uptime de 99,99% e suporte humano 24/7. Migre grátis para a CloudX.">
+<meta property="og:image" content="https://picsum.photos/seed/cloudxdatacenter/1200/630">
+<meta property="og:url" content="https://cloudx.com.br">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="CloudX">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="CloudX | Hospedagem que acelera seu negócio">
+<meta name="twitter:description" content="Hospedagem, VPS e Cloud com performance de verdade e suporte humano 24/7.">
+<meta name="twitter:image" content="https://picsum.photos/seed/cloudxdatacenter/1200/630">
+<meta name="language" content="pt-BR">
+<meta name="robots" content="index, follow">
+<meta name="author" content="CloudX">
+<meta name="theme-color" content="#05050a">
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        primary: '#7c3aed',
+        secondary: '#06b6d4',
+        accent: '#a3e635',
+        ink: '#05050a'
+      },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        display: ['Poppins', 'Inter', 'sans-serif'],
+        mono: ['JetBrains Mono', 'ui-monospace', 'monospace']
+      }
+    }
+  }
+}
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+<script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Poppins:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest"></script>
+
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Inter', sans-serif;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  background: #05050a;
+}
+[x-cloak] { display: none !important; }
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+}
+.text-gradient {
+  background: linear-gradient(90deg, #a78bfa 0%, #22d3ee 50%, #a3e635 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  background-size: 200% auto;
+  animation: shine 6s linear infinite;
+}
+@keyframes shine { to { background-position: 200% center; } }
+.gradient-border { position: relative; }
+.gradient-border::before {
+  content: ''; position: absolute; inset: 0; padding: 1px; border-radius: inherit;
+  background: linear-gradient(135deg, rgba(124,58,237,.8), rgba(6,182,212,.5), rgba(163,230,53,.3));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none;
+}
+.glass { background: rgba(255,255,255,0.03); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.08); }
+.marquee { animation: marquee 35s linear infinite; }
+@keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.float { animation: float 6s ease-in-out infinite; }
+.float-delay { animation: float 7s ease-in-out infinite; animation-delay: 1.5s; }
+@keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-14px); } }
+.blink { animation: blink 1s step-end infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.orb { filter: blur(100px); opacity: .55; }
+.bar { animation: grow 2.4s ease-in-out infinite alternate; transform-origin: bottom; }
+@keyframes grow { from { transform: scaleY(.45); } to { transform: scaleY(1); } }
+.ping-dot::after { content:''; position:absolute; inset:0; border-radius:9999px; background:inherit; animation: ping 1.8s cubic-bezier(0,0,.2,1) infinite; }
+@keyframes ping { 75%,100% { transform: scale(2.4); opacity: 0; } }
+.spotlight:hover { box-shadow: 0 30px 80px -20px rgba(124,58,237,.45); }
+::selection { background: #7c3aed; color: #fff; }
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-track { background: #05050a; }
+::-webkit-scrollbar-thumb { background: linear-gradient(#7c3aed, #06b6d4); border-radius: 10px; }
+.brand-logo { filter: drop-shadow(0 4px 18px rgba(124,58,237,.35)); transition: transform .3s ease, filter .3s ease; }
+.group:hover .brand-logo { transform: scale(1.03); filter: drop-shadow(0 6px 24px rgba(6,182,212,.45)); }
+</style>
+</head>
+<body class="text-white">
+
+<!-- ================= HEADER ================= -->
+<header x-data="{ scrolled: false, mobileOpen: false }"
+        @scroll.window="scrolled = window.scrollY > 40"
+        :class="scrolled ? 'bg-black/70 backdrop-blur-xl border-b border-white/10 shadow-2xl shadow-black/40' : 'bg-transparent border-b border-transparent'"
+        class="fixed w-full top-0 z-50 transition-all duration-300">
+  <!-- Top bar -->
+  <div class="hidden md:block bg-gradient-to-r from-primary/20 via-secondary/10 to-accent/10 border-b border-white/5" x-show="!scrolled" x-transition>
+    <div class="max-w-7xl mx-auto px-6 lg:px-8 h-9 flex items-center justify-between text-xs text-white/70">
+      <p class="flex items-center gap-2"><span class="relative w-2 h-2 rounded-full bg-accent ping-dot"></span> Todos os sistemas operacionais · Uptime 99,99%</p>
+      <p>🚀 <span class="text-white font-semibold">Oferta 2026:</span> até 70% OFF + domínio grátis no plano anual</p>
+    </div>
+  </div>
+  <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex justify-between items-center h-20">
+      <a href="#home" class="flex items-center gap-2.5 group" aria-label="CloudX - Página inicial">
+        <img src="https://back.sitexpres.com.br/uploads/logos/1790274392975.webp" alt="CloudX Hospedagem" width="190" height="40" class="brand-logo h-9 sm:h-10 w-auto object-contain">
+      </a>
+
+      <div class="hidden lg:flex items-center gap-1">
+        <a href="#produtos" class="px-4 py-2 rounded-full text-sm text-white/70 hover:text-white hover:bg-white/5 transition-all font-medium">Produtos</a>
+        <a href="#planos" class="px-4 py-2 rounded-full text-sm text-white/70 hover:text-white hover:bg-white/5 transition-all font-medium">Planos</a>
+        <a href="#infra" class="px-4 py-2 rounded-full text-sm text-white/70 hover:text-white hover:bg-white/5 transition-all font-medium">Infraestrutura</a>
+        <a href="#dominios" class="px-4 py-2 rounded-full text-sm text-white/70 hover:text-white hover:bg-white/5 transition-all font-medium">Domínios</a>
+        <a href="#faq" class="px-4 py-2 rounded-full text-sm text-white/70 hover:text-white hover:bg-white/5 transition-all font-medium">Ajuda</a>
+      </div>
+
+      <div class="hidden lg:flex items-center gap-3">
+        <a href="#" class="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white/80 hover:text-white transition-colors">
+          <i data-lucide="user-circle" class="w-4 h-4"></i> Área do Cliente
+        </a>
+        <a href="#planos" class="relative px-6 py-3 rounded-full text-sm font-semibold bg-white text-ink hover:scale-105 transition-all shadow-lg shadow-white/10 hover:shadow-secondary/40">
+          Começar agora
+        </a>
+      </div>
+
+      <button @click="mobileOpen = !mobileOpen" class="lg:hidden p-2 rounded-lg hover:bg-white/10 transition" aria-label="Abrir menu">
+        <i data-lucide="menu" x-show="!mobileOpen" class="w-6 h-6"></i>
+        <i data-lucide="x" x-show="mobileOpen" x-cloak class="w-6 h-6"></i>
+      </button>
+    </div>
+
+    <div x-show="mobileOpen" x-cloak
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0 -translate-y-4"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         @click.outside="mobileOpen=false"
+         class="lg:hidden pb-6">
+      <div class="glass rounded-2xl p-4 space-y-1">
+        <a @click="mobileOpen=false" href="#produtos" class="block px-4 py-3 rounded-xl hover:bg-white/5">Produtos</a>
+        <a @click="mobileOpen=false" href="#planos" class="block px-4 py-3 rounded-xl hover:bg-white/5">Planos</a>
+        <a @click="mobileOpen=false" href="#infra" class="block px-4 py-3 rounded-xl hover:bg-white/5">Infraestrutura</a>
+        <a @click="mobileOpen=false" href="#dominios" class="block px-4 py-3 rounded-xl hover:bg-white/5">Domínios</a>
+        <a @click="mobileOpen=false" href="#faq" class="block px-4 py-3 rounded-xl hover:bg-white/5">Ajuda</a>
+        <a @click="mobileOpen=false" href="#planos" class="block mt-3 text-center px-4 py-3 rounded-xl bg-gradient-to-r from-primary to-secondary font-semibold">Começar agora</a>
+      </div>
+    </div>
+  </nav>
+</header>
+
+<!-- ================= HERO ================= -->
+<section id="home" class="relative min-h-screen flex items-center overflow-hidden pt-36 pb-24">
+  <div class="absolute inset-0 grid-bg"></div>
+  <div class="absolute -top-40 -left-40 w-[600px] h-[600px] rounded-full bg-primary orb"></div>
+  <div class="absolute top-40 -right-40 w-[500px] h-[500px] rounded-full bg-secondary orb" style="opacity:.35"></div>
+  <div class="absolute bottom-0 left-1/3 w-[400px] h-[400px] rounded-full bg-accent orb" style="opacity:.12"></div>
+
+  <div class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+    <div class="grid lg:grid-cols-12 gap-16 items-center">
+      <div class="lg:col-span-6" data-aos="fade-right">
+        <a href="#infra" class="inline-flex items-center gap-2 pl-1.5 pr-4 py-1.5 rounded-full glass text-sm hover:bg-white/10 transition mb-8 group">
+          <span class="px-2.5 py-0.5 rounded-full bg-gradient-to-r from-primary to-secondary text-xs font-semibold">NOVO</span>
+          <span class="text-white/80">Servidores NVMe Gen5 + IA anti-DDoS</span>
+          <i data-lucide="arrow-right" class="w-4 h-4 text-white/60 group-hover:translate-x-1 transition-transform"></i>
+        </a>
+        <h1 class="font-display text-5xl sm:text-6xl lg:text-7xl font-bold leading-[1.05] tracking-tight mb-7">
+          Hospedagem que<br>
+          <span class="text-gradient">voa na velocidade</span><br>
+          do seu negócio.
+        </h1>
+        <p class="text-lg sm:text-xl text-white/60 leading-relaxed mb-10 max-w-xl">
+          Sites, WordPress, VPS e Cloud em infraestrutura NVMe no Brasil. SSL grátis, backups diários e suporte humano 24/7 que realmente resolve.
+        </p>
+        <div class="flex flex-col sm:flex-row gap-4 mb-12">
+          <a href="#planos" class="group relative inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl font-semibold bg-gradient-to-r from-primary to-secondary hover:scale-105 transition-all duration-300 shadow-2xl shadow-primary/40">
+            Ver planos a partir de R$ 9,90
+            <i data-lucide="arrow-right" class="w-5 h-5 group-hover:translate-x-1 transition-transform"></i>
+          </a>
+          <a href="#contato" class="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl font-semibold glass hover:bg-white/10 hover:scale-105 transition-all duration-300">
+            <i data-lucide="repeat" class="w-5 h-5 text-secondary"></i> Migração grátis
+          </a>
+        </div>
+        <div class="flex flex-wrap items-center gap-x-8 gap-y-4 text-sm text-white/60">
+          <div class="flex items-center gap-3">
+            <div class="flex -space-x-3">
+              <img src="https://ui-avatars.com/api/?name=Ana+Lima&background=7c3aed&color=fff&size=64" alt="Cliente Ana Lima" class="w-9 h-9 rounded-full ring-2 ring-ink">
+              <img src="https://ui-avatars.com/api/?name=Rafael+Costa&background=06b6d4&color=fff&size=64" alt="Cliente Rafael Costa" class="w-9 h-9 rounded-full ring-2 ring-ink">
+              <img src="https://ui-avatars.com/api/?name=Julia+Mendes&background=65a30d&color=fff&size=64" alt="Cliente Julia Mendes" class="w-9 h-9 rounded-full ring-2 ring-ink">
+              <img src="https://ui-avatars.com/api/?name=Pedro+Alves&background=db2777&color=fff&size=64" alt="Cliente Pedro Alves" class="w-9 h-9 rounded-full ring-2 ring-ink">
+            </div>
+            <div>
+              <div class="flex text-yellow-400">
+                <i data-lucide="star" class="w-4 h-4 fill-yellow-400"></i><i data-lucide="star" class="w-4 h-4 fill-yellow-400"></i><i data-lucide="star" class="w-4 h-4 fill-yellow-400"></i><i data-lucide="star" class="w-4 h-4 fill-yellow-400"></i><i data-lucide="star" class="w-4 h-4 fill-yellow-400"></i>
+              </div>
+              <p class="text-xs mt-0.5"><span class="text-white font-semibold">4.9/5</span> por +12.000 clientes</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2"><i data-lucide="shield-check" class="w-5 h-5 text-accent"></i> Garantia de 30 dias</div>
+        </div>
+      </div>
+
+      <!-- Mockup -->
+      <div class="lg:col-span-6 relative" data-aos="fade-left" data-aos-delay="200">
+        <div class="absolute inset-0 bg-gradient-to-tr from-primary/30 to-secondary/30 blur-3xl rounded-full"></div>
+
+        <div class="relative gradient-border rounded-3xl bg-[#0b0b14]/90 backdrop-blur-xl shadow-2xl overflow-hidden">
+          <div class="flex items-center justify-between px-5 py-4 border-b border-white/5">
+            <div class="flex gap-2"><span class="w-3 h-3 rounded-full bg-red-500/80"></span><span class="w-3 h-3 rounded-full bg-yellow-500/80"></span><span class="w-3 h-3 rounded-full bg-green-500/80"></span></div>
+            <span class="text-xs text-white/40 font-mono">painel.cloudx.com.br</span>
+            <i data-lucide="lock" class="w-3.5 h-3.5 text-accent"></i>
+          </div>
+          <div class="p-6 space-y-5">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-xs text-white/40 uppercase tracking-wider">Servidor</p>
+                <p class="font-semibold flex items-center gap-2">cloudx-sp-01 <span class="text-[10px] px-2 py-0.5 rounded-full bg-accent/15 text-accent font-semibold">ONLINE</span></p>
+              </div>
+              <div class="text-right">
+                <p class="text-xs text-white/40 uppercase tracking-wider">Uptime</p>
+                <p class="font-semibold text-accent">99.998%</p>
+              </div>
+            </div>
+            <div class="grid grid-cols-3 gap-3">
+              <div class="rounded-2xl bg-white/[0.03] border border-white/5 p-4">
+                <i data-lucide="cpu" class="w-4 h-4 text-primary mb-2"></i>
+                <p class="text-xl font-bold">18%</p><p class="text-[11px] text-white/40">CPU</p>
+              </div>
+              <div class="rounded-2xl bg-white/[0.03] border border-white/5 p-4">
+                <i data-lucide="memory-stick" class="w-4 h-4 text-secondary mb-2"></i>
+                <p class="text-xl font-bold">2.1<span class="text-sm text-white/40">GB</span></p><p class="text-[11px] text-white/40">RAM</p>
+              </div>
+              <div class="rounded-2xl bg-white/[0.03] border border-white/5 p-4">
+                <i data-lucide="gauge" class="w-4 h-4 text-accent mb-2"></i>
+                <p class="text-xl font-bold">87<span class="text-sm text-white/40">ms</span></p><p class="text-[11px] text-white/40">TTFB</p>
+              </div>
+            </div>
+            <div class="rounded-2xl bg-white/[0.03] border border-white/5 p-4">
+              <div class="flex justify-between text-xs text-white/40 mb-3"><span>Tráfego (24h)</span><span class="text-accent">+32%</span></div>
+              <div class="flex items-end gap-1.5 h-24">
+                <div class="flex-1 rounded-t bg-gradient-to-t from-primary/40 to-primary bar" style="height:40%"></div>
+                <div class="flex-1 rounded-t bg-gradient-to-t from-primary/40 to-primary bar" style="height:65%;animation-delay:.2s"></div>
+                <div class="flex-1 rounded-t bg-gradient-to-t from-primary/40 to-secondary bar" style="height:50%;animation-delay:.4s"></div>
+                <div class="flex-1 rounded-t bg-gradient-to-t from-primary/40 to-secondary bar" style="height:80%;animation-delay:.1s"></div>
+                <div class="flex-1 rounded-t bg-gradient-to-t from-secondary/40 to-secondary bar" style="height:60%;animation-delay:.5s"></div>
+                <div class="flex-1 rounded-t bg-gradient-to-t from-secondary/40 to-secondary bar" style="height:95%;animation-delay:.3s"></div>
+                <div class="flex-1 rounded-t bg-gradient-to-t from-secondary/40 to-accent bar" style="height:70%;animation-delay:.6s"></div>
+                <div class="flex-1 rounded-t bg-gradient-to-t from-secondary/40 to-accent bar" style="height:85%;animation-delay:.2s"></div>
+                <div class="flex-1 rounded-t bg-gradient-to-t from-accent/40 to-accent bar" style="height:100%;animation-delay:.4s"></div>
+                <div class="flex-1 rounded-t bg-gradient-to-t from-accent/40 to-accent bar" style="height:75%;animation-delay:.1s"></div>
+              </div>
+            </div>
+            <div class="rounded-2xl bg-black/60 border border-white/5 p-4 font-mono text-xs leading-6">
+              <p><span class="text-accent">➜</span> <span class="text-secondary">~</span> cloudx deploy --site meunegocio.com.br</p>
+              <p class="text-white/50">✓ Build concluído em 3.2s</p>
+              <p class="text-white/50">✓ SSL emitido · CDN propagada</p>
+              <p class="text-accent">✓ Online em https://meunegocio.com.br<span class="blink">▋</span></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Floating badges -->
+        <div class="hidden sm:flex absolute -left-8 top-24 glass rounded-2xl px-4 py-3 items-center gap-3 shadow-2xl float">
+          <div class="w-10 h-10 rounded-xl bg-accent/15 flex items-center justify-center"><i data-lucide="zap" class="w-5 h-5 text-accent"></i></div>
+          <div><p class="text-xs text-white/50">PageSpeed</p><p class="font-bold">98/100</p></div>
+        </div>
+        <div class="hidden sm:flex absolute -right-6 bottom-16 glass rounded-2xl px-4 py-3 items-center gap-3 shadow-2xl float-delay">
+          <div class="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center"><i data-lucide="shield" class="w-5 h-5 text-primary"></i></div>
+          <div><p class="text-xs text-white/50">Ataques bloqueados</p><p class="font-bold">1.284 hoje</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <a href="#dominios" class="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce text-white/40 hover:text-white transition" aria-label="Rolar">
+    <i data-lucide="chevron-down" class="w-7 h-7"></i>
+  </a>
+</section>
+
+<!-- ================= DOMAIN SEARCH ================= -->
+<section id="dominios" class="relative py-16" x-data="{ q: '', searched: false, ext: '.com.br' }">
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8" data-aos="zoom-in">
+    <div class="gradient-border rounded-[2rem] bg-gradient-to-br from-white/[0.06] to-white/[0.01] backdrop-blur-xl p-8 sm:p-12 shadow-2xl">
+      <div class="text-center mb-8">
+        <h2 class="font-display text-3xl sm:text-4xl font-bold mb-3">Encontre o domínio perfeito</h2>
+        <p class="text-white/60">Registre agora ou ganhe <span class="text-accent font-semibold">grátis</span> no plano anual de hospedagem.</p>
+      </div>
+      <form @submit.prevent="searched = q.length > 0" class="flex flex-col sm:flex-row gap-3 p-2 rounded-2xl bg-black/50 border border-white/10 focus-within:border-secondary/60 transition">
+        <div class="flex items-center flex-1 px-4">
+          <i data-lucide="globe" class="w-5 h-5 text-white/40 mr-3"></i>
+          <input x-model="q" @input="searched=false" type="text" placeholder="digite o nome do seu site" aria-label="Buscar domínio" class="w-full bg-transparent py-4 outline-none placeholder-white/30 text-lg">
+        </div>
+        <select x-model="ext" aria-label="Extensão" class="bg-white/5 border border-white/10 rounded-xl px-4 py-4 outline-none text-white">
+          <option class="bg-ink">.com.br</option><option class="bg-ink">.com</option><option class="bg-ink">.net</option><option class="bg-ink">.io</option><option class="bg-ink">.store</option>
+        </select>
+        <button type="submit" class="px-8 py-4 rounded-xl font-semibold bg-gradient-to-r from-primary to-secondary hover:scale-105 transition-all shadow-lg shadow-primary/30 flex items-center justify-center gap-2">
+          <i data-lucide="search" class="w-5 h-5"></i> Buscar
+        </button>
+      </form>
+      <div x-show="searched" x-cloak x-transition class="mt-5 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl bg-accent/10 border border-accent/30 px-6 py-4">
+        <p class="flex items-center gap-2"><i data-lucide="check-circle-2" class="w-5 h-5 text-accent"></i> <span class="font-semibold" x-text="q.toLowerCase().replace(/\s+/g,'') + ext"></span> está disponível!</p>
+        <a href="#planos" class="px-5 py-2.5 rounded-xl bg-accent text-ink font-semibold hover:scale-105 transition">Registrar por R$ 36,00/ano</a>
+      </div>
+      <div class="flex flex-wrap justify-center gap-3 mt-8 text-sm">
+        <span class="px-4 py-2 rounded-full bg-white/5 border border-white/10">.com.br <b class="text-secondary ml-1">R$ 36,00</b></span>
+        <span class="px-4 py-2 rounded-full bg-white/5 border border-white/10">.com <b class="text-secondary ml-1">R$ 69,90</b></span>
+        <span class="px-4 py-2 rounded-full bg-white/5 border border-white/10">.net <b class="text-secondary ml-1">R$ 79,90</b></span>
+        <span class="px-4 py-2 rounded-full bg-white/5 border border-white/10">.io <b class="text-secondary ml-1">R$ 249,90</b></span>
+        <span class="px-4 py-2 rounded-full bg-white/5 border border-white/10">.store <b class="text-secondary ml-1">R$ 19,90</b></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= SOCIAL PROOF ================= -->
+<section class="py-16 border-y border-white/5 bg-white/[0.01]" data-aos="fade-up">
+  <p class="text-center text-sm uppercase tracking-[0.25em] text-white/40 mb-10">Mais de 45.000 sites confiam na CloudX</p>
+  <div class="relative overflow-hidden" style="mask-image:linear-gradient(90deg,transparent,black 15%,black 85%,transparent);-webkit-mask-image:linear-gradient(90deg,transparent,black 15%,black 85%,transparent)">
+    <div class="flex w-max marquee gap-16 items-center text-2xl font-display font-bold text-white/30">
+      <span class="flex items-center gap-2 hover:text-white transition"><i data-lucide="hexagon" class="w-7 h-7"></i>Nexora</span>
+      <span class="flex items-center gap-2 hover:text-white transition"><i data-lucide="triangle" class="w-7 h-7"></i>Vértice</span>
+      <span class="flex items-center gap-2 hover:text-white transition"><i data-lucide="circle-dot" class="w-7 h-7"></i>Orbital</span>
+      <span class="flex items-center gap-2 hover:text-white transition"><i data-lucide="square-stack" class="w-7 h-7"></i>Stackly</span>
+      <span class="flex items-center gap-2 hover:text-white transition"><i data-lucide="leaf" class="w-7 h-7"></i>Verdana</span>
+      <span class="flex items-center gap-2 hover:text-white transition"><i data-lucide="aperture" class="w-7 h-7"></i>Lumina</span>
+      <span class="flex items-center gap-2 hover:text-white transition"><i data-lucide="waves" class="w-7 h-7"></i>Maré</span>
+      <span class="flex items-center gap-2 hover:text-white transition"><i data-lucide="hexagon" class="w-7 h-7"></i>Nexora</span>
+      <span class="flex items-center gap-2 hover:text-white transition"><i data-lucide="triangle" class="w-7 h-7"></i>Vértice</span>
+      <span class="flex items-center gap-2 hover:text-white transition"><i data-lucide="circle-dot" class="w-7 h-7"></i>Orbital</span>
+      <span class="flex items-center gap-2 hover:text-white transition"><i data-lucide="square-stack" class="w-7 h-7"></i>Stackly</span>
+      <span class="flex items-center gap-2 hover:text-white transition"><i data-lucide="leaf" class="w-7 h-7"></i>Verdana</span>
+      <span class="flex items-center gap-2 hover:text-white transition"><i data-lucide="aperture" class="w-7 h-7"></i>Lumina</span>
+      <span class="flex items-center gap-2 hover:text-white transition"><i data-lucide="waves" class="w-7 h-7"></i>Maré</span>
+    </div>
+  </div>
+
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-16 grid grid-cols-2 lg:grid-cols-4 gap-6">
+    <div class="text-center" data-aos="fade-up" data-aos-delay="0">
+      <p class="font-display text-4xl sm:text-5xl font-bold text-gradient" data-count="45000" data-suffix="+">0</p>
+      <p class="text-white/50 mt-2 text-sm">Sites hospedados</p>
+    </div>
+    <div class="text-center" data-aos="fade-up" data-aos-delay="100">
+      <p class="font-display text-4xl sm:text-5xl font-bold text-gradient" data-count="99.99" data-suffix="%" data-decimals="2">0</p>
+      <p class="text-white/50 mt-2 text-sm">Uptime garantido em SLA</p>
+    </div>
+    <div class="text-center" data-aos="fade-up" data-aos-delay="200">
+      <p class="font-display text-4xl sm:text-5xl font-bold text-gradient" data-count="47" data-prefix="&lt;" data-suffix="s">0</p>
+      <p class="text-white/50 mt-2 text-sm">Tempo médio de 1ª resposta</p>
+    </div>
+    <div class="text-center" data-aos="fade-up" data-aos-delay="300">
+      <p class="font-display text-4xl sm:text-5xl font-bold text-gradient" data-count="12" data-suffix=" anos">0</p>
+      <p class="text-white/50 mt-2 text-sm">De experiência no mercado</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= PRODUTOS ================= -->
+<section id="produtos" class="relative py-28 overflow-hidden">
+  <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full bg-primary/10 blur-[120px]"></div>
+  <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center max-w-3xl mx-auto mb-20" data-aos="fade-up">
+      <span class="inline-block px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider uppercase bg-primary/15 text-primary border border-primary/30 mb-5">Soluções</span>
+      <h2 class="font-display text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-6">Tudo que seu projeto precisa, <span class="text-gradient">em um só lugar</span></h2>
+      <p class="text-lg text-white/60">Do primeiro site ao cluster de alta disponibilidade. Escale sem trocar de provedor.</p>
+    </div>
+
+    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <!-- Card grande -->
+      <div class="group lg:col-span-2 lg:row-span-1 relative rounded-3xl p-10 bg-gradient-to-br from-primary/25 via-[#0d0b1c] to-[#0b0b14] border border-white/10 overflow-hidden hover:-translate-y-2 transition-all duration-500 spotlight" data-aos="fade-up">
+        <div class="absolute -right-20 -top-20 w-72 h-72 bg-primary/30 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-700"></div>
+        <div class="relative flex flex-col md:flex-row gap-8 md:items-end justify-between h-full">
+          <div>
+            <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center mb-6 shadow-xl shadow-primary/40 group-hover:scale-110 group-hover:rotate-3 transition-transform"><i data-lucide="server" class="w-8 h-8"></i></div>
+            <h3 class="font-display text-3xl font-bold mb-3">Hospedagem de Sites</h3>
+            <p class="text-white/60 max-w-md leading-relaxed mb-6">cPanel, LiteSpeed Enterprise, NVMe e e-mails ilimitados. Perfeito para sites institucionais, blogs e lojas.</p>
+            <ul class="grid grid-cols-2 gap-2 text-sm text-white/70">
+              <li class="flex items-center gap-2"><i data-lucide="check" class="w-4 h-4 text-accent"></i>SSL grátis</li>
+              <li class="flex items-center gap-2"><i data-lucide="check" class="w-4 h-4 text-accent"></i>Backup diário</li>
+              <li class="flex items-center gap-2"><i data-lucide="check" class="w-4 h-4 text-accent"></i>Migração grátis</li>
+              <li class="flex items-center gap-2"><i data-lucide="check" class="w-4 h-4 text-accent"></i>CDN global</li>
+            </ul>
+          </div>
+          <div class="md:text-right">
+            <p class="text-sm text-white/50">a partir de</p>
+            <p class="font-display text-5xl font-bold">R$ 9<span class="text-2xl">,90</span><span class="text-base text-white/50 font-normal">/mês</span></p>
+            <a href="#planos" class="mt-4 inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-white text-ink font-semibold hover:scale-105 transition">Ver planos <i data-lucide="arrow-up-right" class="w-4 h-4"></i></a>
+          </div>
+        </div>
+      </div>
+
+      <div class="group relative rounded-3xl p-8 bg-[#0b0b14] border border-white/10 hover:border-secondary/50 hover:-translate-y-2 transition-all duration-500 overflow-hidden spotlight" data-aos="fade-up" data-aos-delay="100">
+        <div class="absolute inset-0 bg-gradient-to-br from-secondary/0 to-secondary/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+        <div class="relative">
+          <div class="w-14 h-14 rounded-2xl bg-secondary/15 border border-secondary/30 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform"><i data-lucide="layout-template" class="w-7 h-7 text-secondary"></i></div>
+          <h3 class="font-display text-2xl font-bold mb-3">WordPress Gerenciado</h3>
+          <p class="text-white/60 leading-relaxed mb-6">Cache em camadas, staging em 1 clique, atualizações automáticas e WooCommerce otimizado.</p>
+          <div class="flex items-center justify-between"><span class="text-white/50 text-sm">desde <b class="text-white text-lg">R$ 19,90</b>/mês</span><i data-lucide="arrow-up-right" class="w-5 h-5 text-white/40 group-hover:text-secondary group-hover:rotate-45 transition-all"></i></div>
+        </div>
+      </div>
+
+      <div class="group relative rounded-3xl p-8 bg-[#0b0b14] border border-white/10 hover:border-accent/50 hover:-translate-y-2 transition-all duration-500 overflow-hidden spotlight" data-aos="fade-up" data-aos-delay="0">
+        <div class="absolute inset-0 bg-gradient-to-br from-accent/0 to-accent/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+        <div class="relative">
+          <div class="w-14 h-14 rounded-2xl bg-accent/15 border border-accent/30 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform"><i data-lucide="hard-drive" class="w-7 h-7 text-accent"></i></div>
+          <h3 class="font-display text-2xl font-bold mb-3">Servidor VPS</h3>
+          <p class="text-white/60 leading-relaxed mb-6">Root total, IPv4 dedicado, AMD EPYC e deploy em 60 segundos. Linux ou Windows.</p>
+          <div class="flex items-center justify-between"><span class="text-white/50 text-sm">desde <b class="text-white text-lg">R$ 39,90</b>/mês</span><i data-lucide="arrow-up-right" class="w-5 h-5 text-white/40 group-hover:text-accent group-hover:rotate-45 transition-all"></i></div>
+        </div>
+      </div>
+
+      <div class="group relative rounded-3xl p-8 bg-[#0b0b14] border border-white/10 hover:border-primary/50 hover:-translate-y-2 transition-all duration-500 overflow-hidden spotlight" data-aos="fade-up" data-aos-delay="100">
+        <div class="absolute inset-0 bg-gradient-to-br from-primary/0 to-primary/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+        <div class="relative">
+          <div class="w-14 h-14 rounded-2xl bg-primary/15 border border-primary/30 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform"><i data-lucide="cloud-cog" class="w-7 h-7 text-primary"></i></div>
+          <h3 class="font-display text-2xl font-bold mb-3">Cloud Dedicado</h3>
+          <p class="text-white/60 leading-relaxed mb-6">Recursos garantidos, alta disponibilidade e autoscaling para aplicações críticas.</p>
+          <div class="flex items-center justify-between"><span class="text-white/50 text-sm">desde <b class="text-white text-lg">R$ 149</b>/mês</span><i data-lucide="arrow-up-right" class="w-5 h-5 text-white/40 group-hover:text-primary group-hover:rotate-45 transition-all"></i></div>
+        </div>
+      </div>
+
+      <div class="group relative rounded-3xl p-8 bg-[#0b0b14] border border-white/10 hover:border-pink-500/50 hover:-translate-y-2 transition-all duration-500 overflow-hidden spotlight" data-aos="fade-up" data-aos-delay="200">
+        <div class="absolute inset-0 bg-gradient-to-br from-pink-500/0 to-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+        <div class="relative">
+          <div class="w-14 h-14 rounded-2xl bg-pink-500/15 border border-pink-500/30 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform"><i data-lucide="mail" class="w-7 h-7 text-pink-400"></i></div>
+          <h3 class="font-display text-2xl font-bold mb-3">E-mail Profissional</h3>
+          <p class="text-white/60 leading-relaxed mb-6">@suaempresa com antispam por IA, 50GB por conta e integração com Outlook e celular.</p>
+          <div class="flex items-center justify-between"><span class="text-white/50 text-sm">desde <b class="text-white text-lg">R$ 6,90</b>/conta</span><i data-lucide="arrow-up-right" class="w-5 h-5 text-white/40 group-hover:text-pink-400 group-hover:rotate-45 transition-all"></i></div>
+        </div>
+      </div>
+
+      <div class="group relative md:col-span-2 lg:col-span-3 rounded-3xl p-8 sm:p-10 bg-gradient-to-r from-[#0b0b14] via-secondary/10 to-[#0b0b14] border border-white/10 hover:border-secondary/40 transition-all duration-500 overflow-hidden" data-aos="fade-up">
+        <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+          <div class="flex items-center gap-6">
+            <div class="w-14 h-14 flex-shrink-0 rounded-2xl bg-gradient-to-br from-secondary to-accent flex items-center justify-center group-hover:scale-110 transition-transform"><i data-lucide="users" class="w-7 h-7 text-ink"></i></div>
+            <div>
+              <h3 class="font-display text-2xl font-bold">Revenda de Hospedagem</h3>
+              <p class="text-white/60">WHM, white-label e WHMCS inclusos. Crie sua própria empresa de hospedagem hoje.</p>
+            </div>
+          </div>
+          <a href="#contato" class="flex-shrink-0 inline-flex items-center gap-2 px-6 py-3 rounded-xl glass hover:bg-white/10 font-semibold transition hover:scale-105">Quero revender <i data-lucide="arrow-right" class="w-4 h-4"></i></a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FEATURES / INFRA ================= -->
+<section id="infra" class="relative py-28 bg-gradient-to-b from-transparent via-[#08081a] to-transparent">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <!-- Row 1 -->
+    <div class="grid lg:grid-cols-2 gap-16 items-center mb-32">
+      <div data-aos="fade-right">
+        <span class="inline-block px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider uppercase bg-secondary/15 text-secondary border border-secondary/30 mb-5">Performance</span>
+        <h2 class="font-display text-4xl sm:text-5xl font-bold tracking-tight mb-6">Até <span class="text-gradient">5x mais rápido</span> que a hospedagem comum</h2>
+        <p class="text-lg text-white/60 leading-relaxed mb-8">Discos NVMe Gen5, processadores AMD EPYC de última geração e servidor web LiteSpeed Enterprise. Seu site carrega em milissegundos e ranqueia melhor no Google.</p>
+        <div class="space-y-4">
+          <div class="flex gap-4 p-5 rounded-2xl bg-white/[0.03] border border-white/5 hover:border-secondary/30 hover:bg-white/[0.05] transition-all">
+            <div class="w-12 h-12 flex-shrink-0 rounded-xl bg-secondary/15 flex items-center justify-center"><i data-lucide="zap" class="w-6 h-6 text-secondary"></i></div>
+            <div><h3 class="font-semibold mb-1">LiteSpeed + LSCache</h3><p class="text-sm text-white/55">Cache nativo que reduz o tempo de carregamento em até 80%.</p></div>
+          </div>
+          <div class="flex gap-4 p-5 rounded-2xl bg-white/[0.03] border border-white/5 hover:border-secondary/30 hover:bg-white/[0.05] transition-all">
+            <div class="w-12 h-12 flex-shrink-0 rounded-xl bg-secondary/15 flex items-center justify-center"><i data-lucide="globe-2" class="w-6 h-6 text-secondary"></i></div>
+            <div><h3 class="font-semibold mb-1">CDN com +300 pontos</h3><p class="text-sm text-white/55">Conteúdo entregue do servidor mais próximo do seu visitante.</p></div>
+          </div>
+        </div>
+      </div>
+      <div class="relative" data-aos="fade-left" data-aos-delay="150">
+        <div class="absolute -inset-4 bg-gradient-to-tr from-secondary/30 to-primary/30 rounded-[2.5rem] blur-2xl"></div>
+        <div class="relative gradient-border rounded-[2rem] bg-[#0b0b14] p-8 shadow-2xl">
+          <p class="text-sm text-white/50 mb-6">Tempo de carregamento médio (segundos)</p>
+          <div class="space-y-6">
+            <div>
+              <div class="flex justify-between text-sm mb-2"><span class="font-semibold flex items-center gap-2"><i data-lucide="cloud" class="w-4 h-4 text-secondary"></i>CloudX</span><span class="text-accent font-bold">0.4s</span></div>
+              <div class="h-3 rounded-full bg-white/5 overflow-hidden"><div class="h-full w-[12%] rounded-full bg-gradient-to-r from-secondary to-accent shadow-[0_0_20px_rgba(163,230,53,.6)]"></div></div>
+            </div>
+            <div>
+              <div class="flex justify-between text-sm mb-2 text-white/60"><span>Concorrente A</span><span>1.6s</span></div>
+              <div class="h-3 rounded-full bg-white/5 overflow-hidden"><div class="h-full w-[48%] rounded-full bg-white/20"></div></div>
+            </div>
+            <div>
+              <div class="flex justify-between text-sm mb-2 text-white/60"><span>Concorrente B</span><span>2.3s</span></div>
+              <div class="h-3 rounded-full bg-white/5 overflow-hidden"><div class="h-full w-[68%] rounded-full bg-white/20"></div></div>
+            </div>
+            <div>
+              <div class="flex justify-between text-sm mb-2 text-white/60"><span>Hospedagem compartilhada comum</span><span>3.1s</span></div>
+              <div class="h-3 rounded-full bg-white/5 overflow-hidden"><div class="h-full w-[92%] rounded-full bg-white/20"></div></div>
+            </div>
+          </div>
+          <p class="text-xs text-white/30 mt-6">* Teste interno com WordPress + WooCommerce, servidor em São Paulo, 2026.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 2 -->
+    <div class="grid lg:grid-cols-2 gap-16 items-center mb-32">
+      <div class="relative order-2 lg:order-1" data-aos="fade-right">
+        <div class="absolute -inset-4 bg-gradient-to-tr from-primary/30 to-pink-500/20 rounded-[2.5rem] blur-2xl"></div>
+        <div class="relative rounded-[2rem] overflow-hidden border border-white/10 shadow-2xl group">
+          <img src="https://picsum.photos/seed/cloudxserver/900/700" alt="Datacenter CloudX com servidores de alta performance" loading="lazy" class="w-full h-[420px] object-cover object-center group-hover:scale-105 transition-transform duration-700">
+          <div class="absolute inset-0 bg-gradient-to-t from-ink via-ink/60 to-primary/20"></div>
+          <div class="absolute bottom-0 left-0 right-0 p-8">
+            <div class="grid grid-cols-3 gap-3">
+              <div class="glass rounded-2xl p-4 text-center"><p class="font-bold text-xl">Tier III</p><p class="text-xs text-white/50">Datacenter</p></div>
+              <div class="glass rounded-2xl p-4 text-center"><p class="font-bold text-xl">3 Tbps</p><p class="text-xs text-white/50">Anti-DDoS</p></div>
+              <div class="glass rounded-2xl p-4 text-center"><p class="font-bold text-xl">SP · BR</p><p class="text-xs text-white/50">Localização</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="order-1 lg:order-2" data-aos="fade-left">
+        <span class="inline-block px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider uppercase bg-primary/15 text-primary border border-primary/30 mb-5">Segurança</span>
+        <h2 class="font-display text-4xl sm:text-5xl font-bold tracking-tight mb-6">Blindagem de <span class="text-gradient">nível enterprise</span> para qualquer site</h2>
+        <p class="text-lg text-white/60 leading-relaxed mb-8">Firewall com inteligência artificial, proteção anti-DDoS de 3 Tbps, varredura de malware diária e backups isolados. Durma tranquilo.</p>
+        <ul class="grid sm:grid-cols-2 gap-4">
+          <li class="flex items-center gap-3 p-4 rounded-xl bg-white/[0.03] border border-white/5"><i data-lucide="shield-check" class="w-5 h-5 text-accent"></i><span class="text-sm">WAF com IA</span></li>
+          <li class="flex items-center gap-3 p-4 rounded-xl bg-white/[0.03] border border-white/5"><i data-lucide="lock-keyhole" class="w-5 h-5 text-accent"></i><span class="text-sm">SSL Let's Encrypt grátis</span></li>
+          <li class="flex items-center gap-3 p-4 rounded-xl bg-white/[0.03] border border-white/5"><i data-lucide="database-backup" class="w-5 h-5 text-accent"></i><span class="text-sm">Backups diários 30 dias</span></li>
+          <li class="flex items-center gap-3 p-4 rounded-xl bg-white/[0.03] border border-white/5"><i data-lucide="scan-search" class="w-5 h-5 text-accent"></i><span class="text-sm">Scanner de malware</span></li>
+          <li class="flex items-center gap-3 p-4 rounded-xl bg-white/[0.03] border border-white/5"><i data-lucide="fingerprint" class="w-5 h-5 text-accent"></i><span class="text-sm">Autenticação 2FA</span></li>
+          <li class="flex items-center gap-3 p-4 rounded-xl bg-white/[0.03] border border-white/5"><i data-lucide="file-lock-2" class="w-5 h-5 text-accent"></i><span class="text-sm">Conformidade LGPD</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Features grid -->
+    <div class="text-center max-w-3xl mx-auto mb-16" data-aos="fade-up">
+      <h2 class="font-display text-4xl sm:text-5xl font-bold tracking-tight mb-5">Recursos que fazem a diferença</h2>
+      <p class="text-lg text-white/60">Tudo incluso. Sem letras miúdas, sem taxas escondidas.</p>
+    </div>
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div class="group p-7 rounded-3xl bg-white/[0.02] border border-white/5 hover:bg-gradient-to-br hover:from-primary/20 hover:to-secondary/10 hover:border-primary/30 hover:-translate-y-1 transition-all duration-300" data-aos="zoom-in">
+        <i data-lucide="headphones" class="w-9 h-9 text-primary mb-5 group-hover:scale-110 transition-transform"></i>
+        <h3 class="font-semibold text-lg mb-2">Suporte humano 24/7</h3>
+        <p class="text-sm text-white/55 leading-relaxed">Especialistas brasileiros via WhatsApp, chat e ticket. Sem robôs.</p>
+      </div>
+      <div class="group p-7 rounded-3xl bg-white/[0.02] border border-white/5 hover:bg-gradient-to-br hover:from-primary/20 hover:to-secondary/10 hover:border-primary/30 hover:-translate-y-1 transition-all duration-300" data-aos="zoom-in" data-aos-delay="100">
+        <i data-lucide="repeat" class="w-9 h-9 text-secondary mb-5 group-hover:scale-110 transition-transform"></i>
+        <h3 class="font-semibold text-lg mb-2">Migração gratuita</h3>
+        <p class="text-sm text-white/55 leading-relaxed">Trazemos seu site de qualquer provedor sem downtime.</p>
+      </div>
+      <div class="group p-7 rounded-3xl bg-white/[0.02] border border-white/5 hover:bg-gradient-to-br hover:from-primary/20 hover:to-secondary/10 hover:border-primary/30 hover:-translate-y-1 transition-all duration-300" data-aos="zoom-in" data-aos-delay="200">
+        <i data-lucide="sparkles" class="w-9 h-9 text-accent mb-5 group-hover:scale-110 transition-transform"></i>
+        <h3 class="font-semibold text-lg mb-2">Criador de sites com IA</h3>
+        <p class="text-sm text-white/55 leading-relaxed">Descreva seu negócio e tenha um site pronto em minutos.</p>
+      </div>
+      <div class="group p-7 rounded-3xl bg-white/[0.02] border border-white/5 hover:bg-gradient-to-br hover:from-primary/20 hover:to-secondary/10 hover:border-primary/30 hover:-translate-y-1 transition-all duration-300" data-aos="zoom-in" data-aos-delay="300">
+        <i data-lucide="git-branch" class="w-9 h-9 text-pink-400 mb-5 group-hover:scale-110 transition-transform"></i>
+        <h3 class="font-semibold text-lg mb-2">Git, SSH & Staging</h3>
+        <p class="text-sm text-white/55 leading-relaxed">Fluxo de deploy moderno para devs e agências.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= PRICING ================= -->
+<section id="planos" class="relative py-28 overflow-hidden" x-data="{ annual: true }">
+  <div class="absolute inset-0 grid-bg opacity-60"></div>
+  <div class="absolute top-20 left-1/2 -translate-x-1/2 w-[900px] h-[500px] bg-gradient-to-r from-primary/20 via-secondary/15 to-accent/10 blur-[120px] rounded-full"></div>
+  <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center max-w-3xl mx-auto mb-14" data-aos="fade-up">
+      <span class="inline-block px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider uppercase bg-accent/15 text-accent border border-accent/30 mb-5">Planos</span>
+      <h2 class="font-display text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-6">Preço justo, <span class="text-gradient">performance absurda</span></h2>
+      <p class="text-lg text-white/60">Escolha o plano ideal. Faça upgrade quando quiser, sem perder nada.</p>
+    </div>
+
+    <div class="flex justify-center mb-14" data-aos="fade-up">
+      <div class="relative inline-flex p-1.5 rounded-full glass">
+        <button @click="annual=false" :class="!annual ? 'bg-white text-ink shadow-lg' : 'text-white/70'" class="relative px-6 py-2.5 rounded-full text-sm font-semibold transition-all">Mensal</button>
+        <button @click="annual=true" :class="annual ? 'bg-white text-ink shadow-lg' : 'text-white/70'" class="relative px-6 py-2.5 rounded-full text-sm font-semibold transition-all flex items-center gap-2">Anual <span class="px-2 py-0.5 rounded-full bg-accent text-ink text-[10px] font-bold">-50%</span></button>
+      </div>
+    </div>
+
+    <div class="grid lg:grid-cols-3 gap-6 items-stretch">
+      <!-- Start -->
+      <div class="group relative rounded-3xl p-8 bg-[#0b0b14]/80 backdrop-blur border border-white/10 hover:border-white/25 hover:-translate-y-2 hover:shadow-2xl transition-all duration-300 flex flex-col" data-aos="fade-up">
+        <div class="flex items-center gap-3 mb-2"><i data-lucide="rocket" class="w-5 h-5 text-secondary"></i><h3 class="font-display text-xl font-bold">Start</h3></div>
+        <p class="text-sm text-white/50 mb-8">Para o primeiro site ou landing page.</p>
+        <div class="mb-2 flex items-end gap-1">
+          <span class="text-white/50 text-lg mb-2">R$</span>
+          <span class="font-display text-6xl font-bold" x-text="annual ? '9,90' : '19,90'">9,90</span>
+          <span class="text-white/50 mb-2">/mês</span>
+        </div>
+        <p class="text-xs text-white/40 mb-8 h-4" x-text="annual ? 'Cobrado R$ 118,80/ano · economize R$ 120' : 'Sem fidelidade'"></p>
+        <a href="#contato" class="block text-center py-4 rounded-2xl font-semibold border border-white/15 hover:bg-white hover:text-ink transition-all mb-8">Contratar Start</a>
+        <ul class="space-y-3.5 text-sm text-white/70 flex-1">
+          <li class="flex items-center gap-3"><i data-lucide="check" class="w-4 h-4 text-accent"></i>1 site</li>
+          <li class="flex items-center gap-3"><i data-lucide="check" class="w-4 h-4 text-accent"></i>25 GB NVMe</li>
+          <li class="flex items-center gap-3"><i data-lucide="check" class="w-4 h-4 text-accent"></i>5 contas de e-mail</li>
+          <li class="flex items-center gap-3"><i data-lucide="check" class="w-4 h-4 text-accent"></i>SSL grátis</li>
+          <li class="flex items-center gap-3"><i data-lucide="check" class="w-4 h-4 text-accent"></i>Backup semanal</li>
+          <li class="flex items-center gap-3 text-white/30"><i data-lucide="x" class="w-4 h-4"></i>Domínio grátis</li>
+        </ul>
+      </div>
+
+      <!-- Pro (featured) -->
+      <div class="group relative rounded-3xl p-[1.5px] bg-gradient-to-br from-primary via-secondary to-accent hover:-translate-y-3 transition-all duration-300 shadow-2xl shadow-primary/30 lg:scale-105" data-aos="fade-up" data-aos-delay="100">
+        <div class="absolute -top-4 left-1/2 -translate-x-1/2 z-10 px-4 py-1.5 rounded-full bg-gradient-to-r from-primary to-secondary text-xs font-bold uppercase tracking-wider shadow-lg flex items-center gap-1.5"><i data-lucide="flame" class="w-3.5 h-3.5"></i>Mais escolhido</div>
+        <div class="relative h-full rounded-[calc(1.5rem-1px)] p-8 bg-gradient-to-b from-[#16102e] to-[#0b0b14] flex flex-col">
+          <div class="flex items-center gap-3 mb-2"><i data-lucide="gem" class="w-5 h-5 text-primary"></i><h3 class="font-display text-xl font-bold">Pro</h3></div>
+          <p class="text-sm text-white/50 mb-8">Para empresas e lojas em crescimento.</p>
+          <div class="mb-2 flex items-end gap-1">
+            <span class="text-white/50 text-lg mb-2">R$</span>
+            <span class="font-display text-6xl font-bold text-gradient" x-text="annual ? '19,90' : '39,90'">19,90</span>
+            <span class="text-white/50 mb-2">/mês</span>
+          </div>
+          <p class="text-xs text-white/40 mb-8 h-4" x-text="annual ? 'Cobrado R$ 238,80/ano · economize R$ 240' : 'Sem fidelidade'"></p>
+          <a href="#contato" class="block text-center py-4 rounded-2xl font-semibold bg-gradient-to-r from-primary to-secondary hover:scale-[1.03] hover:shadow-xl hover:shadow-primary/40 transition-all mb-8">Contratar Pro</a>
+          <ul class="space-y-3.5 text-sm text-white/80 flex-1">
+            <li class="flex items-center gap-3"><i data-lucide="check" class="w-4 h-4 text-accent"></i><b>Sites ilimitados</b></li>
+            <li class="flex items-center gap-3"><i data-lucide="check" class="w-4 h-4 text-accent"></i>100 GB NVMe</li>
+            <li class="flex items-center gap-3"><i data-lucide="check" class="w-4 h-4 text-accent"></i>E-mails ilimitados</li>
+            <li class="flex items-center gap-3"><i data-lucide="check" class="w-4 h-4 text-accent"></i>Domínio grátis no anual</li>
+            <li class="flex items-center gap-3"><i data-lucide="check" class="w-4 h-4 text-accent"></i>Backup diário + CDN</li>
+            <li class="flex items-center gap-3"><i data-lucide="check" class="w-4 h-4 text-accent"></i>Criador de sites com IA</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Business -->
+      <div class="group relative rounded-3xl p-8 bg-[#0b0b14]/80 backdrop-blur border border-white/10 hover:border-white/25 hover:-translate-y-2 hover:shadow-2xl transition-all duration-300 flex flex-col" data-aos="fade-up" data-aos-delay="200">
+        <div class="flex items-center gap-3 mb-2"><i data-lucide="building-2" class="w-5 h-5 text-accent"></i><h3 class="font-display text-xl font-bold">Business</h3></div>
+        <p class="text-sm text-white/50 mb-8">Recursos dedicados e máxima performance.</p>
+        <div class="mb-2 flex items-end gap-1">
+          <span class="text-white/50 text-lg mb-2">R$</span>
+          <span class="font-display text-6xl font-bold" x-text="annual ? '49,90' : '89,90'">49,90</span>
+          <span class="text-white/50 mb-2">/mês</span>
+        </div>
+        <p class="text-xs text-white/40 mb-8 h-4" x-text="annual ? 'Cobrado R$ 598,80/ano · economize R$ 480' : 'Sem fidelidade'"></p>
+        <a href="#contato" class="block text-center py-4 rounded-2xl font-semibold border border-white/15 hover:bg-white hover:text-ink transition-all mb-8">Contratar Business</a>
+        <ul class="space-y-3.5 text-sm text-white/70 flex-1">
+          <li class="flex items-center gap-3"><i data-lucide="check" class="w-4 h-4 text-accent"></i>Sites ilimitados</li>
+          <li class="flex items-center gap-3"><i data-lucide="check" class="w-4 h-4 text-accent"></i>250 GB NVMe Gen5</li>
+          <li class="flex items-center gap-3"><i data-lucide="check" class="w-4 h-4 text-accent"></i>4 vCPU · 8 GB RAM dedicados</li>
+          <li class="flex items-center gap-3"><i data-lucide="check" class="w-4 h-4 text-accent"></i>IP dedicado</li>
+          <li class="flex items-center gap-3"><i data-lucide="check" class="w-4 h-4 text-accent"></i>Suporte prioritário VIP</li>
+          <li class="flex items-center gap-3"><i data-lucide="check" class="w-4 h-4 text-accent"></i>SLA 99,99% em contrato</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="mt-14 flex flex-wrap justify-center gap-x-10 gap-y-4 text-sm text-white/60" data-aos="fade-up">
+      <span class="flex items-center gap-2"><i data-lucide="badge-check" class="w-5 h-5 text-accent"></i>30 dias de garantia</span>
+      <span class="flex items-center gap-2"><i data-lucide="credit-card" class="w-5 h-5 text-accent"></i>Pix, boleto e cartão em até 12x</span>
+      <span class="flex items-center gap-2"><i data-lucide="receipt" class="w-5 h-5 text-accent"></i>Nota fiscal automática</span>
+      <span class="flex items-center gap-2"><i data-lucide="unlock" class="w-5 h-5 text-accent"></i>Cancele quando quiser</span>
+    </div>
+  </div>
+</section>
+
+<!-- ================= TESTIMONIALS ================= -->
+<section class="py-28 relative" x-data="{ i: 0, total: 3, timer: null, start(){ this.timer = setInterval(()=>{ this.i = (this.i+1) % this.total }, 6000) } }" x-init="start()">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-14" data-aos="fade-up">
+      <div class="max-w-2xl">
+        <span class="inline-block px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider uppercase bg-primary/15 text-primary border border-primary/30 mb-5">Depoimentos</span>
+        <h2 class="font-display text-4xl sm:text-5xl font-bold tracking-tight">Quem migra, <span class="text-gradient">não volta atrás</span></h2>
+      </div>
+      <div class="flex gap-3">
+        <button @click="i = (i - 1 + total) % total" class="w-12 h-12 rounded-full glass hover:bg-white/10 flex items-center justify-center transition hover:scale-110" aria-label="Anterior"><i data-lucide="arrow-left" class="w-5 h-5"></i></button>
+        <button @click="i = (i + 1) % total" class="w-12 h-12 rounded-full bg-white text-ink flex items-center justify-center transition hover:scale-110" aria-label="Próximo"><i data-lucide="arrow-right" class="w-5 h-5"></i></button>
+      </div>
+    </div>
+
+    <div class="overflow-hidden" data-aos="fade-up" data-aos-delay="100">
+      <div class="flex transition-transform duration-700 ease-out" :style="`transform: translateX(-${i * 100}%)`">
+        <!-- Slide 1 -->
+        <div class="w-full flex-shrink-0 grid lg:grid-cols-3 gap-6 px-1">
+          <div class="lg:col-span-2 relative rounded-3xl p-10 sm:p-12 bg-gradient-to-br from-primary/20 via-[#0d0b1c] to-[#0b0b14] border border-white/10">
+            <i data-lucide="quote" class="w-14 h-14 text-primary/40 mb-6"></i>
+            <p class="text-2xl sm:text-3xl font-display font-medium leading-snug mb-10">"Migramos nossa loja com 40 mil produtos e o tempo de carregamento caiu de 4s para 0,6s. As vendas subiram 28% no primeiro mês."</p>
+            <div class="flex items-center gap-4">
+              <img src="https://ui-avatars.com/api/?name=Mariana+Rocha&background=7c3aed&color=fff&size=128" alt="Mariana Rocha" loading="lazy" class="w-14 h-14 rounded-full ring-2 ring-primary/50">
+              <div><p class="font-semibold">Mariana Rocha</p><p class="text-sm text-white/50">CEO · Casa Verdana E-commerce</p></div>
+            </div>
+          </div>
+          <div class="rounded-3xl p-8 bg-[#0b0b14] border border-white/10 flex flex-col justify-between">
+            <div>
+              <p class="text-sm text-white/50 mb-2">Resultado</p>
+              <p class="font-display text-6xl font-bold text-gradient mb-2">+28%</p>
+              <p class="text-white/60">em conversões após migrar para a CloudX</p>
+            </div>
+            <div class="flex text-yellow-400 mt-8"><i data-lucide="star" class="w-5 h-5 fill-yellow-400"></i><i data-lucide="star" class="w-5 h-5 fill-yellow-400"></i><i data-lucide="star" class="w-5 h-5 fill-yellow-400"></i><i data-lucide="star" class="w-5 h-5 fill-yellow-400"></i><i data-lucide="star" class="w-5 h-5 fill-yellow-400"></i></div>
+          </div>
+        </div>
+        <!-- Slide 2 -->
+        <div class="w-full flex-shrink-0 grid lg:grid-cols-3 gap-6 px-1">
+          <div class="lg:col-span-2 relative rounded-3xl p-10 sm:p-12 bg-gradient-to-br from-secondary/20 via-[#08141a] to-[#0b0b14] border border-white/10">
+            <i data-lucide="quote" class="w-14 h-14 text-secondary/40 mb-6"></i>
+            <p class="text-2xl sm:text-3xl font-display font-medium leading-snug mb-10">"Tenho uma agência com 120 clientes na revenda. Em 3 anos nunca tive uma queda relevante. O suporte responde em segundos, de madrugada inclusive."</p>
+            <div class="flex items-center gap-4">
+              <img src="https://ui-avatars.com/api/?name=Thiago+Nunes&background=06b6d4&color=fff&size=128" alt="Thiago Nunes" loading="lazy" class="w-14 h-14 rounded-full ring-2 ring-secondary/50">
+              <div><p class="font-semibold">Thiago Nunes</p><p class="text-sm text-white/50">Fundador · Orbital Digital</p></div>
+            </div>
+          </div>
+          <div class="rounded-3xl p-8 bg-[#0b0b14] border border-white/10 flex flex-col justify-between">
+            <div>
+              <p class="text-sm text-white/50 mb-2">Uptime em 3 anos</p>
+              <p class="font-display text-6xl font-bold text-gradient mb-2">99,99%</p>
+              <p class="text-white/60">com 120 sites de clientes hospedados</p>
+            </div>
+            <div class="flex text-yellow-400 mt-8"><i data-lucide="star" class="w-5 h-5 fill-yellow-400"></i><i data-lucide="star" class="w-5 h-5 fill-yellow-400"></i><i data-lucide="star" class="w-5 h-5 fill-yellow-400"></i><i data-lucide="star" class="w-5 h-5 fill-yellow-400"></i><i data-lucide="star" class="w-5 h-5 fill-yellow-400"></i></div>
+          </div>
+        </div>
+        <!-- Slide 3 -->
+        <div class="w-full flex-shrink-0 grid lg:grid-cols-3 gap-6 px-1">
+          <div class="lg:col-span-2 relative rounded-3xl p-10 sm:p-12 bg-gradient-to-br from-accent/15 via-[#0e1408] to-[#0b0b14] border border-white/10">
+            <i data-lucide="quote" class="w-14 h-14 text-accent/40 mb-6"></i>
+            <p class="text-2xl sm:text-3xl font-display font-medium leading-snug mb-10">"Nossa API roda em VPS CloudX com deploy via Git. Latência baixíssima para usuários no Brasil e custo 40% menor que na nuvem gringa."</p>
+            <div class="flex items-center gap-4">
+              <img src="https://ui-avatars.com/api/?name=Lucas+Ferreira&background=65a30d&color=fff&size=128" alt="Lucas Ferreira" loading="lazy" class="w-14 h-14 rounded-full ring-2 ring-accent/50">
+              <div><p class="font-semibold">Lucas Ferreira</p><p class="text-sm text-white/50">CTO · Stackly SaaS</p></div>
+            </div>
+          </div>
+          <div class="rounded-3xl p-8 bg-[#0b0b14] border border-white/10 flex flex-col justify-between">
+            <div>
+              <p class="text-sm text-white/50 mb-2">Economia mensal</p>
+              <p class="font-display text-6xl font-bold text-gradient mb-2">-40%</p>
+              <p class="text-white/60">em custo de infraestrutura cloud</p>
+            </div>
+            <div class="flex text-yellow-400 mt-8"><i data-lucide="star" class="w-5 h-5 fill-yellow-400"></i><i data-lucide="star" class="w-5 h-5 fill-yellow-400"></i><i data-lucide="star" class="w-5 h-5 fill-yellow-400"></i><i data-lucide="star" class="w-5 h-5 fill-yellow-400"></i><i data-lucide="star" class="w-5 h-5 fill-yellow-400"></i></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex justify-center gap-2 mt-10">
+      <button @click="i=0" :class="i===0 ? 'w-10 bg-gradient-to-r from-primary to-secondary' : 'w-2.5 bg-white/20'" class="h-2.5 rounded-full transition-all duration-300" aria-label="Depoimento 1"></button>
+      <button @click="i=1" :class="i===1 ? 'w-10 bg-gradient-to-r from-primary to-secondary' : 'w-2.5 bg-white/20'" class="h-2.5 rounded-full transition-all duration-300" aria-label="Depoimento 2"></button>
+      <button @click="i=2" :class="i===2 ? 'w-10 bg-gradient-to-r from-primary to-secondary' : 'w-2.5 bg-white/20'" class="h-2.5 rounded-full transition-all duration-300" aria-label="Depoimento 3"></button>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FAQ ================= -->
+<section id="faq" class="py-28 relative">
+  <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-16" data-aos="fade-up">
+      <span class="inline-block px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider uppercase bg-secondary/15 text-secondary border border-secondary/30 mb-5">FAQ</span>
+      <h2 class="font-display text-4xl sm:text-5xl font-bold tracking-tight mb-5">Perguntas frequentes</h2>
+      <p class="text-lg text-white/60">Não encontrou sua resposta? Nosso time responde em menos de 1 minuto.</p>
+    </div>
+
+    <div x-data="{ active: 1 }" class="space-y-4">
+      <div class="rounded-2xl border transition-all duration-300" :class="active===1 ? 'bg-white/[0.05] border-primary/40 shadow-lg shadow-primary/10' : 'bg-white/[0.02] border-white/10 hover:border-white/20'" data-aos="fade-up">
+        <button @click="active = active === 1 ? null : 1" class="w-full px-7 py-6 text-left flex justify-between items-center gap-4">
+          <span class="font-semibold text-lg">A migração do meu site é realmente gratuita?</span>
+          <span class="w-9 h-9 flex-shrink-0 rounded-full bg-white/5 flex items-center justify-center transition-transform duration-300" :class="active===1 ? 'rotate-45 bg-primary' : ''"><i data-lucide="plus" class="w-4 h-4"></i></span>
+        </button>
+        <div x-show="active === 1" x-collapse x-transition class="px-7 pb-6 text-white/60 leading-relaxed">Sim! Nossa equipe técnica migra seus sites, e-mails e bancos de dados de qualquer provedor sem custo e sem tempo fora do ar. Basta abrir um chamado após a contratação.</div>
+      </div>
+
+      <div class="rounded-2xl border transition-all duration-300" :class="active===2 ? 'bg-white/[0.05] border-primary/40 shadow-lg shadow-primary/10' : 'bg-white/[0.02] border-white/10 hover:border-white/20'" data-aos="fade-up" data-aos-delay="50">
+        <button @click="active = active === 2 ? null : 2" class="w-full px-7 py-6 text-left flex justify-between items-center gap-4">
+          <span class="font-semibold text-lg">Onde ficam os servidores da CloudX?</span>
+          <span class="w-9 h-9 flex-shrink-0 rounded-full bg-white/5 flex items-center justify-center transition-transform duration-300" :class="active===2 ? 'rotate-45 bg-primary' : ''"><i data-lucide="plus" class="w-4 h-4"></i></span>
+        </button>
+        <div x-show="active === 2" x-cloak x-transition class="px-7 pb-6 text-white/60 leading-relaxed">Nossos servidores estão em datacenters Tier III em São Paulo, garantindo baixa latência para todo o Brasil e total conformidade com a LGPD.</div>
+      </div>
+
+      <div class="rounded-2xl border transition-all duration-300" :class="active===3 ? 'bg-white/[0.05] border-primary/40 shadow-lg shadow-primary/10' : 'bg-white/[0.02] border-white/10 hover:border-white/20'" data-aos="fade-up" data-aos-delay="100">
+        <button @click="active = active === 3 ? null : 3" class="w-full px-7 py-6 text-left flex justify-between items-center gap-4">
+          <span class="font-semibold text-lg">Como funciona a garantia de 30 dias?</span>
+          <span class="w-9 h-9 flex-shrink-0 rounded-full bg-white/5 flex items-center justify-center transition-transform duration-300" :class="active===3 ? 'rotate-45 bg-primary' : ''"><i data-lucide="plus" class="w-4 h-4"></i></span>
+        </button>
+        <div x-show="active === 3" x-cloak x-transition class="px-7 pb-6 text-white/60 leading-relaxed">Se por qualquer motivo você não ficar satisfeito nos primeiros 30 dias, devolvemos 100% do valor pago pela hospedagem. Sem perguntas, sem burocracia.</div>
+      </div>
+
+      <div class="rounded-2xl border transition-all duration-300" :class="active===4 ? 'bg-white/[0.05] border-primary/40 shadow-lg shadow-primary/10' : 'bg-white/[0.02] border-white/10 hover:border-white/20'" data-aos="fade-up" data-aos-delay="150">
+        <button @click="active = active === 4 ? null : 4" class="w-full px-7 py-6 text-left flex justify-between items-center gap-4">
+          <span class="font-semibold text-lg">Posso fazer upgrade do meu plano depois?</span>
+          <span class="w-9 h-9 flex-shrink-0 rounded-full bg-white/5 flex items-center justify-center transition-transform duration-300" :class="active===4 ? 'rotate-45 bg-primary' : ''"><i data-lucide="plus" class="w-4 h-4"></i></span>
+        </button>
+        <div x-show="active === 4" x-cloak x-transition class="px-7 pb-6 text-white/60 leading-relaxed">Claro! O upgrade é feito em poucos cliques pela Área do Cliente, sem perder arquivos, e-mails ou configurações. Você paga apenas a diferença proporcional.</div>
+      </div>
+
+      <div class="rounded-2xl border transition-all duration-300" :class="active===5 ? 'bg-white/[0.05] border-primary/40 shadow-lg shadow-primary/10' : 'bg-white/[0.02] border-white/10 hover:border-white/20'" data-aos="fade-up" data-aos-delay="200">
+        <button @click="active = active === 5 ? null : 5" class="w-full px-7 py-6 text-left flex justify-between items-center gap-4">
+          <span class="font-semibold text-lg">Quais formas de pagamento vocês aceitam?</span>
+          <span class="w-9 h-9 flex-shrink-0 rounded-full bg-white/5 flex items-center justify-center transition-transform duration-300" :class="active===5 ? 'rotate-45 bg-primary' : ''"><i data-lucide="plus" class="w-4 h-4"></i></span>
+        </button>
+        <div x-show="active === 5" x-cloak x-transition class="px-7 pb-6 text-white/60 leading-relaxed">Aceitamos Pix (com ativação imediata), boleto bancário e cartão de crédito em até 12x. A nota fiscal é emitida automaticamente a cada pagamento.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CONTATO / CTA ================= -->
+<section id="contato" class="relative py-28 overflow-hidden" x-data="{ sent: false, nome: '', email: '', whats: '', interesse: 'Hospedagem de Sites', msg: '' }">
+  <div class="absolute inset-0 grid-bg opacity-50"></div>
+  <div class="absolute -bottom-40 -left-40 w-[500px] h-[500px] rounded-full bg-primary orb" style="opacity:.3"></div>
+  <div class="absolute -top-20 -right-40 w-[500px] h-[500px] rounded-full bg-secondary orb" style="opacity:.25"></div>
+  <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="grid lg:grid-cols-2 gap-16 items-center">
+      <div data-aos="fade-right">
+        <span class="inline-block px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider uppercase bg-accent/15 text-accent border border-accent/30 mb-5">Fale conosco</span>
+        <h2 class="font-display text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-6">Pronto para <span class="text-gradient">acelerar</span> seu site?</h2>
+        <p class="text-lg text-white/60 leading-relaxed mb-10 max-w-xl">Solicite sua migração gratuita ou tire suas dúvidas com um especialista. Resposta em minutos, 24 horas por dia.</p>
+        <div class="space-y-4">
+          <a href="https://wa.me/5500000000000" target="_blank" rel="noopener" class="flex items-center gap-4 p-5 rounded-2xl bg-white/[0.03] border border-white/5 hover:border-accent/40 hover:bg-white/[0.05] transition-all group">
+            <div class="w-12 h-12 flex-shrink-0 rounded-xl bg-accent/15 flex items-center justify-center group-hover:scale-110 transition-transform"><i data-lucide="message-circle" class="w-6 h-6 text-accent"></i></div>
+            <div><p class="font-semibold">WhatsApp 24/7</p><p class="text-sm text-white/55">Atendimento humano imediato</p></div>
+            <i data-lucide="arrow-up-right" class="w-5 h-5 text-white/40 ml-auto group-hover:text-accent group-hover:rotate-45 transition-all"></i>
+          </a>
+          <a href="mailto:contato@cloudx.com.br" class="flex items-center gap-4 p-5 rounded-2xl bg-white/[0.03] border border-white/5 hover:border-secondary/40 hover:bg-white/[0.05] transition-all group">
+            <div class="w-12 h-12 flex-shrink-0 rounded-xl bg-secondary/15 flex items-center justify-center group-hover:scale-110 transition-transform"><i data-lucide="mail" class="w-6 h-6 text-secondary"></i></div>
+            <div><p class="font-semibold">contato@cloudx.com.br</p><p class="text-sm text-white/55">Comercial e parcerias</p></div>
+            <i data-lucide="arrow-up-right" class="w-5 h-5 text-white/40 ml-auto group-hover:text-secondary group-hover:rotate-45 transition-all"></i>
+          </a>
+          <a href="#" class="flex items-center gap-4 p-5 rounded-2xl bg-white/[0.03] border border-white/5 hover:border-primary/40 hover:bg-white/[0.05] transition-all group">
+            <div class="w-12 h-12 flex-shrink-0 rounded-xl bg-primary/15 flex items-center justify-center group-hover:scale-110 transition-transform"><i data-lucide="life-buoy" class="w-6 h-6 text-primary"></i></div>
+            <div><p class="font-semibold">Central de Ajuda</p><p class="text-sm text-white/55">Tutoriais e abertura de tickets</p></div>
+            <i data-lucide="arrow-up-right" class="w-5 h-5 text-white/40 ml-auto group-hover:text-primary group-hover:rotate-45 transition-all"></i>
+          </a>
+        </div>
+      </div>
+
+      <div class="relative" data-aos="fade-left" data-aos-delay="150">
+        <div class="absolute -inset-4 bg-gradient-to-tr from-primary/30 to-secondary/30 rounded-[2.5rem] blur-2xl"></div>
+        <div class="relative gradient-border rounded-[2rem] bg-[#0b0b14]/90 backdrop-blur-xl p-8 sm:p-10 shadow-2xl">
+          <form x-show="!sent" @submit.prevent="sent = true" class="space-y-5">
+            <h3 class="font-display text-2xl font-bold mb-2">Solicite sua migração grátis</h3>
+            <p class="text-sm text-white/50 mb-4">Preencha e um especialista entra em contato.</p>
+            <div class="grid sm:grid-cols-2 gap-4">
+              <input x-model="nome" required type="text" placeholder="Seu nome" aria-label="Nome" class="w-full px-5 py-4 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-secondary/60 placeholder-white/30 transition">
+              <input x-model="whats" type="tel" placeholder="WhatsApp" aria-label="WhatsApp" class="w-full px-5 py-4 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-secondary/60 placeholder-white/30 transition">
+            </div>
+            <input x-model="email" required type="email" placeholder="Seu melhor e-mail" aria-label="E-mail" class="w-full px-5 py-4 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-secondary/60 placeholder-white/30 transition">
+            <select x-model="interesse" aria-label="Interesse" class="w-full px-5 py-4 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-secondary/60 text-white transition">
+              <option class="bg-ink">Hospedagem de Sites</option>
+              <option class="bg-ink">WordPress Gerenciado</option>
+              <option class="bg-ink">Servidor VPS</option>
+              <option class="bg-ink">Cloud Dedicado</option>
+              <option class="bg-ink">E-mail Profissional</option>
+              <option class="bg-ink">Revenda de Hospedagem</option>
+              <option class="bg-ink">Migração gratuita</option>
+            </select>
+            <textarea x-model="msg" rows="4" placeholder="Conte um pouco sobre seu projeto" aria-label="Mensagem" class="w-full px-5 py-4 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-secondary/60 placeholder-white/30 transition resize-none"></textarea>
+            <button type="submit" class="w-full group inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl font-semibold bg-gradient-to-r from-primary to-secondary hover:scale-[1.02] transition-all duration-300 shadow-2xl shadow-primary/40">
+              Enviar solicitação <i data-lucide="send" class="w-5 h-5 group-hover:translate-x-1 transition-transform"></i>
+            </button>
+            <p class="text-xs text-white/30 text-center flex items-center justify-center gap-1.5"><i data-lucide="lock" class="w-3.5 h-3.5"></i> Seus dados estão protegidos conforme a LGPD.</p>
+          </form>
+          <div x-show="sent" x-cloak x-transition class="text-center py-12">
+            <div class="w-20 h-20 mx-auto rounded-full bg-accent/15 flex items-center justify-center mb-6"><i data-lucide="check-circle-2" class="w-10 h-10 text-accent"></i></div>
+            <h3 class="font-display text-2xl font-bold mb-3">Recebemos sua solicitação!</h3>
+            <p class="text-white/60 mb-8">Obrigado, <span class="text-white font-semibold" x-text="nome"></span>. Um especialista CloudX falará com você em instantes.</p>
+            <button @click="sent=false; nome=''; email=''; whats=''; msg=''" class="px-6 py-3 rounded-xl glass hover:bg-white/10 font-semibold transition">Enviar outra mensagem</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FOOTER ================= -->
+<footer class="relative border-t border-white/5 bg-black/40 pt-20 pb-10">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="grid md:grid-cols-2 lg:grid-cols-12 gap-12 mb-16">
+      <div class="lg:col-span-4">
+        <a href="#home" class="inline-flex items-center group mb-6" aria-label="CloudX - Voltar ao topo">
+          <img src="https://back.sitexpres.com.br/uploads/logos/1790274392975.webp" alt="CloudX Hospedagem" width="190" height="40" loading="lazy" class="brand-logo h-10 w-auto object-contain">
+        </a>
+        <p class="text-white/50 leading-relaxed mb-6 max-w-sm">Hospedagem de sites, WordPress, VPS e Cloud de alta performance, com infraestrutura no Brasil e suporte humano 24/7.</p>
+        <div class="flex gap-3">
+          <a href="#" aria-label="Instagram" class="w-10 h-10 rounded-xl glass flex items-center justify-center hover:bg-white/10 hover:scale-110 transition"><i data-lucide="instagram" class="w-4 h-4"></i></a>
+          <a href="#" aria-label="LinkedIn" class="w-10 h-10 rounded-xl glass flex items-center justify-center hover:bg-white/10 hover:scale-110 transition"><i data-lucide="linkedin" class="w-4 h-4"></i></a>
+          <a href="#" aria-label="YouTube" class="w-10 h-10 rounded-xl glass flex items-center justify-center hover:bg-white/10 hover:scale-110 transition"><i data-lucide="youtube" class="w-4 h-4"></i></a>
+          <a href="#" aria-label="Facebook" class="w-10 h-10 rounded-xl glass flex items-center justify-center hover:bg-white/10 hover:scale-110 transition"><i data-lucide="facebook" class="w-4 h-4"></i></a>
+        </div>
+      </div>
+      <div class="lg:col-span-2">
+        <h4 class="font-semibold mb-5">Produtos</h4>
+        <ul class="space-y-3 text-sm text-white/50">
+          <li><a href="#produtos" class="hover:text-white transition">Hospedagem de Sites</a></li>
+          <li><a href="#produtos" class="hover:text-white transition">WordPress</a></li>
+          <li><a href="#produtos" class="hover:text-white transition">Servidor VPS</a></li>
+          <li><a href="#produtos" class="hover:text-white transition">Cloud Dedicado</a></li>
+          <li><a href="#produtos" class="hover:text-white transition">E-mail Profissional</a></li>
+        </ul>
+      </div>
+      <div class="lg:col-span-2">
+        <h4 class="font-semibold mb-5">Empresa</h4>
+        <ul class="space-y-3 text-sm text-white/50">
+          <li><a href="#infra" class="hover:text-white transition">Infraestrutura</a></li>
+          <li><a href="#planos" class="hover:text-white transition">Planos</a></li>
+          <li><a href="#dominios" class="hover:text-white transition">Domínios</a></li>
+          <li><a href="#produtos" class="hover:text-white transition">Revenda</a></li>
+          <li><a href="#contato" class="hover:text-white transition">Contato</a></li>
+        </ul>
+      </div>
+      <div class="lg:col-span-4">
+        <h4 class="font-semibold mb-5">Receba ofertas exclusivas</h4>
+        <p class="text-sm text-white/50 mb-4">Cupons, novidades e dicas de performance direto no seu e-mail.</p>
+        <form x-data="{ ok: false }" @submit.prevent="ok = true" class="flex gap-2 p-1.5 rounded-2xl bg-white/5 border border-white/10 focus-within:border-secondary/60 transition">
+          <input type="email" required placeholder="seu@email.com" aria-label="E-mail para newsletter" class="flex-1 bg-transparent px-4 py-3 outline-none placeholder-white/30 text-sm min-w-0">
+          <button type="submit" class="px-5 py-3 rounded-xl bg-white text-ink text-sm font-semibold hover:scale-105 transition" x-text="ok ? 'Inscrito ✓' : 'Assinar'">Assinar</button>
+        </form>
+        <div class="mt-6 flex items-center gap-2 text-xs text-white/40"><span class="relative w-2 h-2 rounded-full bg-accent ping-dot"></span> Todos os sistemas operacionais</div>
+      </div>
+    </div>
+    <div class="pt-8 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-white/40">
+      <p>© 2026 CloudX. Todos os direitos reservados.</p>
+      <div class="flex flex-wrap justify-center gap-6">
+        <a href="#" class="hover:text-white transition">Termos de uso</a>
+        <a href="#" class="hover:text-white transition">Política de privacidade</a>
+        <a href="#" class="hover:text-white transition">LGPD</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<!-- WhatsApp flutuante -->
+<a href="https://wa.me/5500000000000" target="_blank" rel="noopener" aria-label="Fale conosco no WhatsApp" class="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-gradient-to-br from-accent to-secondary text-ink flex items-center justify-center shadow-2xl shadow-secondary/40 hover:scale-110 transition float">
+  <i data-lucide="message-circle" class="w-7 h-7"></i>
+</a>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  if (window.lucide) lucide.createIcons();
+  if (window.AOS) AOS.init({ duration: 800, once: true, offset: 60, easing: 'ease-out-cubic' });
+
+  // Contadores animados
+  const counters = document.querySelectorAll('[data-count]');
+  const animate = (el) => {
+    const target = parseFloat(el.dataset.count);
+    const decimals = parseInt(el.dataset.decimals || '0', 10);
+    const prefix = el.dataset.prefix || '';
+    const suffix = el.dataset.suffix || '';
+    const duration = 1800;
+    const start = performance.now();
+    const step = (now) => {
+      const p = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - p, 3);
+      const val = target * eased;
+      el.textContent = prefix + val.toLocaleString('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) + suffix;
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  };
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => { if (e.isIntersecting) { animate(e.target); io.unobserve(e.target); } });
+    }, { threshold: 0.4 });
+    counters.forEach((c) => io.observe(c));
+  } else {
+    counters.forEach(animate);
+  }
+});
+document.addEventListener('alpine:initialized', function () {
+  if (window.lucide) lucide.createIcons();
+});
+</script>
+</body>
+</html>
