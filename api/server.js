@@ -117,6 +117,11 @@ app.get("/api/health", (req, res) => {
       uptimeSeconds: process.uptime(),
       nodeVersion: process.version,
       memoryUsage: process.memoryUsage()
+    },
+    integrations: {
+      cloudx: {
+        configured: !!process.env.user_directamin && !!process.env.pass_directamin
+      }
     }
   });
 });
