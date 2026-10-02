@@ -258,7 +258,8 @@ export const newsite = async (req, res) => {
             hasError = false;
             jobs[jobId].progress = 100;
           } else {
-            logStep(jobId, '🤖 Enviando prompt para a IA (Claude Haiku)... aguarde');
+            const nomeModeloIa = baseHTML ? 'Claude Haiku' : 'Claude Sonnet 5.5';
+            logStep(jobId, `🤖 Enviando prompt para a IA (${nomeModeloIa})... aguarde`);
           const tIA = Date.now();
           const geracaoResult = await gerar_site(
             finalPrompt,

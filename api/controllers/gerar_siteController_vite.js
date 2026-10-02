@@ -83,7 +83,8 @@ ${prompt}
   const expectedChars = MAX_TOKENS * 4;
 
   try {
-    const MODELO = "claude-haiku-4-5-20251001";
+    const MODELO = isEditing ? "claude-haiku-4-5-20251001" : "claude-sonnet-5-5";
+    const maxTokens = isEditing ? 64000 : 100000;
     let reactCode = '';
     const tStream = Date.now();
     if (prompt.toLowerCase().includes('[teste]')) {
@@ -115,10 +116,10 @@ export default function App() {
       if (onProgress) onProgress(80);
       await uso_creditos(userId, 50, 50, id_projeto);
     } else {
-      console.log(`[${new Date().toISOString()}] [GERAR_SITE_VITE] 🧠 Chamando Claude API (Haiku) | modelo: ${MODELO}`);
+      console.log(`[${new Date().toISOString()}] [GERAR_SITE_VITE] 🧠 Chamando Claude API (${isEditing ? 'Haiku' : 'Sonnet 5.5'}) | modelo: ${MODELO} | max_tokens: ${maxTokens}`);
       const stream = await anthropic.messages.stream({
         model: MODELO,
-        max_tokens: 100000,
+        max_tokens: maxTokens,
         system: isEditing ? systemPromptEdicao : systemPromptCriacao,
         messages: [{ role: "user", content: isEditing ? prompt : "Crie o componente React conforme solicitado: " + prompt }]
       });

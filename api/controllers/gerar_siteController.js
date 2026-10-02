@@ -21,7 +21,7 @@ const USE_GEMINI = false;
 
 
 // max_tokens esperado — usado pra calcular % de progresso
-const MAX_TOKENS_HAIKU = 100000;
+const MAX_TOKENS_HAIKU = 64000;
 
 const GENERIC_HTML_TEMPLAT_PTBR = `<!DOCTYPE html>
 <html lang="pt-br">
