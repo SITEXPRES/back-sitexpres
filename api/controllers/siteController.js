@@ -241,16 +241,17 @@ export const newsite = async (req, res) => {
           }
           logStep(jobId, `ℹ️  Modo: ${primeiraVez ? 'CRIAÇÃO (primeira vez)' : 'EDIÇÃO (site existente)'}`);
 
+          logStep(jobId, '🔎 Verificando se há URLs no prompt original...');
+          const promptWithUrls = await extractUrlsAndFetchContent(prompt, logStep, jobId);
+
           const fullPrompt = uploadedFiles.length > 0
-            ? `${prompt}\n[INSTRUÇÃO DE IMAGENS/LOGOS: O usuário enviou ${uploadedFiles.length} imagem(ns). Utilize os caminhos relativos abaixo nas tags <img> correspondentes. O nome original do arquivo indica o propósito de cada imagem (ex: "logo.png" → use como logo, "footer.jpg" → use no footer, "banner.jpg" → use como banner):\n${uploadedFiles.map((f, i) => `- Arquivo "${f.originalname}" → caminho: "./images/${f.filename}" (ex: <img src="./images/${f.filename}" alt="${f.originalname.replace(/\.[^.]+$/, '')}">)`).join('\n')}\nNUNCA utilize links absolutos apontando para back.sitexpres.com.br nem links externos para esses arquivos!]`
-            : prompt;
+            ? `${promptWithUrls}\n[INSTRUÇÃO DE IMAGENS/LOGOS: O usuário enviou ${uploadedFiles.length} imagem(ns). Utilize os caminhos relativos abaixo nas tags <img> correspondentes. O nome original do arquivo indica o propósito de cada imagem (ex: "logo.png" → use como logo, "footer.jpg" → use no footer, "banner.jpg" → use como banner):\n${uploadedFiles.map((f, i) => `- Arquivo "${f.originalname}" → caminho: "./images/${f.filename}" (ex: <img src="./images/${f.filename}" alt="${f.originalname.replace(/\.[^.]+$/, '')}">)`).join('\n')}\nNUNCA utilize links absolutos apontando para back.sitexpres.com.br nem links externos para esses arquivos!]`
+            : promptWithUrls;
 
           finalPrompt = primeiraVez
             ? fullPrompt
             : `HTML atual:\n${baseHTML}\nFaça as alterações solicitadas: ${fullPrompt}`;
-          
-          logStep(jobId, '🔎 Verificando se há URLs no prompt...');
-          finalPrompt = await extractUrlsAndFetchContent(finalPrompt, logStep, jobId);
+
 
           // ─── LIBERA O CLIENT antes da IA (operação longa!) ──────────────────
           client.release();
