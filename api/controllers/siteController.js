@@ -354,12 +354,13 @@ export const newsite = async (req, res) => {
   <style>
     html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #ffffff; }
     iframe { width: 100%; height: 100%; border: none; }
+    #react-source { display: none; }
   </style>
 </head>
 <body>
-  <!-- SITEXPRES_REACT_START -->
-  ${html}
-  <!-- SITEXPRES_REACT_END -->
+  <script type="sitexpres/react" id="react-source"><!-- SITEXPRES_REACT_START -->
+${html}
+<!-- SITEXPRES_REACT_END --></script>
   <iframe src="https://${nomeSubdominio}.sitexpres.com.br" title="Preview"></iframe>
 </body>
 </html>`;
