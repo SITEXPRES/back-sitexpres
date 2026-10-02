@@ -59,11 +59,12 @@ REGRAS:
 2. Use 'framer-motion' para animações suaves (import { motion } from 'framer-motion').
 3. O componente deve ser exportado como 'export default function App() { ... }'.
 4. Crie uma interface moderna, clean, com micro-interações, hover states e design premium.
-5. Imagens e Logos:
+5. ÍCONES: NUNCA importe ícones de redes sociais do 'lucide-react' (ex: Facebook, Instagram, Linkedin, Youtube, Twitter). Eles não estão exportados e causarão erro no build! Se precisar, use SVGs inline ou apenas texto (ex: "Instagram").
+6. Imagens e Logos:
    - Se o prompt solicitar imagem ou logo enviado pelo usuário, use estritamente o caminho relativo informado (ex: "./images/arquivo.png").
    - Para imagens complementares de alta qualidade, use 'https://source.unsplash.com/...' ou 'https://picsum.photos/...'.
    - NUNCA use domínios como back.sitexpres.com.br!
-6. O código deve ser self-contained em um único arquivo (incluindo sub-componentes se necessário).
+7. O código deve ser self-contained em um único arquivo (incluindo sub-componentes se necessário).
 
 Analise o prompt do usuário e gere a melhor interface possível para o cenário descrito.
 `;
@@ -77,6 +78,7 @@ Sua tarefa é CONVERTER ESSE SITE INTEIRO para um componente React (App.jsx) uti
 O novo componente deve manter o mesmo visual ou melhorá-lo, e deve obrigatoriamente ser exportado como 'export default function App() { ... }'.
 
 ⚠️ RETORNE APENAS O CÓDIGO REACT ATUALIZADO (JSX). NUNCA retorne HTML puro (sem <!DOCTYPE html>). Sem explicações, sem markdown.
+⚠️ ÍCONES: NUNCA importe ícones de redes sociais do 'lucide-react' (ex: Facebook, Instagram, Linkedin, Youtube, Twitter). Eles NÃO estão exportados e causarão erro de build!
 
 CÓDIGO HTML ATUAL:
 ${baseHTML}
@@ -89,6 +91,7 @@ Você receberá o código fonte atual do componente (App.jsx).
 Faça APENAS as modificações solicitadas pelo usuário, mantendo todo o resto do design system, animações e lógica intactos.
 
 ⚠️ RETORNE APENAS O CÓDIGO REACT ATUALIZADO. Sem explicações, sem markdown, apenas código válido.
+⚠️ ÍCONES: NUNCA importe ícones de redes sociais do 'lucide-react' (ex: Facebook, Instagram, Linkedin, Youtube, Twitter). Eles NÃO estão exportados e causarão erro de build!
 
 CÓDIGO ATUAL:
 ${baseHTML}

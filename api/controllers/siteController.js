@@ -975,17 +975,33 @@ export const restauracao_versao = async (req, res) => {
 
     const dados_sites = await pool.query(
       `SELECT site_url FROM public.sites
-   WHERE id_projeto = $1`,
+       WHERE id_projeto = $1`,
       [id_projeto]
     );
 
     let site_url = dados_sites.rows[0]?.site_url;
-
     let subdominio = "";
 
     if (site_url) {
-      const url = new URL(site_url);
-      subdominio = url.host;
+      try {
+        const url_string = site_url.startsWith('http') ? site_url : 'https://' + site_url;
+        const url = new URL(url_string);
+        subdominio = url.host;
+      } catch (e) {
+        subdominio = site_url.replace(/^https?:\/\//, '');
+      }
+    }
+
+    if (!subdominio) {
+      const dados_gen = await pool.query(
+        `SELECT subdominio, name FROM public.generated_sites WHERE id_projeto = $1 LIMIT 1`,
+        [id_projeto]
+      );
+      if (dados_gen.rows.length > 0) {
+        subdominio = dados_gen.rows[0].subdominio 
+          ? dados_gen.rows[0].subdominio + '.sitexpres.com.br' 
+          : dados_gen.rows[0].name.replace("Site de ", "").toLowerCase() + '.sitexpres.com.br';
+      }
     }
 
     console.log("Subdomínio ==> " + subdominio);
