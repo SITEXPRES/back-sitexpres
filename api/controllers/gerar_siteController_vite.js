@@ -210,7 +210,57 @@ export default function App() {
         await execPromise('npm run build', { cwd: tmpDirPath });
       }
     } catch (buildErr) {
-      console.error(`[${new Date().toISOString()}] [GERAR_SITE_VITE] ❌ Erro no build:`, buildErr);
+      const errMsg = buildErr.message || '';
+      const isMissingExport = errMsg.includes('[MISSING_EXPORT]');
+
+      if (isMissingExport) {
+        console.log(`[${new Date().toISOString()}] [GERAR_SITE_VITE] 🔧 Auto-corrigindo ícones inválidos do lucide-react...`);
+
+        // Extrai os nomes dos ícones inválidos do erro
+        const missingIconMatches = [...errMsg.matchAll(/"([^"]+)" is not exported by "node_modules\/lucide-react/g)];
+        const missingIcons = missingIconMatches.map(m => m[1]);
+        console.log(`[${new Date().toISOString()}] [GERAR_SITE_VITE] 🚫 Ícones inválidos encontrados: ${missingIcons.join(', ')}`);
+
+        let fixedCode = reactCode;
+
+        // 1. Remove os ícones inválidos das linhas de import do lucide-react
+        fixedCode = fixedCode.replace(/import\s*\{([^}]+)\}\s*from\s*['"]lucide-react['"]/g, (match, iconList) => {
+          const icons = iconList.split(',').map(i => i.trim()).filter(i => !missingIcons.includes(i) && i.length > 0);
+          if (icons.length === 0) return '// lucide-react import removido (ícones inválidos)';
+          return `import { ${icons.join(', ')} } from 'lucide-react'`;
+        });
+
+        // 2. Substitui os usos JSX dos ícones inválidos por um SVG genérico seguro
+        for (const icon of missingIcons) {
+          const safeReplace = `({className=""}) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/></svg>`;
+          // Adiciona uma declaração da função logo após os imports
+          const importEnd = fixedCode.indexOf('\n\n', fixedCode.lastIndexOf('from \'lucide-react\''));
+          if (importEnd !== -1) {
+            fixedCode = fixedCode.slice(0, importEnd) +
+              `\nconst ${icon} = ${safeReplace};` +
+              fixedCode.slice(importEnd);
+          }
+        }
+
+        // 3. Sobrescreve App.jsx corrigido e tenta o build novamente
+        await fs.writeFile(path.join(tmpDirPath, 'src', 'App.jsx'), fixedCode, 'utf8');
+        console.log(`[${new Date().toISOString()}] [GERAR_SITE_VITE] 🔁 Tentando build novamente após auto-correção...`);
+
+        try {
+          try {
+            await execPromise('npx --no-install vite build', { cwd: tmpDirPath });
+          } catch {
+            await execPromise('npm run build', { cwd: tmpDirPath });
+          }
+          const distPath = path.join(tmpDirPath, 'dist');
+          console.log(`[${new Date().toISOString()}] [GERAR_SITE_VITE] ✅ Build concluído após auto-correção!`);
+          return { reactCode: fixedCode, distPath, tmpDirPath, hasError: false };
+        } catch (retryErr) {
+          console.error(`[${new Date().toISOString()}] [GERAR_SITE_VITE] ❌ Build falhou mesmo após auto-correção:`, retryErr.message?.slice(0, 300));
+        }
+      } else {
+        console.error(`[${new Date().toISOString()}] [GERAR_SITE_VITE] ❌ Erro no build:`, buildErr);
+      }
 
       // Criar um dist de erro para mostrar no preview
       const distErrorPath = path.join(tmpDirPath, "dist");
