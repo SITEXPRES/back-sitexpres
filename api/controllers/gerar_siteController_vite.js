@@ -188,6 +188,25 @@ export default function App() {
     // 1. Copiar template para a pasta temporária
     await fs.cp(templatePath, tmpDirPath, { recursive: true });
 
+    // 1.5. Atualizar o title do index.html com o nome do site
+    try {
+      const siteInfo = await pool.query(`SELECT site_url FROM public.sites WHERE id_projeto = $1`, [id_projeto]);
+      if (siteInfo.rows.length > 0 && siteInfo.rows[0].site_url) {
+        let siteNome = siteInfo.rows[0].site_url.replace(/^https?:\/\//, '').replace('.sitexpres.com.br', '');
+        siteNome = siteNome.charAt(0).toUpperCase() + siteNome.slice(1); // Deixa primeira letra maiúscula
+        
+        const indexHtmlPath = path.join(tmpDirPath, "index.html");
+        if (fsSync.existsSync(indexHtmlPath)) {
+          let indexHtmlContent = await fs.readFile(indexHtmlPath, 'utf8');
+          // Substitui o title padrão (Vite + React) pelo nome do site
+          indexHtmlContent = indexHtmlContent.replace(/<title>.*?<\/title>/i, `<title>${siteNome}</title>`);
+          await fs.writeFile(indexHtmlPath, indexHtmlContent, 'utf8');
+        }
+      }
+    } catch (errTitle) {
+      console.error("Erro ao injetar title no index.html:", errTitle);
+    }
+
     // 2. Sobrescrever App.jsx com o componente gerado pela IA
     await fs.writeFile(path.join(tmpDirPath, "src", "App.jsx"), reactCode, 'utf8');
 
