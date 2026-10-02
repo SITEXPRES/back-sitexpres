@@ -156,7 +156,7 @@ export default function App() {
     console.log(`[${new Date().toISOString()}] [GERAR_SITE_VITE] ⚙️ Iniciando processo de build do Vite...`);
 
     const templatePath = path.resolve(__dirname, "../templates/vite-base");
-    const tmpBase = path.resolve(__dirname, "../../tmp");
+    const tmpBase = path.resolve(__dirname, "../tmp");
     if (!fsSync.existsSync(tmpBase)) {
       fsSync.mkdirSync(tmpBase, { recursive: true });
     }
@@ -176,8 +176,16 @@ export default function App() {
       if (!fsSync.existsSync(path.join(tmpDirPath, "node_modules"))) {
         await execPromise('npm install --prefer-offline --no-audit', { cwd: tmpDirPath });
       }
+      // Garante permissões em .bin
+      await execPromise('chmod -R +x node_modules/.bin || true', { cwd: tmpDirPath }).catch(() => {});
+
       if (onProgress) onProgress(95);
-      await execPromise('npm run build', { cwd: tmpDirPath });
+      // Executa Vite diretamente via node para evitar 'Permission denied' do shell no Alpine
+      try {
+        await execPromise('node ./node_modules/vite/bin/vite.js build', { cwd: tmpDirPath });
+      } catch (nodeViteErr) {
+        await execPromise('npm run build', { cwd: tmpDirPath });
+      }
     } catch (buildErr) {
       console.error(`[${new Date().toISOString()}] [GERAR_SITE_VITE] ❌ Erro no build:`, buildErr);
 

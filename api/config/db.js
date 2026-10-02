@@ -174,8 +174,18 @@ const pool = {
       // Usa originalPool diretamente para um check rápido sem retries do wrapper
       await originalPool.query("SELECT 1");
       console.log("✅ PostgreSQL conectado com sucesso!");
-      // Garante colunas adicionadas recentemente
+      // Garante colunas e tabelas adicionadas recentemente
       await originalPool.query("ALTER TABLE public.site_prompts ADD COLUMN IF NOT EXISTS assistant_message TEXT;").catch(e => console.warn("Nota migration assistant_message:", e.message));
+      await originalPool.query("ALTER TABLE public.generated_sites ADD COLUMN IF NOT EXISTS js_content TEXT;").catch(() => {});
+      await originalPool.query(`
+        CREATE TABLE IF NOT EXISTS github_integrations (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id),
+          repo_name VARCHAR(255) NOT NULL,
+          github_token VARCHAR(255) NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+      `).catch(() => {});
       return;
     } catch (err) {
       // Se o pool já estiver fechando/fechado, para o health check silenciosamente

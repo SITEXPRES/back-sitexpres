@@ -39,6 +39,13 @@ function limparRetorno(codigo) {
   return codigo.trim();
 }
 
+function extrairReactCode(conteudo) {
+  if (!conteudo) return "";
+  const match = conteudo.match(/<!-- SITEXPRES_REACT_START -->([\s\S]*?)<!-- SITEXPRES_REACT_END -->/);
+  if (match) return match[1].trim();
+  return conteudo;
+}
+
 
 
 async function countTokensManual(systemPrompt) {
@@ -140,12 +147,12 @@ export const newsite = async (req, res) => {
     const t0 = Date.now();
 
     const dadosSite = await pool.query(
-      `SELECT id, name, html_content FROM generated_sites 
+      `SELECT id, name, html_content, js_content FROM generated_sites 
            WHERE id_projeto = $1 and status = 'ativo'
            ORDER BY created_at DESC LIMIT 1`,
       [id_projeto]
     );
-    const baseHTML = dadosSite.rows.length > 0 ? dadosSite.rows[0].html_content : "";
+    const baseHTML = dadosSite.rows.length > 0 ? (dadosSite.rows[0].js_content || extrairReactCode(dadosSite.rows[0].html_content)) : "";
     logStep(null, `✅ Dados do site carregados (${Date.now() - t0}ms) | site existente: ${dadosSite.rows.length > 0}`);
 
     logStep(null, '🔍 Verificando créditos do usuário...');
@@ -199,7 +206,7 @@ export const newsite = async (req, res) => {
           logStep(jobId, '🔍 Verificando se site já existe...');
           const t3 = Date.now();
           const existing = await client.query(
-            `SELECT id, name, html_content FROM generated_sites 
+            `SELECT id, name, html_content, js_content FROM generated_sites 
            WHERE id_projeto = $1 and status = 'ativo'
            ORDER BY created_at DESC LIMIT 1`,
             [id_projeto]
@@ -224,7 +231,7 @@ export const newsite = async (req, res) => {
           }
 
           primeiraVez = existing.rows.length === 0;
-          baseHTML    = primeiraVez ? "" : existing.rows[0].html_content;
+          baseHTML    = primeiraVez ? "" : (existing.rows[0].js_content || extrairReactCode(existing.rows[0].html_content));
           if (!primeiraVez) {
             nomeSubdominio = existing.rows[0].name.replace("Site de ", "").toLowerCase();
           }
@@ -339,12 +346,30 @@ export const newsite = async (req, res) => {
             [id_projeto]
           );
 
+          const previewHtml = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #ffffff; }
+    iframe { width: 100%; height: 100%; border: none; }
+  </style>
+</head>
+<body>
+  <!-- SITEXPRES_REACT_START -->
+  ${html}
+  <!-- SITEXPRES_REACT_END -->
+  <iframe src="https://${nomeSubdominio}.sitexpres.com.br" title="Preview"></iframe>
+</body>
+</html>`;
+
           const insertSite = await client.query(
             `INSERT INTO generated_sites 
-           (user_id, name, prompt, html_content, id_projeto, image_path, subdominio, status)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+           (user_id, name, prompt, html_content, id_projeto, image_path, subdominio, status, js_content)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
            RETURNING id, name, prompt, html_content, created_at`,
-            [userId, `Site de ${nomeSubdominio}`, prompt, html, id_projeto, relativeImageURL || (existing.rows[0]?.image_path ? desatrelarHtmlSitexpress(existing.rows[0].image_path) : null), nomeSubdominio, 'ativo']
+            [userId, `Site de ${nomeSubdominio}`, prompt, previewHtml, id_projeto, relativeImageURL || (existing.rows[0]?.image_path ? desatrelarHtmlSitexpress(existing.rows[0].image_path) : null), nomeSubdominio, 'ativo', html]
           );
 
           const novoId = insertSite.rows[0].id;
@@ -486,7 +511,8 @@ export const newsite = async (req, res) => {
             
             await new Promise((resolve, reject) => {
               const output = fsSync.createWriteStream(zipPath);
-              const archive = archiver('zip', { zlib: { level: 9 } });
+              const archiverFn = typeof archiver === 'function' ? archiver : (archiver?.default || archiver);
+              const archive = archiverFn('zip', { zlib: { level: 9 } });
               output.on('close', resolve);
               archive.on('error', reject);
               archive.pipe(output);
