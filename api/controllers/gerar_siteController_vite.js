@@ -23,8 +23,11 @@ const anthropic = new Anthropic({
 const MAX_TOKENS = 6000;
 
 function limparRetorno(codigo) {
-  codigo = codigo.replace(/```(?:jsx|js|tsx|html)?\n?/gi, "");
+  // Remove blocos de markdown com qualquer linguagem (jsx, js, tsx, html, javascript, etc.)
+  codigo = codigo.replace(/```(?:javascript|jsx|js|tsx|ts|html|css)?\n?/gi, "");
   codigo = codigo.replace(/```/g, "");
+  // Remove "javascript" solto no início caso a IA retorne sem backticks
+  codigo = codigo.replace(/^javascript\s*\n?/i, "");
   return codigo.trim();
 }
 
