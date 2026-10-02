@@ -1,0 +1,6 @@
+node_modules
+npm-debug.log
+templates/vite-base/node_modules
+templates/vite-base/dist
+tmp
+.git

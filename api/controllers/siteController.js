@@ -514,12 +514,16 @@ export const newsite = async (req, res) => {
               let archive;
               if (typeof archiver === 'function') {
                 archive = archiver('zip', { zlib: { level: 9 } });
+              } else if (archiver && archiver.Archiver) {
+                archive = new archiver.Archiver('zip', { zlib: { level: 9 } });
+              } else if (archiver && archiver.ZipArchive) {
+                archive = new archiver.ZipArchive({ zlib: { level: 9 } });
               } else if (archiver && typeof archiver.create === 'function') {
                 archive = archiver.create('zip', { zlib: { level: 9 } });
               } else if (archiver && typeof archiver.default === 'function') {
                 archive = archiver.default('zip', { zlib: { level: 9 } });
-              } else if (archiver && archiver.default && typeof archiver.default.create === 'function') {
-                archive = archiver.default.create('zip', { zlib: { level: 9 } });
+              } else if (archiver && archiver.default && archiver.default.Archiver) {
+                archive = new archiver.default.Archiver('zip', { zlib: { level: 9 } });
               } else {
                 throw new Error("Archiver não é suportado: " + typeof archiver);
               }
