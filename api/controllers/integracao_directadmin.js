@@ -127,24 +127,56 @@ export async function enviarDiretorioSubdominio(host, usuario, senha, subdominio
     throw new Error("Parâmetros inválidos para enviarDiretorioSubdominio");
   }
 
+  // Verifica se o distPath existe e lista os arquivos antes de enviar
+  const { readdirSync, statSync, existsSync } = await import("fs");
+  if (!existsSync(dirPath)) {
+    throw new Error(`❌ [FTP] distPath não existe no servidor: ${dirPath}`);
+  }
+  const arquivosLocais = readdirSync(dirPath);
+  console.log(`[FTP] 📂 distPath: ${dirPath}`);
+  console.log(`[FTP] 📄 Arquivos no dist (${arquivosLocais.length}):`, arquivosLocais);
+
   const client = new ftp.Client();
-  client.ftp.verbose = false;
+  client.ftp.verbose = true; // Ativa logs detalhados do FTP
 
   try {
     // Conecta no FTP
+    console.log(`[FTP] 🔌 Conectando em ${host} com usuário ${usuario}...`);
     await client.access({ host, user: usuario, password: senha, secure: false });
+    console.log(`[FTP] ✅ Conexão FTP estabelecida`);
 
     // Caminho remoto
     const remoteDir = `/domains/${subdominio}/public_html`;
+    console.log(`[FTP] 📁 Diretório remoto alvo: ${remoteDir}`);
 
     // Garante que o diretório exista
     await client.ensureDir(remoteDir);
+    console.log(`[FTP] ✅ Diretório remoto garantido`);
 
-    // Limpa o diretório antes de fazer upload do novo (opcional, mas recomendado para build)
+    // Lista o que havia antes de limpar
+    try {
+      const listaAntes = await client.list();
+      console.log(`[FTP] 📋 Arquivos remotos ANTES da limpeza (${listaAntes.length}):`, listaAntes.map(f => f.name));
+    } catch (listErr) {
+      console.warn(`[FTP] ⚠️ Não foi possível listar arquivos remotos antes:`, listErr.message);
+    }
+
+    // Limpa o diretório antes de fazer upload do novo
     await client.clearWorkingDir();
+    console.log(`[FTP] 🧹 Diretório remoto limpo`);
 
     // Envia o diretório inteiro
+    console.log(`[FTP] 📤 Iniciando upload de: ${dirPath}`);
     await client.uploadFromDir(dirPath);
+    console.log(`[FTP] ✅ uploadFromDir concluído`);
+
+    // Lista o que foi enviado para confirmar
+    try {
+      const listaDepois = await client.list();
+      console.log(`[FTP] 📋 Arquivos remotos APÓS upload (${listaDepois.length}):`, listaDepois.map(f => f.name));
+    } catch (listErr) {
+      console.warn(`[FTP] ⚠️ Não foi possível listar arquivos remotos após upload:`, listErr.message);
+    }
 
     console.log(`✅ Diretório enviado com sucesso para ${subdominio}!`);
   } catch (err) {
