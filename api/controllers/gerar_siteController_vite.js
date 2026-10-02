@@ -104,7 +104,7 @@ ${prompt}
   const expectedChars = MAX_TOKENS * 4;
 
   try {
-    const MODELO = isEditing ? "claude-haiku-4-5-20251001" : "claude-sonnet-5-5";
+    const MODELO = "claude-sonnet-5-5"; // Usa Sonnet para criação E edição
     const maxTokens = isEditing ? 64000 : 100000;
     let reactCode = '';
     const tStream = Date.now();
