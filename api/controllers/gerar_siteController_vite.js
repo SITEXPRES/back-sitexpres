@@ -173,17 +173,19 @@ export default function App() {
     // 3. Executar npm install (caso falte) e build
     if (onProgress) onProgress(90);
     try {
-      if (!fsSync.existsSync(path.join(tmpDirPath, "node_modules"))) {
-        await execPromise('npm install --prefer-offline --no-audit', { cwd: tmpDirPath });
+      const vitePkg = path.join(tmpDirPath, "node_modules", "vite");
+      if (!fsSync.existsSync(vitePkg)) {
+        console.log(`[${new Date().toISOString()}] [GERAR_SITE_VITE] 📦 Instalando dependências (Vite)...`);
+        await execPromise('npm install --include=dev --no-audit', { cwd: tmpDirPath });
       }
       // Garante permissões em .bin
       await execPromise('chmod -R +x node_modules/.bin || true', { cwd: tmpDirPath }).catch(() => {});
 
       if (onProgress) onProgress(95);
-      // Executa Vite diretamente via node para evitar 'Permission denied' do shell no Alpine
+      // Executa Vite build
       try {
-        await execPromise('node ./node_modules/vite/bin/vite.js build', { cwd: tmpDirPath });
-      } catch (nodeViteErr) {
+        await execPromise('npx --no-install vite build', { cwd: tmpDirPath });
+      } catch (npxErr) {
         await execPromise('npm run build', { cwd: tmpDirPath });
       }
     } catch (buildErr) {

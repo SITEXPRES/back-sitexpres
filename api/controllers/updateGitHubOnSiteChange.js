@@ -17,15 +17,33 @@ function decrypt(encryptedText) {
 export async function updateGitHubIfIntegrated(userId, id_projeto, htmlContent, commitMessage = "Atualização automática do site") {
   try {
     // 1. Verificar se existe integração para este projeto
-    const integrationQuery = `
-      SELECT * FROM github_integrations 
-      WHERE id_projeto = $1 AND user_id = $2
-    `;
-    const integrationResult = await pool.query(integrationQuery, [id_projeto, userId]);
+    let integrationResult;
+    try {
+      integrationResult = await pool.query(
+        `SELECT * FROM github_integrations WHERE id_projeto = $1 AND user_id = $2`,
+        [id_projeto, userId]
+      );
+    } catch (dbErr) {
+      if (dbErr.code === '42703' || dbErr.code === '42P01') {
+        pool.query(`
+          CREATE TABLE IF NOT EXISTS github_integrations (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER REFERENCES users(id),
+            id_projeto VARCHAR(255),
+            repo_name VARCHAR(255),
+            repo_url TEXT,
+            repo_full_name VARCHAR(255),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+          ALTER TABLE public.github_integrations ADD COLUMN IF NOT EXISTS id_projeto VARCHAR(255);
+        `).catch(() => {});
+        return { updated: false, message: "Sem integração GitHub" };
+      }
+      throw dbErr;
+    }
 
     // Se não tem integração, retorna sem fazer nada
-    if (integrationResult.rows.length === 0) {
-      console.log(`Nenhuma integração GitHub encontrada para id_projeto: ${id_projeto}`);
+    if (!integrationResult || integrationResult.rows.length === 0) {
       return { updated: false, message: "Sem integração GitHub" };
     }
 

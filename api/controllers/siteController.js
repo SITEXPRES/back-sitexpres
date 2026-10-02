@@ -511,8 +511,18 @@ export const newsite = async (req, res) => {
             
             await new Promise((resolve, reject) => {
               const output = fsSync.createWriteStream(zipPath);
-              const archiverFn = typeof archiver === 'function' ? archiver : (archiver?.default || archiver);
-              const archive = archiverFn('zip', { zlib: { level: 9 } });
+              let archive;
+              if (typeof archiver === 'function') {
+                archive = archiver('zip', { zlib: { level: 9 } });
+              } else if (archiver && typeof archiver.create === 'function') {
+                archive = archiver.create('zip', { zlib: { level: 9 } });
+              } else if (archiver && typeof archiver.default === 'function') {
+                archive = archiver.default('zip', { zlib: { level: 9 } });
+              } else if (archiver && archiver.default && typeof archiver.default.create === 'function') {
+                archive = archiver.default.create('zip', { zlib: { level: 9 } });
+              } else {
+                throw new Error("Archiver não é suportado: " + typeof archiver);
+              }
               output.on('close', resolve);
               archive.on('error', reject);
               archive.pipe(output);
