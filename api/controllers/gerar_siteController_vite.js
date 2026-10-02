@@ -68,7 +68,22 @@ REGRAS:
 Analise o prompt do usuário e gere a melhor interface possível para o cenário descrito.
 `;
 
-  const systemPromptEdicao = `
+  const isLegacyHTML = baseHTML && (baseHTML.toLowerCase().includes('<!doctype html') || baseHTML.toLowerCase().includes('<html'));
+
+  const systemPromptEdicao = isLegacyHTML ? `
+Você é um Engenheiro UX SÊNIOR especialista em migrar sites legados para componentes React premium.
+Você receberá o código fonte HTML atual do site. 
+Sua tarefa é CONVERTER ESSE SITE INTEIRO para um componente React (App.jsx) utilizando Tailwind v4, Shadcn UI, Framer Motion e Lucide React, aplicando também as modificações solicitadas pelo usuário.
+O novo componente deve manter o mesmo visual ou melhorá-lo, e deve obrigatoriamente ser exportado como 'export default function App() { ... }'.
+
+⚠️ RETORNE APENAS O CÓDIGO REACT ATUALIZADO (JSX). NUNCA retorne HTML puro (sem <!DOCTYPE html>). Sem explicações, sem markdown.
+
+CÓDIGO HTML ATUAL:
+${baseHTML}
+
+PROMPT DO USUÁRIO (O QUE DEVE SER ALTERADO/MIGRADO):
+${prompt}
+` : `
 Você é um Engenheiro UX SÊNIOR especialista em EDITAR componentes React premium existentes.
 Você receberá o código fonte atual do componente (App.jsx). 
 Faça APENAS as modificações solicitadas pelo usuário, mantendo todo o resto do design system, animações e lógica intactos.
