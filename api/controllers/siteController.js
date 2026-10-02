@@ -158,7 +158,8 @@ export const newsite = async (req, res) => {
     logStep(null, '🔍 Verificando créditos do usuário...');
     const t1 = Date.now();
     const verificar_creditos_prompt_result = await verificar_creditos_prompt(userId, prompt, baseHTML);
-    if (req.file) {
+    const temArquivos = req.files && req.files.length > 0;
+    if (temArquivos) {
       if (verificar_creditos_prompt_result.tokensDisponiveis < 100000) verificar_creditos_prompt_result.podeRodar = false;
     } else {
       if (verificar_creditos_prompt_result.tokensDisponiveis < 60000) verificar_creditos_prompt_result.podeRodar = false;
@@ -178,8 +179,10 @@ export const newsite = async (req, res) => {
       const typedo_plano = plano.plan;
       logStep(null, `✅ Plano consultado (${Date.now() - t2}ms) | plano: ${typedo_plano}`);
 
-      // Imagem/Logo enviado pelo usuário (desatrelado da Sitexpres)
-      const relativeImageURL = req.file ? `./images/${req.file.filename}` : null;
+      // Imagens/Logos enviados pelo usuário (suporte a múltiplos)
+      const uploadedFiles = req.files && req.files.length > 0 ? req.files : [];
+      // Usa o primeiro arquivo como imagem principal para o prompt (compatibilidade)
+      const relativeImageURL = uploadedFiles.length > 0 ? `./images/${uploadedFiles[0].filename}` : null;
       const imageURL = relativeImageURL;
 
       // Cria job assincrono para monitorar o progresso
@@ -237,8 +240,8 @@ export const newsite = async (req, res) => {
           }
           logStep(jobId, `ℹ️  Modo: ${primeiraVez ? 'CRIAÇÃO (primeira vez)' : 'EDIÇÃO (site existente)'}`);
 
-          const fullPrompt = relativeImageURL
-            ? `${prompt}\n[INSTRUÇÃO DE IMAGEM/LOGO: O usuário enviou uma imagem/logo. Utilize no código HTML EXATAMENTE o caminho relativo "${relativeImageURL}" no src da tag <img> do logotipo ou banner principal (exemplo: <img src="${relativeImageURL}" alt="Logo">). NUNCA utilize links absolutos apontando para back.sitexpres.com.br nem links externos para este arquivo!]`
+          const fullPrompt = uploadedFiles.length > 0
+            ? `${prompt}\n[INSTRUÇÃO DE IMAGENS/LOGOS: O usuário enviou ${uploadedFiles.length} imagem(ns). Utilize os caminhos relativos abaixo nas tags <img> correspondentes:\n${uploadedFiles.map((f, i) => `- Imagem ${i + 1}: "./images/${f.filename}" (ex: <img src="./images/${f.filename}" alt="Imagem ${i + 1}">)`).join('\n')}\nNUNCA utilize links absolutos apontando para back.sitexpres.com.br nem links externos para esses arquivos!]`
             : prompt;
 
           finalPrompt = primeiraVez
@@ -421,7 +424,7 @@ ${html}
           );
 
           // Coleta arquivos e imagens locais para subir junto na hospedagem do cliente
-          const arquivosExtras = await coletarArquivosProjeto(id_projeto, html, req.file, client);
+          const arquivosExtras = await coletarArquivosProjeto(id_projeto, html, uploadedFiles, client);
           logStep(jobId, `📁 Assets e imagens do projeto coletados para upload: ${arquivosExtras.length}`);
 
           // Libera antes do FTP (outra operação longa)

@@ -50,15 +50,23 @@ export async function coletarArquivosProjeto(id_projeto, htmlContent, currentFil
     return null;
   }
 
-  // 1. Arquivo recebido na requisição atual
-  if (currentFile && currentFile.path) {
-    const filename = currentFile.filename || path.basename(currentFile.path);
-    arquivos.push({
-      localPath: path.resolve(currentFile.path),
-      remoteName: filename,
-      remoteSubdir: "images"
-    });
-    adicionados.add(filename);
+  // 1. Arquivo(s) recebido(s) na requisição atual (suporte a array ou único)
+  const filesArray = Array.isArray(currentFile)
+    ? currentFile                              // req.files (múltiplos)
+    : currentFile ? [currentFile] : [];        // req.file (único, legado)
+
+  for (const file of filesArray) {
+    if (file && file.path) {
+      const filename = file.filename || path.basename(file.path);
+      if (!adicionados.has(filename)) {
+        arquivos.push({
+          localPath: path.resolve(file.path),
+          remoteName: filename,
+          remoteSubdir: "images"
+        });
+        adicionados.add(filename);
+      }
+    }
   }
 
   // 2. Extrair arquivos referenciados em ./images/ ou images/ no HTML

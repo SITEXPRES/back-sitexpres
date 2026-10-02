@@ -7,7 +7,7 @@ const router = express.Router();
 
 
 /* router.post("/gerar_new_site", authMiddleware, newsite); */
-router.post("/gerar_new_site", upload.single("logo"), newsite);
+router.post("/gerar_new_site", upload.array("logos", 10), newsite);
 router.get("/job-status/:jobId", authMiddleware, jobStatus);  //gerando site assincrono
 router.get("/", authMiddleware, getSites);
 router.get("/teste", (req, res) => res.send("rota site ok"));
