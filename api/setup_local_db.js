@@ -41,6 +41,7 @@ async function run() {
                 id_site_gererate INTEGER,
                 prompt TEXT,
                 status VARCHAR(50) DEFAULT 'pending',
+                assistant_message TEXT,
                 created_at TIMESTAMP DEFAULT NOW()
             );
 

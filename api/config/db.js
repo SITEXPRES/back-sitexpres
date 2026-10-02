@@ -174,6 +174,8 @@ const pool = {
       // Usa originalPool diretamente para um check rápido sem retries do wrapper
       await originalPool.query("SELECT 1");
       console.log("✅ PostgreSQL conectado com sucesso!");
+      // Garante colunas adicionadas recentemente
+      await originalPool.query("ALTER TABLE public.site_prompts ADD COLUMN IF NOT EXISTS assistant_message TEXT;").catch(e => console.warn("Nota migration assistant_message:", e.message));
       return;
     } catch (err) {
       // Se o pool já estiver fechando/fechado, para o health check silenciosamente

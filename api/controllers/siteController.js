@@ -367,11 +367,26 @@ export const newsite = async (req, res) => {
               console.error("Erro ao gerar mensagem com Haiku", err);
             }
 
-            await client.query(
-              `INSERT INTO site_prompts (user_id, id_projeto, prompt, id_site_gererate, status, assistant_message)
-               VALUES ($1, $2, $3, $4, $5, $6)`,
-              [userId, id_projeto, prompt, novoId, 'ativo', assistantMessage]
-            );
+            try {
+              await client.query(
+                `INSERT INTO site_prompts (user_id, id_projeto, prompt, id_site_gererate, status, assistant_message)
+                 VALUES ($1, $2, $3, $4, $5, $6)`,
+                [userId, id_projeto, prompt, novoId, 'ativo', assistantMessage]
+              );
+            } catch (promptErr) {
+              if (promptErr.code === '42703' || (promptErr.message && promptErr.message.includes('assistant_message'))) {
+                console.warn(`[${new Date().toISOString()}] ⚠️ Coluna assistant_message ainda não existe em site_prompts. Inserindo sem ela e criando coluna...`);
+                await client.query(
+                  `INSERT INTO site_prompts (user_id, id_projeto, prompt, id_site_gererate, status)
+                   VALUES ($1, $2, $3, $4, $5)`,
+                  [userId, id_projeto, prompt, novoId, 'ativo']
+                );
+                // Executa migration assíncrona para adicionar a coluna para as próximas chamadas
+                pool.query(`ALTER TABLE public.site_prompts ADD COLUMN IF NOT EXISTS assistant_message TEXT;`).catch(() => {});
+              } else {
+                throw promptErr;
+              }
+            }
           logStep(jobId, `✅ HTML salvo no banco (${Date.now() - tDB}ms) | id gerado: ${novoId}`);
 
           const existe_hospedagem = await client.query(
