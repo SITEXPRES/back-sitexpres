@@ -23,7 +23,7 @@ export const sendMail = async (to, assunto, mensagem) => {
   const fromAddress = process.env.MAIL_FROM || process.env.EMAIL_USER;
 
   const mailOptions = {
-    from: '"Sitexpress" <' + fromAddress + '>',
+    from: '"Sitexpres" <' + fromAddress + '>',
     to: to,
     subject: assunto,
     html: mensagem,

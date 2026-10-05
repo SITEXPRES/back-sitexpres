@@ -502,7 +502,7 @@ export const consultarPix = async (req, res) => {
                         ) VALUES ($1, 'purchase_credits', 'pending', $2, $3, $4, 'PIX', $5, $6, $7)`,
                         [
                             transacao.user_id,                               // $1
-                            'Mensalidade Sitexpress - Próximo Ciclo',        // $2
+                            'Mensalidade Sitexpres - Próximo Ciclo',        // $2
                             50,                                              // $3
                             29.90,                                           // $4
                             txidNext,                                        // $5
@@ -871,7 +871,7 @@ export const criarCobrancaUnica = async (req, res) => {
             original: valor
         },
         chave: process.env.INTER_CHAVE_PIX,
-        solicitacaoPagador: "Pagamento Servico Sitexpress IA e WebHosting"
+        solicitacaoPagador: "Pagamento Servico Sitexpres IA e WebHosting"
     };
 
     const cpfLimpo = cpf ? cpf.replace(/\D/g, '') : '';
@@ -908,7 +908,7 @@ export const criarCobrancaUnica = async (req, res) => {
             qtd_creditos,
             nome,
             cpf,
-            descricao: 'Compra via pix Sitexpress IA e WebHosting',
+            descricao: 'Compra via pix Sitexpres IA e WebHosting',
             chave: process.env.INTER_CHAVE_PIX,
             expiracao: 3600,
             status: "pending"

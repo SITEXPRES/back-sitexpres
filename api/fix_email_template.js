@@ -18,7 +18,7 @@ async function fixEmailTemplate() {
     <html>
     <head>
       <meta charset="utf-8">
-      <title>Recuperação de Senha - Sitexpress</title>
+      <title>Recuperação de Senha - Sitexpres</title>
       <style>
         body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 20px; }
         .container { background-color: #ffffff; max-width: 600px; margin: 0 auto; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
@@ -32,13 +32,13 @@ async function fixEmailTemplate() {
       <div class="container">
         <h2>Recuperação de Senha</h2>
         <p>Olá,</p>
-        <p>Recebemos uma solicitação para redefinir a senha da sua conta na Sitexpress. Se você não fez essa solicitação, pode ignorar este e-mail.</p>
+        <p>Recebemos uma solicitação para redefinir a senha da sua conta na Sitexpres. Se você não fez essa solicitação, pode ignorar este e-mail.</p>
         <p>Para criar uma nova senha, clique no botão abaixo:</p>
         <a href="[link_reset]" class="btn">Redefinir Minha Senha</a>
         <p>Ou copie e cole o link abaixo no seu navegador:</p>
         <p><a href="[link_reset]">[link_reset]</a></p>
         <div class="footer">
-          <p>&copy; 2026 Sitexpress. Todos os direitos reservados.</p>
+          <p>&copy; 2026 Sitexpres. Todos os direitos reservados.</p>
         </div>
       </div>
     </body>
@@ -50,7 +50,7 @@ async function fixEmailTemplate() {
         "INSERT INTO email_templates (name, subject, body, variables) VALUES ($1, $2, $3, $4)",
         [
           'Recuperação de Senha',
-          'Recuperação de Senha - Sitexpress',
+          'Recuperação de Senha - Sitexpres',
           htmlTemplate,
           '["link_reset"]'
         ]

@@ -4,7 +4,7 @@ export function buildStyledEmail(title, userName, bodyHtml, ctaText, ctaLink) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SITEXPRESS</title>
+  <title>SITEXPRES</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; background: linear-gradient(135deg, #b3f4fc 0%, #f1fcfc 100%); margin: 0; padding: 40px 20px; }
     .email-container { max-width: 600px; margin: 0 auto; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 40px rgba(4, 204, 252, 0.2); }
@@ -23,7 +23,7 @@ export function buildStyledEmail(title, userName, bodyHtml, ctaText, ctaLink) {
   <div class="email-container">
     <div class="email-header">
       <h1 class="logo">
-        <img src="https://sitexpres.com.br/logos/logo1.png" alt="Sitexpress" width="400" style="max-width: 100%;">
+        <img src="https://sitexpres.com.br/logos/logo1.png" alt="Sitexpres" width="400" style="max-width: 100%;">
       </h1>
     </div>
     <div class="email-body">

@@ -142,7 +142,7 @@ export async function gerarNotaNacional(data) {
           codigoMunicipio: process.env.NFSE_CODIGO_MUNICIPIO || "1506138", // Redenção
           cnpjPrestador: process.env.NFSE_CNPJ_PRESTADOR || "",
           inscricaoMunicipal: process.env.NFSE_INSCRICAO_MUNICIPAL || "",
-          nomeFantasia: process.env.NFSE_NOME_FANTASIA || "Sitexpress",
+          nomeFantasia: process.env.NFSE_NOME_FANTASIA || "Sitexpres",
           telefone: process.env.NFSE_TELEFONE || "",
           email: process.env.NFSE_EMAIL || "contato@sitexpres.com",
           optanteSimplesNacional: process.env.NFSE_OPTANTE_SN || 1, // 1 - Sim, 2 - Não...

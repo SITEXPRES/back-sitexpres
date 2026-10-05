@@ -903,7 +903,7 @@ export async function paymentSuccess(req, res) {
                     ) VALUES ($1, 'purchase_credits', 'pending', $2, $3, $4, 'PAYPAL', $5, $6, $7)`,
                     [
                         user_id,                                         // $1
-                        'Mensalidade Sitexpress - Próximo Ciclo',        // $2
+                        'Mensalidade Sitexpres - Próximo Ciclo',        // $2
                         50,                                              // $3
                         29.90,                                           // $4
                         txidNext,                                        // $5
