@@ -7,7 +7,15 @@ const router = express.Router();
 
 
 /* router.post("/gerar_new_site", authMiddleware, newsite); */
-router.post("/gerar_new_site", upload.array("logos", 10), newsite);
+const uploadLogos = upload.array("logos", 10);
+router.post("/gerar_new_site", (req, res, next) => {
+  uploadLogos(req, res, function (err) {
+    if (err) {
+      return res.status(400).json({ success: false, message: err.message });
+    }
+    next();
+  });
+}, newsite);
 router.get("/job-status/:jobId", authMiddleware, jobStatus);  //gerando site assincrono
 router.get("/", authMiddleware, getSites);
 router.get("/teste", (req, res) => res.send("rota site ok"));
