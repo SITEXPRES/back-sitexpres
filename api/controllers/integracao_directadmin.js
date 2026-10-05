@@ -162,8 +162,14 @@ export async function enviarDiretorioSubdominio(host, usuario, senha, subdominio
     }
 
     // Limpa o diretório antes de fazer upload do novo
-    await client.clearWorkingDir();
-    console.log(`[FTP] 🧹 Diretório remoto limpo`);
+    // Preserva images/ (logos de deploys anteriores); o novo dist/images é mesclado por cima
+    for (const item of await client.list()) {
+      if (item.name === "." || item.name === "..") continue;
+      if (item.isDirectory && item.name === "images") continue;
+      if (item.isDirectory) await client.removeDir(item.name);
+      else await client.remove(item.name);
+    }
+    console.log(`[FTP] 🧹 Diretório remoto limpo (images/ preservada)`);
 
     // Envia o diretório inteiro
     console.log(`[FTP] 📤 Iniciando upload de: ${dirPath}`);

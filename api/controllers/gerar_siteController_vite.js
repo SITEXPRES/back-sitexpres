@@ -8,6 +8,7 @@ import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 dotenv.config();
 import { uso_creditos } from "./creditosController.js";
+import { parseEditBlocks, applyEditBlocks } from "../services/editBlocks.js";
 import { exec } from "child_process";
 import util from "util";
 const execPromise = util.promisify(exec);
@@ -100,11 +101,38 @@ PROMPT DO USUÁRIO:
 ${prompt}
 `;
 
+  // Modo econômico: a IA devolve só blocos SEARCH/REPLACE (o código vai UMA vez, com cache)
+  const systemPromptBlocos = `
+Você é um Engenheiro UX SÊNIOR especialista em EDITAR componentes React (App.jsx) existentes.
+Faça APENAS as modificações pedidas, mantendo todo o resto intacto.
+
+⚠️ NÃO retorne o arquivo inteiro. Retorne SOMENTE blocos de edição neste formato exato:
+
+<<<<<<< SEARCH
+(trecho EXATO copiado do código atual, com 2-3 linhas de contexto para ser único)
+=======
+(trecho novo que substitui o anterior)
+>>>>>>> REPLACE
+
+REGRAS:
+- Pode usar vários blocos, na ordem em que aparecem no arquivo. Cada SEARCH deve existir exatamente uma vez no código.
+- Copie o SEARCH caractere por caractere (indentação inclusa). Não use "..." nem comentários no lugar de código.
+- Para inserir algo, use no SEARCH uma linha existente próxima e repita-a no REPLACE junto com o novo conteúdo.
+- Para apagar, deixe o REPLACE vazio.
+- Se precisar de novo import/ícone, edite a linha de import com um bloco.
+- Sem explicações, sem markdown, sem texto fora dos blocos.
+- ÍCONES: NUNCA importe ícones de redes sociais do 'lucide-react' (Facebook, Instagram, Linkedin, Youtube, Twitter).
+
+CÓDIGO ATUAL:
+${baseHTML}
+`;
+
   const systemPrompt = isEditing ? systemPromptEdicao : systemPromptCriacao;
   const expectedChars = MAX_TOKENS * 4;
 
   try {
-    const MODELO = "claude-sonnet-5-5"; // Usa Sonnet para criação E edição
+    const MODELO = "claude-sonnet-5-5"; // Criação e fallback de reescrita completa
+    const MODELO_EDICAO = "claude-haiku-4-5-20251001"; // Edição por blocos (barato)
     const maxTokens = isEditing ? 64000 : 100000;
     let reactCode = '';
     const tStream = Date.now();
@@ -137,35 +165,68 @@ export default function App() {
       if (onProgress) onProgress(80);
       await uso_creditos(userId, 50, 50, id_projeto);
     } else {
-      console.log(`[${new Date().toISOString()}] [GERAR_SITE_VITE] 🧠 Chamando Claude API (${isEditing ? 'Haiku' : 'Sonnet 5.5'}) | modelo: ${MODELO} | max_tokens: ${maxTokens}`);
-      const stream = await anthropic.messages.stream({
-        model: MODELO,
-        max_tokens: maxTokens,
-        system: isEditing ? systemPromptEdicao : systemPromptCriacao,
-        messages: [{ role: "user", content: isEditing ? prompt : "Crie o componente React conforme solicitado: " + prompt }]
-      });
-
-      if (onProgress) onProgress(5); 
-      let chunkCount = 0;
-      let lastReportedPercent = 0;
-
-      for await (const event of stream) {
-        if (event.type === "content_block_delta" && event.delta?.text) {
-          reactCode += event.delta.text;
-          chunkCount++;
-
-          const percent = Math.min(Math.round((reactCode.length / expectedChars) * 75) + 5, 80);
-          if (onProgress && percent !== lastReportedPercent) {
-            onProgress(percent);
-            lastReportedPercent = percent;
+      // Chamada com streaming; o system vai com cache_control (releituras ~90% mais baratas)
+      const streamClaude = async (systemText, userContent, maxTok, label, modelo = MODELO) => {
+        console.log(`[${new Date().toISOString()}] [GERAR_SITE_VITE] 🧠 Chamando Claude API (${label}) | modelo: ${modelo} | max_tokens: ${maxTok}`);
+        const stream = await anthropic.messages.stream({
+          model: modelo,
+          max_tokens: maxTok,
+          system: [{ type: "text", text: systemText, cache_control: { type: "ephemeral" } }],
+          messages: [{ role: "user", content: userContent }]
+        });
+        if (onProgress) onProgress(5);
+        let out = '';
+        let lastReportedPercent = 0;
+        for await (const event of stream) {
+          if (event.type === "content_block_delta" && event.delta?.text) {
+            out += event.delta.text;
+            const percent = Math.min(Math.round((out.length / expectedChars) * 75) + 5, 80);
+            if (onProgress && percent !== lastReportedPercent) {
+              onProgress(percent);
+              lastReportedPercent = percent;
+            }
           }
         }
+        const finalMessage = await stream.finalMessage();
+        const u = finalMessage.usage || {};
+        const inputTokens = (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0);
+        const outputTokens = u.output_tokens ?? 0;
+        console.log(`[${new Date().toISOString()}] [GERAR_SITE_VITE] 📊 Tokens: input=${u.input_tokens ?? 0} cache_write=${u.cache_creation_input_tokens ?? 0} cache_read=${u.cache_read_input_tokens ?? 0} output=${outputTokens}`);
+        await uso_creditos(userId, inputTokens + outputTokens, inputTokens + outputTokens, id_projeto);
+        return out;
+      };
+
+      let editadoPorBlocos = false;
+      if (isEditing && !isLegacyHTML) {
+        try {
+          const resp = await streamClaude(systemPromptBlocos, prompt, 16000, 'edição por blocos (Haiku)', MODELO_EDICAO);
+          const blocks = parseEditBlocks(resp);
+          if (blocks.length > 0) {
+            const r = applyEditBlocks(baseHTML, blocks);
+            console.log(`[${new Date().toISOString()}] [GERAR_SITE_VITE] 🧩 Blocos: ${r.applied} aplicados, ${r.failed} falharam`);
+            if (r.failed === 0 && r.applied > 0) {
+              reactCode = r.code;
+              editadoPorBlocos = true;
+            }
+          } else if (/export\s+default\s+function\s+App/.test(resp)) {
+            // a IA devolveu o arquivo completo; aproveita
+            reactCode = resp;
+            editadoPorBlocos = true;
+          }
+        } catch (blkErr) {
+          console.error(`[${new Date().toISOString()}] [GERAR_SITE_VITE] ⚠️ Edição por blocos falhou:`, blkErr?.message ?? blkErr);
+        }
+        if (!editadoPorBlocos) console.log(`[${new Date().toISOString()}] [GERAR_SITE_VITE] 🔁 Fallback: reescrita completa do arquivo`);
       }
 
-      const finalMessage = await stream.finalMessage();
-      const inputTokens = finalMessage.usage?.input_tokens ?? 0;
-      const outputTokens = finalMessage.usage?.output_tokens ?? 0;
-      await uso_creditos(userId, inputTokens + outputTokens, inputTokens + outputTokens, id_projeto);
+      if (!editadoPorBlocos) {
+        reactCode = await streamClaude(
+          systemPrompt,
+          isEditing ? prompt : "Crie o componente React conforme solicitado: " + prompt,
+          maxTokens,
+          isEditing ? 'edição completa' : 'criação'
+        );
+      }
     }
 
     reactCode = limparRetorno(reactCode);

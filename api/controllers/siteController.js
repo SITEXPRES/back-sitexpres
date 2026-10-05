@@ -250,7 +250,7 @@ export const newsite = async (req, res) => {
 
           finalPrompt = primeiraVez
             ? fullPrompt
-            : `HTML atual:\n${baseHTML}\nFaça as alterações solicitadas: ${fullPrompt}`;
+            : `Faça as alterações solicitadas: ${fullPrompt}`;
 
 
           // ─── LIBERA O CLIENT antes da IA (operação longa!) ──────────────────
