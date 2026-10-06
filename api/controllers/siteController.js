@@ -370,7 +370,7 @@ export const newsite = async (req, res) => {
   <script type="sitexpres/react" id="react-source"><!-- SITEXPRES_REACT_START -->
 ${html}
 <!-- SITEXPRES_REACT_END --></script>
-  <iframe src="https://${nomeSubdominio}.sitexpres.com.br" title="Preview"></iframe>
+  <iframe src="https://${nomeSubdominio}.sitexpres.com.br?v=${Date.now()}" title="Preview"></iframe>
 </body>
 </html>`;
 
