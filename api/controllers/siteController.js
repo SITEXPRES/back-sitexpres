@@ -13,6 +13,10 @@ const archiver = require("archiver");
 import ftp from "basic-ftp";
 import { criarSubdominioDirectAdmin, enviarHTMLSubdominio, subdominioExiste, deletarSubdominioDirectAdmin, enviarDiretorioSubdominio } from "./integracao_directadmin.js";
 import dotenv from "dotenv";
+import { fileURLToPath } from "url";
+import { exec } from "child_process";
+import util from "util";
+const execPromise = util.promisify(exec);
 dotenv.config();
 import { updateGitHubIfIntegrated } from "./updateGitHubOnSiteChange.js";
 import { uso_creditos, verificar_creditos_prompt } from "./creditosController.js";
@@ -961,7 +965,7 @@ export const restauracao_versao = async (req, res) => {
 
     //Consult html 
     const resultado = await pool.query(
-      `SELECT html_content 
+      `SELECT html_content, js_content 
        FROM public.generated_sites
        WHERE id_projeto = $1 
        AND status = 'ativo'`,
@@ -970,6 +974,8 @@ export const restauracao_versao = async (req, res) => {
 
     let html_new = resultado.rows[0]?.html_content || "<h5>Nenhum HTML encontrado</h5><br>erro:@$231";
     html_new = desatrelarHtmlSitexpress(html_new);
+
+    let js_content = resultado.rows[0]?.js_content || extrairReactCode(html_new);
 
     const arquivosExtras = await coletarArquivosProjeto(id_projeto, html_new, null, pool);
 
@@ -988,7 +994,7 @@ export const restauracao_versao = async (req, res) => {
         const url = new URL(url_string);
         subdominio = url.host;
       } catch (e) {
-        subdominio = site_url.replace(/^https?:\/\//, '');
+        subdominio = site_url.replace(/^https?:\\/\\//, '');
       }
     }
 
@@ -1006,14 +1012,116 @@ export const restauracao_versao = async (req, res) => {
 
     console.log("Subdomínio ==> " + subdominio);
 
-    await enviarHTMLSubdominio(
-      "ftp.sitexpres.com.br",
-      process.env.user_directamin,
-      process.env.pass_directamin,
-      subdominio,
-      html_new,
-      arquivosExtras
+    // Identificar hostFTP, userFTP e passFTP (Custom Hosting ou DirectAdmin)
+    const existe_hospedagem = await pool.query(
+      `SELECT * FROM hospedagens where id_projeto = $1`,
+      [id_projeto]
     );
+
+    let isCustomHost = false;
+    let userFTP = process.env.user_directamin;
+    let passFTP = process.env.pass_directamin;
+    let dominioFTP = subdominio;
+
+    if (existe_hospedagem.rows.length > 0) {
+      userFTP = existe_hospedagem.rows[0].username;
+      passFTP = existe_hospedagem.rows[0].senha;
+      dominioFTP = existe_hospedagem.rows[0].dominio;
+      isCustomHost = true;
+    }
+
+    // Build do Vite
+    const __filename_local = fileURLToPath(import.meta.url);
+    const __dirname_local = path.dirname(__filename_local);
+    const templatePath = path.resolve(__dirname_local, "../templates/vite-base");
+    const tmpBase = path.resolve(__dirname_local, "../tmp");
+    if (!fsSync.existsSync(tmpBase)) {
+      fsSync.mkdirSync(tmpBase, { recursive: true });
+    }
+    const tmpDirName = \`restauracao_\${id_projeto}_\${Date.now()}\`;
+    const tmpDirPath = path.join(tmpBase, tmpDirName);
+    
+    let distPath = null;
+
+    try {
+      if (js_content) {
+        await fs.cp(templatePath, tmpDirPath, { recursive: true });
+        await fs.writeFile(path.join(tmpDirPath, "src", "App.jsx"), js_content, 'utf8');
+
+        // Atualizar title do index.html
+        if (site_url) {
+          let siteNome = site_url.replace(/^https?:\\/\\//, '').replace('.sitexpres.com.br', '');
+          siteNome = siteNome.charAt(0).toUpperCase() + siteNome.slice(1);
+          const indexHtmlPath = path.join(tmpDirPath, "index.html");
+          if (fsSync.existsSync(indexHtmlPath)) {
+            let indexHtmlContent = await fs.readFile(indexHtmlPath, 'utf8');
+            indexHtmlContent = indexHtmlContent.replace(/<title>.*?<\\/title>/i, \`<title>\${siteNome}</title>\`);
+            await fs.writeFile(indexHtmlPath, indexHtmlContent, 'utf8');
+          }
+        }
+
+        const vitePkg = path.join(tmpDirPath, "node_modules", "vite");
+        if (!fsSync.existsSync(vitePkg)) {
+          await execPromise('npm install --include=dev --no-audit', { cwd: tmpDirPath });
+        }
+        await execPromise('chmod -R +x node_modules/.bin || true', { cwd: tmpDirPath }).catch(() => {});
+        
+        try {
+          await execPromise('npx --no-install vite build', { cwd: tmpDirPath });
+        } catch {
+          await execPromise('npm run build', { cwd: tmpDirPath });
+        }
+        distPath = path.join(tmpDirPath, "dist");
+        
+        // Copiar arquivos extras (imagens) para a pasta dist
+        if (distPath && arquivosExtras.length > 0) {
+          const imagesDist = path.join(distPath, 'images');
+          await fs.mkdir(imagesDist, { recursive: true });
+          for (const arq of arquivosExtras) {
+            await fs.copyFile(arq.localPath, path.join(imagesDist, arq.remoteName));
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Erro no build da restauração", e);
+    }
+
+    // Enviar ao FTP
+    try {
+      if (distPath && fsSync.existsSync(distPath)) {
+        await enviarDiretorioSubdominio(
+          "ftp.sitexpres.com.br",
+          userFTP,
+          passFTP,
+          dominioFTP,
+          distPath
+        );
+      } else {
+        await enviarHTMLSubdominio(
+          "ftp.sitexpres.com.br",
+          userFTP,
+          passFTP,
+          dominioFTP,
+          html_new,
+          arquivosExtras
+        );
+      }
+    } catch (e1) {
+      console.error("Erro ao enviar FTP (restauração), tentando fallback", e1.message);
+      try {
+        if (distPath && fsSync.existsSync(distPath)) {
+          await enviarDiretorioSubdominio("srv3br.com.br", userFTP, passFTP, dominioFTP, distPath);
+        } else {
+          await enviarHTMLSubdominio("srv3br.com.br", userFTP, passFTP, dominioFTP, html_new, arquivosExtras);
+        }
+      } catch (e2) {
+        console.error("Erro FTP (fallback) na restauração:", e2.message);
+      }
+    } finally {
+      if (tmpDirPath && fsSync.existsSync(tmpDirPath)) {
+         await fs.rm(tmpDirPath, { recursive: true, force: true }).catch(e => console.error(e));
+      }
+    }
 
     //--------------------
 
