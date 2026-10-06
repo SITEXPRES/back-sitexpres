@@ -994,7 +994,7 @@ export const restauracao_versao = async (req, res) => {
         const url = new URL(url_string);
         subdominio = url.host;
       } catch (e) {
-        subdominio = site_url.replace(/^https?:\\/\\//, '');
+        subdominio = site_url.replace(/^https?:\/\//, '');
       }
     }
 
@@ -1050,7 +1050,7 @@ export const restauracao_versao = async (req, res) => {
 
         // Atualizar title do index.html
         if (site_url) {
-          let siteNome = site_url.replace(/^https?:\\/\\//, '').replace('.sitexpres.com.br', '');
+          let siteNome = site_url.replace(/^https?:\/\//, '').replace('.sitexpres.com.br', '');
           siteNome = siteNome.charAt(0).toUpperCase() + siteNome.slice(1);
           const indexHtmlPath = path.join(tmpDirPath, "index.html");
           if (fsSync.existsSync(indexHtmlPath)) {
