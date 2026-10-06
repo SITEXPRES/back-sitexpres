@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #ffffff; }
+    iframe { width: 100%; height: 100%; border: none; }
+    #react-source { display: none; }
+  </style>
+</head>
+<body>
+  <script type="sitexpres/react" id="react-source"><!-- SITEXPRES_REACT_START -->
+import React, { useState, useEffect } from 'react';
+import { Menu, X, ArrowRight, Globe, Search, CheckCircle2, Star, Server, LayoutTemplate, HardDrive, CloudCog, Mail, Users, Zap, Globe2, ShieldCheck, LockKeyhole, DatabaseBackup, ScanSearch, Fingerprint, FileLock2, Headphones, Repeat, Sparkles, GitBranch, Rocket, Gem, Building2, Badge, CreditCard, Receipt, Unlock, Flame, Quote, ArrowLeft, Plus, Lock, ChevronDown, MessageCircle, Send, LifeBuoy, UserCircle, Check, X as XIcon, MemoryStick, Gauge, Cloud, Shield, Hexagon, Triangle, CircleDot, SquareStack, Leaf, Aperture, Waves } from 'lucide-react';
+const CPU = ({className=""}) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/></svg>;
+const PingIcon = ({className=""}) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/></svg>;
+
+export default function App() {
+  const [scrolled, setScrolled] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [annual, setAnnual] = useState(true);
+  const [testimonialIndex, setTestimonialIndex] = useState(0);
+  const [faqActive, setFaqActive] = useState(1);
+  const [formSent, setFormSent] = useState(false);
+  const [formData, setFormData] = useState({
+    nome: '',
+    email: '',
+    whats: '',
+    interesse: 'Hospedagem de Sites',
+    msg: ''
+  });
+  const [domainSearch, setDomainSearch] = useState({ q: '', searched: false, ext: '.com.br' });
+  const [newsletterOk, setNewsletterOk] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 40);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTestimonialIndex((prev) => (prev + 1) % 3);
+    }, 6000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const handleDomainSearch = (e) => {
+    e.preventDefault();
+    setDomainSearch({ ...domainSearch, searched: domainSearch.q.length > 0 });
+  };
+
+  const handleFormSubmit = (e) => {
+    e.preventDefault();
+    setFormSent(true);
+  };
+
+  return (
+    <div className="bg-[#05050a] text-white min-h-screen scroll-smooth">
+      {/* Favicon Link - HTML Head */}
+      <link rel="icon" type="image/png" href="./images/1790969492713.png" />
+      
+      {/* ================= HEADER ================= */}
+      <header
+        className={`fixed w-full top-0 z-50 transition-all duration-300 ${
+          scrolled
+            ? 'bg-black/70 backdrop-blur-xl border-b border-white/10 shadow-2xl shadow-black/40'
+            : 'bg-transparent border-b border-transparent'
+        }`}
+      >
+        {/* Top bar */}
+        {!scrolled && (
+          <div className="hidden md:block bg-gradient-to-r from-primary/20 via-secondary/10 to-accent/10 border-b border-white/5">
+            <div className="max-w-7xl mx-auto px-6 lg:px-8 h-9 flex items-center justify-between text-xs text-white/70">
+              <p className="flex items-center gap-2">
+                <span className="relative w-2 h-2 rounded-full bg-accent animate-pulse"></span> Todos os sistemas operacionais · Uptime 99,99%
+              </p>
+              <p>🚀 <span className="text-white font-semibold">Oferta 2026:</span> até 70% OFF + domínio grátis no plano anual</p>
+            </div>
+          </div>
+        )}
+
+        <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-20">
+            <a href="#home" className="flex items-center gap-2.5 group" aria-label="Cloudx - Página inicial">
+              <img src="./images/1790969492713.png" alt="Cloudx Hospedagem" className="h-9 sm:h-10 w-auto object-contain filter drop-shadow-lg hover:drop-shadow-2xl transition-all group-hover:scale-105" />
+            </a>
+
+            <div className="hidden lg:flex items-center gap-1">
+              <a href="#produtos" className="px-4 py-2 rounded-full text-sm text-white/70 hover:text-white hover:bg-white/5 transition-all font-medium">Produtos</a>
+              <a href="#planos" className="px-4 py-2 rounded-full text-sm text-white/70 hover:text-white hover:bg-white/5 transition-all font-medium">Planos</a>
+              <a href="#infra" className="px-4 py-2 rounded-full text-sm text-white/70 hover:text-white hover:bg-white/5 transition-all font-medium">Infraestrutura</a>
+              <a href="#dominios" className="px-4 py-2 rounded-full text-sm text-white/70 hover:text-white hover:bg-white/5 transition-all font-medium">Domínios</a>
+              <a href="#faq" className="px-4 py-2 rounded-full text-sm text-white/70 hover:text-white hover:bg-white/5 transition-all font-medium">Ajuda</a>
+            </div>
+
+            <div className="hidden lg:flex items-center gap-3">
+              <a href="https://painel.cloudx.com.br/clientes/Login.php" className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white/80 hover:text-white transition-colors">
+                <UserCircle className="w-4 h-4" /> Área do Cliente
+              </a>
+              <a href="#planos" className="relative px-6 py-3 rounded-full text-sm font-semibold bg-white text-[#05050a] hover:scale-105 transition-all shadow-lg shadow-white/10 hover:shadow-secondary/40">
+                Começar agora
+              </a>
+            </div>
+
+            <button
+              onClick={() => setMobileOpen(!mobileOpen)}
+              className="lg:hidden p-2 rounded-lg hover:bg-white/10 transition"
+              aria-label="Abrir menu"
+            >
+              {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
+          </div>
+
+          {mobileOpen && (
+            <div className="lg:hidden pb-6 bg-white/[0.03] backdrop-blur-20 rounded-2xl p-4 space-y-1">
+              <a onClick={() => setMobileOpen(false)} href="#produtos" className="block px-4 py-3 rounded-xl hover:bg-white/5">Produtos</a>
+              <a onClick={() => setMobileOpen(false)} href="#planos" className="block px-4 py-3 rounded-xl hover:bg-white/5">Planos</a>
+              <a onClick={() => setMobileOpen(false)} href="#infra" className="block px-4 py-3 rounded-xl hover:bg-white/5">Infraestrutura</a>
+              <a onClick={() => setMobileOpen(false)} href="#dominios" className="block px-4 py-3 rounded-xl hover:bg-white/5">Domínios</a>
+              <a onClick={() => setMobileOpen(false)} href="#faq" className="block px-4 py-3 rounded-xl hover:bg-white/5">Ajuda</a>
+              <a onClick={() => setMobileOpen(false)} href="#planos" className="block mt-3 text-center px-4 py-3 rounded-xl bg-gradient-to-r from-primary to-secondary font-semibold">Começar agora</a>
+            </div>
+          )}
+        </nav>
+      </header>
+
+      {/* ================= HERO ================= */}
+      <section id="home" className="relative min-h-screen flex items-center overflow-hidden pt-36 pb-24">
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#05050a]" style={{
+          backgroundImage: 'radial-gradient(circle at 20% 50%, rgba(124,58,237,0.15) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(6,182,212,0.1) 0%, transparent 50%)'
+        }}></div>
+
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+          <div className="grid lg:grid-cols-12 gap-16 items-center">
+            <div className="lg:col-span-6 animate-in fade-in slide-in-from-right duration-1000">
+              <a href="#infra" className="inline-flex items-center gap-2 pl-1.5 pr-4 py-1.5 rounded-full bg-white/[0.03] backdrop-blur-20 border border-white/10 text-sm hover:bg-white/10 transition mb-8 group">
+                <span className="px-2.5 py-0.5 rounded-full bg-gradient-to-r from-primary to-secondary text-xs font-semibold">NOVO</span>
+                <span className="text-white/80">Servidores NVMe Gen5 + IA anti-DDoS</span>
+                <ArrowRight className="w-4 h-4 text-white/60 group-hover:translate-x-1 transition-transform" />
+              </a>
+              <h1 className="font-display text-5xl sm:text-6xl lg:text-7xl font-bold leading-[1.05] tracking-tight mb-7">
+                Hospedagem que<br />
+                <span className="bg-gradient-to-r from-purple-400 via-cyan-400 to-lime-400 bg-clip-text text-transparent animate-pulse">voa na velocidade</span><br />
+                do seu negócio.
+              </h1>
+              <p className="text-lg sm:text-xl text-white/60 leading-relaxed mb-10 max-w-xl">
+                Sites, WordPress, VPS e Cloud em infraestrutura NVMe no Brasil. SSL grátis, backups diários e suporte humano 24/7 que realmente resolve.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 mb-12">
+                <a href="#planos" className="group relative inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl font-semibold bg-gradient-to-r from-purple-600 to-cyan-500 hover:scale-105 transition-all duration-300 shadow-2xl shadow-purple-500/40">
+                  Ver planos a partir de R$ 9,90
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </a>
+                <a href="#contato" className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl font-semibold bg-white/[0.03] backdrop-blur-20 border border-white/10 hover:bg-white/10 hover:scale-105 transition-all duration-300">
+                  <Repeat className="w-5 h-5 text-cyan-400" /> Migração grátis
+                </a>
+              </div>
+              <div className="flex flex-wrap items-center gap-x-8 gap-y-4 text-sm text-white/60">
+                <div className="flex items-center gap-3">
+                  <div className="flex -space-x-3">
+                    <img src="https://ui-avatars.com/api/?name=Ana+Lima&background=7c3aed&color=fff&size=64" alt="Cliente Ana Lima" className="w-9 h-9 rounded-full ring-2 ring-[#05050a]" />
+                    <img src="https://ui-avatars.com/api/?name=Rafael+Costa&background=06b6d4&color=fff&size=64" alt="Cliente Rafael Costa" className="w-9 h-9 rounded-full ring-2 ring-[#05050a]" />
+                    <img src="https://ui-avatars.com/api/?name=Julia+Mendes&background=65a30d&color=fff&size=64" alt="Cliente Julia Mendes" className="w-9 h-9 rounded-full ring-2 ring-[#05050a]" />
+                    <img src="https://ui-avatars.com/api/?name=Pedro+Alves&background=db2777&color=fff&size=64" alt="Cliente Pedro Alves" className="w-9 h-9 rounded-full ring-2 ring-[#05050a]" />
+                  </div>
+                  <div>
+                    <div className="flex text-yellow-400">
+                      {[...Array(5)].map((_, i) => <Star key={i} className="w-4 h-4 fill-yellow-400" />)}
+                    </div>
+                    <p className="text-xs mt-0.5"><span className="text-white font-semibold">4.9/5</span> por +12.000 clientes</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2"><ShieldCheck className="w-5 h-5 text-lime-400" /> Garantia de 30 dias</div>
+              </div>
+            </div>
+
+            {/* Mockup */}
+            <div className="lg:col-span-6 relative animate-in fade-in slide-in-from-left duration-1000 delay-200">
+              <div className="absolute inset-0 bg-gradient-to-tr from-purple-600/30 to-cyan-400/30 blur-3xl rounded-full"></div>
+              <div className="relative rounded-3xl bg-[#0b0b14]/90 backdrop-blur-xl shadow-2xl overflow-hidden border border-white/10">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
+                  <div className="flex gap-2">
+                    <span className="w-3 h-3 rounded-full bg-red-500/80"></span>
+                    <span className="w-3 h-3 rounded-full bg-yellow-500/80"></span>
+                    <span className="w-3 h-3 rounded-full bg-green-500/80"></span>
+                  </div>
+                  <span className="text-xs text-white/40 font-mono">painel.cloudx.com.br</span>
+                  <Lock className="w-3.5 h-3.5 text-lime-400" />
+                </div>
+                <div className="p-6 space-y-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-white/40 uppercase tracking-wider">Servidor</p>
+                      <p className="font-semibold flex items-center gap-2">cloudx-sp-01 <span className="text-[10px] px-2 py-0.5 rounded-full bg-lime-400/15 text-lime-400 font-semibold">ONLINE</span></p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-white/40 uppercase tracking-wider">Uptime</p>
+                      <p className="font-semibold text-lime-400">99.998%</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="rounded-2xl bg-white/[0.03] border border-white/5 p-4">
+                      <CPU className="w-4 h-4 text-purple-400 mb-2" />
+                      <p className="text-xl font-bold">18%</p><p className="text-[11px] text-white/40">CPU</p>
+                    </div>
+                    <div className="rounded-2xl bg-white/[0.03] border border-white/5 p-4">
+                      <MemoryStick className="w-4 h-4 text-cyan-400 mb-2" />
+                      <p className="text-xl font-bold">2.1<span className="text-sm text-white/40">GB</span></p><p className="text-[11px] text-white/40">RAM</p>
+                    </div>
+                    <div className="rounded-2xl bg-white/[0.03] border border-white/5 p-4">
+                      <Gauge className="w-4 h-4 text-lime-400 mb-2" />
+                      <p className="text-xl font-bold">87<span className="text-sm text-white/40">ms</span></p><p className="text-[11px] text-white/40">TTFB</p>
+                    </div>
+                  </div>
+                  <div className="rounded-2xl bg-white/[0.03] border border-white/5 p-4">
+                    <div className="flex justify-between text-xs text-white/40 mb-3"><span>Tráfego (24h)</span><span className="text-lime-400">+32%</span></div>
+                    <div className="flex items-end gap-1.5 h-24">
+                      {[40, 65, 50, 80, 60, 95, 70, 85, 100, 75].map((height, i) => (
+                        <div key={i} className="flex-1 rounded-t bg-gradient-to-t from-purple-400/40 to-cyan-400 animate-pulse" style={{ height: `${height}%` }}></div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-2xl bg-black/60 border border-white/5 p-4 font-mono text-xs leading-6">
+                    <p><span className="text-lime-400">➜</span> <span className="text-cyan-400">~</span> cloudx deploy --site meunegocio.com.br</p>
+                    <p className="text-white/50">✓ Build concluído em 3.2s</p>
+                    <p className="text-white/50">✓ SSL emitido · CDN propagada</p>
+                    <p className="text-lime-400">✓ Online em https://meunegocio.com.br<span className="animate-pulse">▋</span></p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Floating badges */}
+              <div className="hidden sm:flex absolute -left-8 top-24 bg-white/[0.03] backdrop-blur-20 border border-white/10 rounded-2xl px-4 py-3 items-center gap-3 shadow-2xl animate-bounce">
+                <div className="w-10 h-10 rounded-xl bg-lime-400/15 flex items-center justify-center"><Zap className="w-5 h-5 text-lime-400" /></div>
+                <div><p className="text-xs text-white/50">PageSpeed</p><p className="font-bold">98/100</p></div>
+              </div>
+              <div className="hidden sm:flex absolute -right-6 bottom-16 bg-white/[0.03] backdrop-blur-20 border border-white/10 rounded-2xl px-4 py-3 items-center gap-3 shadow-2xl" style={{ animation: 'float 7s ease-in-out infinite 1.5s' }}>
+                <div className="w-10 h-10 rounded-xl bg-purple-600/20 flex items-center justify-center"><Shield className="w-5 h-5 text-purple-400" /></div>
+                <div><p className="text-xs text-white/50">Ataques bloqueados</p><p className="font-bold">1.284 hoje</p></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <a href="#dominios" className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce text-white/40 hover:text-white transition" aria-label="Rolar">
+          <ChevronDown className="w-7 h-7" />
+        </a>
+      </section>
+
+      {/* ================= DOMAIN SEARCH ================= */}
+      <section id="dominios" className="relative py-16">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 animate-in zoom-in duration-1000">
+          <div className="rounded-[2rem] bg-gradient-to-br from-white/[0.06] to-white/[0.01] backdrop-blur-xl p-8 sm:p-12 shadow-2xl border border-white/10">
+            <div className="text-center mb-8">
+              <h2 className="font-display text-3xl sm:text-4xl font-bold mb-3">Encontre o domínio perfeito</h2>
+              <p className="text-white/60">Registre agora ou ganhe <span className="text-lime-400 font-semibold">grátis</span> no plano anual de hospedagem.</p>
+            </div>
+            <form onSubmit={handleDomainSearch} className="flex flex-col sm:flex-row gap-3 p-2 rounded-2xl bg-black/50 border border-white/10 focus-within:border-cyan-400/60 transition">
+              <div className="flex items-center flex-1 px-4">
+                <Globe className="w-5 h-5 text-white/40 mr-3" />
+                <input
+                  value={domainSearch.q}
+                  onChange={(e) => setDomainSearch({ ...domainSearch, q: e.target.value, searched: false })}
+                  type="text"
+                  placeholder="digite o nome do seu site"
+                  aria-label="Buscar domínio"
+                  className="w-full bg-transparent py-4 outline-none placeholder-white/30 text-lg"
+                />
+              </div>
+              <select
+                value={domainSearch.ext}
+                onChange={(e) => setDomainSearch({ ...domainSearch, ext: e.target.value })}
+                aria-label="Extensão"
+                className="bg-white/5 border border-white/10 rounded-xl px-4 py-4 outline-none text-white"
+              >
+                <option className="bg-[#05050a]">.com.br</option>
+                <option className="bg-[#05050a]">.com</option>
+                <option className="bg-[#05050a]">.net</option>
+                <option className="bg-[#05050a]">.io</option>
+                <option className="bg-[#05050a]">.store</option>
+              </select>
+              <button type="submit" className="px-8 py-4 rounded-xl font-semibold bg-gradient-to-r from-purple-600 to-cyan-500 hover:scale-105 transition-all shadow-lg shadow-purple-500/30 flex items-center justify-center gap-2">
+                <Search className="w-5 h-5" /> Buscar
+              </button>
+            </form>
+            {domainSearch.searched && (
+              <div className="mt-5 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl bg-lime-400/10 border border-lime-400/30 px-6 py-4 animate-in fade-in duration-500">
+                <p className="flex items-center gap-2"><CheckCircle2 className="w-5 h-5 text-lime-400" /> <span className="font-semibold">{domainSearch.q.toLowerCase().replace(/\s+/g, '')}{domainSearch.ext}</span> está disponível!</p>
+                <a href="#planos" className="px-5 py-2.5 rounded-xl bg-lime-400 text-[#05050a] font-semibold hover:scale-105 transition">Registrar por R$ 36,00/ano</a>
+              </div>
+            )}
+            <div className="flex flex-wrap justify-center gap-3 mt-8 text-sm">
+              {[
+                { ext: '.com.br', price: 'R$ 36,00' },
+                { ext: '.com', price: 'R$ 69,90' },
+                { ext: '.net', price: 'R$ 79,90' },
+                { ext: '.io', price: 'R$ 249,90' },
+                { ext: '.store', price: 'R$ 19,90' }
+              ].map((domain, i) => (
+                <span key={i} className="px-4 py-2 rounded-full bg-white/5 border border-white/10">{domain.ext} <b className="text-cyan-400 ml-1">{domain.price}</b></span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ================= SOCIAL PROOF ================= */}
+      <section className="py-16 border-y border-white/5 bg-white/[0.01] animate-in fade-in duration-1000">
+        <p className="text-center text-sm uppercase tracking-[0.25em] text-white/40 mb-10">Mais de 45.000 sites confiam na Cloudx</p>
+        <div className="relative overflow-hidden" style={{ maskImage: 'linear-gradient(90deg,transparent,black 15%,black 85%,transparent)', WebkitMaskImage: 'linear-gradient(90deg,transparent,black 15%,black 85%,transparent)' }}>
+          <div className="flex w-max gap-16 items-center text-2xl font-display font-bold text-white/30 animate-marquee">
+            {['Nexora', 'Vértice', 'Orbital', 'Stackly', 'Verdana', 'Lumina', 'Maré'].map((name, i) => (
+              <React.Fragment key={i}>
+                <span key={`${name}-${i}`} className="flex items-center gap-2 hover:text-white transition whitespace-nowrap">{name}</span>
+              </React.Fragment>
+            ))}
+            {['Nexora', 'Vértice', 'Orbital', 'Stackly', 'Verdana', 'Lumina', 'Maré'].map((name, i) => (
+              <span key={`${name}-repeat-${i}`} className="flex items-center gap-2 hover:text-white transition whitespace-nowrap">{name}</span>
+            ))}
+          </div>
+        </div>
+
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-16 grid grid-cols-2 lg:grid-cols-4 gap-6">
+          {[
+            { count: '45000', suffix: '+', label: 'Sites hospedados' },
+            { count: '99.99', suffix: '%', decimals: 2, label: 'Uptime garantido em SLA' },
+            { count: '47', prefix: '<', suffix: 's', label: 'Tempo médio de 1ª resposta' },
+            { count: '12', suffix: ' anos', label: 'De experiência no mercado' }
+          ].map((stat, i) => (
+            <div key={i} className="text-center animate-in fade-in duration-1000" style={{ transitionDelay: `${i * 100}ms` }}>
+              <p className="font-display text-4xl sm:text-5xl font-bold bg-gradient-to-r from-purple-400 via-cyan-400 to-lime-400 bg-clip-text text-transparent">{stat.count}{stat.suffix}</p>
+              <p className="text-white/50 mt-2 text-sm">{stat.label}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ================= PRODUTOS ================= */}
+      <section id="produtos" className="relative py-28 overflow-hidden">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full bg-purple-600/10 blur-[120px]"></div>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-3xl mx-auto mb-20 animate-in fade-in duration-1000">
+            <span className="inline-block px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider uppercase bg-purple-600/15 text-purple-400 border border-purple-600/30 mb-5">Soluções</span>
+            <h2 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-6">Tudo que seu projeto precisa, <span className="bg-gradient-to-r from-purple-400 via-cyan-400 to-lime-400 bg-clip-text text-transparent">em um só lugar</span></h2>
+            <p className="text-lg text-white/60">Do primeiro site ao cluster de alta disponibilidade. Escale sem trocar de provedor.</p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Card grande */}
+            <div className="group lg:col-span-2 lg:row-span-1 relative rounded-3xl p-10 bg-gradient-to-br from-purple-600/25 via-[#0d0b1c] to-[#0b0b14] border border-white/10 overflow-hidden hover:-translate-y-2 transition-all duration-500 shadow-lg hover:shadow-2xl hover:shadow-purple-500/20 animate-in fade-in duration-1000">
+              <div className="absolute -right-20 -top-20 w-72 h-72 bg-purple-600/30 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-700"></div>
+              <div className="relative flex flex-col md:flex-row gap-8 md:items-end justify-between h-full">
+                <div>
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-600 to-cyan-500 flex items-center justify-center mb-6 shadow-xl shadow-purple-600/40 group-hover:scale-110 group-hover:rotate-3 transition-transform"><Server className="w-8 h-8" /></div>
+                  <h3 className="font-display text-3xl font-bold mb-3">Hospedagem de Sites</h3>
+                  <p className="text-white/60 max-w-md leading-relaxed mb-6">cPanel, LiteSpeed Enterprise, NVMe e e-mails ilimitados. Perfeito para sites institucionais, blogs e lojas.</p>
+                  <ul className="grid grid-cols-2 gap-2 text-sm text-white/70">
+                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-lime-400" />SSL grátis</li>
+                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-lime-400" />Backup diário</li>
+                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-lime-400" />Migração grátis</li>
+                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-lime-400" />CDN global</li>
+                  </ul>
+                </div>
+                <div className="md:text-right">
+                  <p className="text-sm text-white/50">a partir de</p>
+                  <p className="font-display text-5xl font-bold">R$ 9<span className="text-2xl">,90</span><span className="text-base text-white/50 font-normal">/mês</span></p>
+                  <a href="#planos" className="mt-4 inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-white text-[#05050a] font-semibold hover:scale-105 transition">Ver planos <ArrowRight className="w-4 h-4" /></a>
+                </div>
+              </div>
+            </div>
+
+            {/* Cards menores */}
+            {[
+              { title: 'WordPress Gerenciado', desc: 'Cache em camadas, staging em 1 clique, atualizações automáticas e WooCommerce otimizado.', price: 'R$ 19,90', icon: LayoutTemplate, color: 'cyan' },
+              { title: 'Servidor VPS', desc: 'Root total, IPv4 dedicado, AMD EPYC e deploy em 60 segundos. Linux ou Windows.', price: 'R$ 39,90', icon: HardDrive, color: 'lime' },
+              { title: 'Cloud Dedicado', desc: 'Recursos garantidos, alta disponibilidade e autoscaling para aplicações críticas.', price: 'R$ 149', icon: CloudCog, color: 'purple' },
+              { title: 'E-mail Profissional', desc: '@suaempresa com antispam por IA, 50GB por conta e integração com Outlook e celular.', price: 'R$ 6,90', icon: Mail, color: 'pink' }
+            ].map((card, i) => {
+              const Icon = card.icon;
+              const colorMap = { cyan: 'cyan-400', lime: 'lime-400', purple: 'purple-400', pink: 'pink-400' };
+              const bgColorMap = { cyan: 'cyan-400/15', lime: 'lime-400/15', purple: 'purple-600/15', pink: 'pink-500/15' };
+              return (
+                <div key={i} className="group relative rounded-3xl p-8 bg-[#0b0b14] border border-white/10 hover:border-white/30 hover:-translate-y-2 transition-all duration-500 overflow-hidden shadow-lg hover:shadow-2xl animate-in fade-in duration-1000" style={{ transitionDelay: `${(i + 1) * 100}ms` }}>
+                  <div className="relative">
+                    <div className={`w-14 h-14 rounded-2xl bg-${bgColorMap[card.color]} border border-${colorMap[card.color]}/30 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform`}><Icon className={`w-7 h-7 text-${colorMap[card.color]}`} /></div>
+                    <h3 className="font-display text-2xl font-bold mb-3">{card.title}</h3>
+                    <p className="text-white/60 leading-relaxed mb-6">{card.desc}</p>
+                    <div className="flex items-center justify-between"><span className="text-white/50 text-sm">desde <b className="text-white text-lg">{card.price}</b>/mês</span><ArrowRight className="w-5 h-5 text-white/40 group-hover:text-white group-hover:rotate-45 transition-all" /></div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Card revenda */}
+            <div className="group relative md:col-span-2 lg:col-span-3 rounded-3xl p-8 sm:p-10 bg-gradient-to-r from-[#0b0b14] via-cyan-400/10 to-[#0b0b14] border border-white/10 hover:border-cyan-400/40 transition-all duration-500 overflow-hidden shadow-lg hover:shadow-2xl animate-in fade-in duration-1000">
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                <div className="flex items-center gap-6">
+                  <div className="w-14 h-14 flex-shrink-0 rounded-2xl bg-gradient-to-br from-cyan-400 to-lime-400 flex items-center justify-center group-hover:scale-110 transition-transform"><Users className="w-7 h-7 text-[#05050a]" /></div>
+                  <div>
+                    <h3 className="font-display text-2xl font-bold">Revenda de Hospedagem</h3>
+                    <p className="text-white/60">WHM, white-label e WHMCS inclusos. Crie sua própria empresa de hospedagem hoje.</p>
+                  </div>
+                </div>
+                <a href="#contato" className="flex-shrink-0 inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-white/[0.03] backdrop-blur-20 border border-white/10 hover:bg-white/10 font-semibold transition hover:scale-105">Quero revender <ArrowRight className="w-4 h-4" /></a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ================= FEATURES / INFRA ================= */}
+      <section id="infra" className="relative py-28 bg-gradient-to-b from-transparent via-[#08081a] to-transparent">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Row 1 */}
+          <div className="grid lg:grid-cols-2 gap-16 items-center mb-32">
+            <div className="animate-in fade-in slide-in-from-left duration-1000">
+              <span className="inline-block px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider uppercase bg-cyan-400/15 text-cyan-400 border border-cyan-400/30 mb-5">Performance</span>
+              <h2 className="font-display text-4xl sm:text-5xl font-bold tracking-tight mb-6">Até <span className="bg-gradient-to-r from-cyan-400 to-lime-400 bg-clip-text text-transparent">5x mais rápido</span> que a hospedagem comum</h2>
+              <p className="text-lg text-white/60 leading-relaxed mb-8">Discos NVMe Gen5, processadores AMD EPYC de última geração e servidor web LiteSpeed Enterprise. Seu site carrega em milissegundos e ranqueia melhor no Google.</p>
+              <div className="space-y-4">
+                {[
+                  { icon: Zap, title: 'LiteSpeed + LSCache', desc: 'Cache nativo que reduz o tempo de carregamento em até 80%.' },
+                  { icon: Globe2, title: 'CDN com +300 pontos', desc: 'Conteúdo entregue do servidor mais próximo do seu visitante.' }
+                ].map((item, i) => {
+                  const Icon = item.icon;
+                  return (
+                    <div key={i} className="flex gap-4 p-5 rounded-2xl bg-white/[0.03] border border-white/5 hover:border-cyan-400/30 hover:bg-white/[0.05] transition-all">
+                      <div className="w-12 h-12 flex-shrink-0 rounded-xl bg-cyan-400/15 flex items-center justify-center"><Icon className="w-6 h-6 text-cyan-400" /></div>
+                      <div><h3 className="font-semibold mb-1">{item.title}</h3><p className="text-sm text-white/55">{item.desc}</p></div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="relative animate-in fade-in slide-in-from-right duration-1000 delay-200">
+              <div className="absolute -inset-4 bg-gradient-to-tr from-cyan-400/30 to-purple-600/30 rounded-[2.5rem] blur-2xl"></div>
+              <div className="relative rounded-[2rem] bg-[#0b0b14] p-8 shadow-2xl border border-white/10">
+                <p className="text-sm text-white/50 mb-6">Tempo de carregamento médio (segundos)</p>
+                <div className="space-y-6">
+                  {[
+                    { name: 'Cloudx', time: '0.4s', width: 12, highlight: true },
+                    { name: 'Concorrente A', time: '1.6s', width: 48 },
+                    { name: 'Concorrente B', time: '2.3s', width: 68 },
+                    { name: 'Hospedagem compartilhada comum', time: '3.1s', width: 92 }
+                  ].map((bar, i) => (
+                    <div key={i}>
+                      <div className="flex justify-between text-sm mb-2">
+                        <span className={`font-semibold flex items-center gap-2 ${bar.highlight ? '' : 'text-white/60'}`}>
+                          {bar.highlight && <Cloud className="w-4 h-4 text-cyan-400" />}
+                          {bar.name}
+                        </span>
+                        <span className={bar.highlight ? 'text-lime-400 font-bold' : 'text-white/60'}>{bar.time}</span>
+                      </div>
+                      <div className="h-3 rounded-full bg-white/5 overflow-hidden">
+                        <div className={`h-full rounded-full transition-all duration-1000 ${bar.highlight ? 'w-[12%] bg-gradient-to-r from-cyan-400 to-lime-400 shadow-lg shadow-lime-400/60' : 'bg-white/20'}`} style={{ width: `${bar.width}%` }}></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-white/30 mt-6">* Teste interno com WordPress + WooCommerce, servidor em São Paulo, 2026.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Row 2 */}
+          <div className="grid lg:grid-cols-2 gap-16 items-center mb-32">
+            <div className="relative order-2 lg:order-1 animate-in fade-in slide-in-from-left duration-1000">
+              <div className="absolute -inset-4 bg-gradient-to-tr from-purple-600/30 to-pink-500/20 rounded-[2.5rem] blur-2xl"></div>
+              <div className="relative rounded-[2rem] overflow-hidden border border-white/10 shadow-2xl group">
+                <img src="https://picsum.photos/seed/cloudxserver/900/700" alt="Datacenter Cloudx com servidores de alta performance" loading="lazy" className="w-full h-[420px] object-cover object-center group-hover:scale-105 transition-transform duration-700" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#05050a] via-[#05050a]/60 to-purple-600/20"></div>
+                <div className="absolute bottom-0 left-0 right-0 p-8">
+                  <div className="grid grid-cols-3 gap-3">
+                    {['Tier III\nDatacenter', '3 Tbps\nAnti-DDoS', 'SP · BR\nLocalização'].map((text, i) => (
+                      <div key={i} className="bg-white/[0.03] backdrop-blur-20 border border-white/10 rounded-2xl p-4 text-center">
+                        <p className="font-bold text-xl">{text.split('\n')[0]}</p>
+                        <p className="text-xs text-white/50">{text.split('\n')[1]}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="order-1 lg:order-2 animate-in fade-in slide-in-from-right duration-1000 delay-200">
+              <span className="inline-block px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider uppercase bg-purple-600/15 text-purple-400 border border-purple-600/30 mb-5">Segurança</span>
+              <h2 className="font-display text-4xl sm:text-5xl font-bold tracking-tight mb-6">Blindagem de <span className="bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">nível enterprise</span> para qualquer site</h2>
+              <p className="text-lg text-white/60 leading-relaxed mb-8">Firewall com inteligência artificial, proteção anti-DDoS de 3 Tbps, varredura de malware diária e backups isolados. Durma tranquilo.</p>
+              <ul className="grid sm:grid-cols-2 gap-4">
+                {[
+                  { icon: ShieldCheck, label: 'WAF com IA' },
+                  { icon: LockKeyhole, label: 'SSL Let\'s Encrypt grátis' },
+                  { icon: DatabaseBackup, label: 'Backups diários 30 dias' },
+                  { icon: ScanSearch, label: 'Scanner de malware' },
+                  { icon: Fingerprint, label: 'Autenticação 2FA' },
+                  { icon: FileLock2, label: 'Conformidade LGPD' }
+                ].map((item, i) => {
+                  const Icon = item.icon;
+                  return (
+                    <li key={i} className="flex items-center gap-3 p-4 rounded-xl bg-white/[0.03] border border-white/5"><Icon className="w-5 h-5 text-lime-400" /><span className="text-sm">{item.label}</span></li>
+                  );
+                })}
+              </ul>
+            </div>
+          </div>
+
+          {/* Features grid */}
+          <div className="text-center max-w-3xl mx-auto mb-16 animate-in fade-in duration-1000">
+            <h2 className="font-display text-4xl sm:text-5xl font-bold tracking-tight mb-5">Recursos que fazem a diferença</h2>
+            <p className="text-lg text-white/60">Tudo incluso. Sem letras miúdas, sem taxas escondidas.</p>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {[
+              { icon: Headphones, title: 'Suporte humano 24/7', desc: 'Especialistas brasileiros via WhatsApp, chat e ticket. Sem robôs.' },
+              { icon: Repeat, title: 'Migração gratuita', desc: 'Trazemos seu site de qualquer provedor sem downtime.' },
+              { icon: Sparkles, title: 'Criador de sites com IA', desc: 'Descreva seu negócio e tenha um site pronto em minutos.' },
+              { icon: GitBranch, title: 'Git, SSH & Staging', desc: 'Fluxo de deploy moderno para devs e agências.' }
+            ].map((item, i) => {
+              const Icon = item.icon;
+              return (
+                <div key={i} className="group p-7 rounded-3xl bg-white/[0.02] border border-white/5 hover:bg-gradient-to-br hover:from-purple-600/20 hover:to-cyan-400/10 hover:border-purple-600/30 hover:-translate-y-1 transition-all duration-300 animate-in zoom-in duration-1000" style={{ transitionDelay: `${i * 100}ms` }}>
+                  <Icon className="w-9 h-9 text-purple-400 mb-5 group-hover:scale-110 transition-transform" />
+                  <h3 className="font-semibold text-lg mb-2">{item.title}</h3>
+                  <p className="text-sm text-white/55 leading-relaxed">{item.desc}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* ================= PRICING ================= */}
+      <section id="planos" className="relative py-28 overflow-hidden">
+        <div className="absolute inset-0 opacity-60" style={{
+          backgroundImage: 'radial-gradient(circle at 20% 50%, rgba(124,58,237,0.1) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(6,182,212,0.1) 0%, transparent 50%)'
+        }}></div>
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 w-[900px] h-[500px] bg-gradient-to-r from-purple-600/20 via-cyan-400/15 to-lime-400/10 blur-[120px] rounded-full"></div>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-3xl mx-auto mb-14 animate-in fade-in duration-1000">
+            <span className="inline-block px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider uppercase bg-lime-400/15 text-lime-400 border border-lime-400/30 mb-5">Planos</span>
+            <h2 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-6">Preço justo, <span className="bg-gradient-to-r from-purple-400 via-cyan-400 to-lime-400 bg-clip-text text-transparent">performance absurda</span></h2>
+            <p className="text-lg text-white/60">Escolha o plano ideal. Faça upgrade quando quiser, sem perder nada.</p>
+          </div>
+
+          <div className="flex justify-center mb-14 animate-in fade-in duration-1000 delay-100">
+            <div className="relative inline-flex p-1.5 rounded-full bg-white/[0.03] backdrop-blur-20 border border-white/10">
+              <button onClick={() => setAnnual(false)} className={`relative px-6 py-2.5 rounded-full text-sm font-semibold transition-all ${!annual ? 'bg-white text-[#05050a] shadow-lg' : 'text-white/70'}`}>Mensal</button>
+              <button onClick={() => setAnnual(true)} className={`relative px-6 py-2.5 rounded-full text-sm font-semibold transition-all flex items-center gap-2 ${annual ? 'bg-white text-[#05050a] shadow-lg' : 'text-white/70'}`}>
+                Anual <span className="px-2 py-0.5 rounded-full bg-lime-400 text-[#05050a] text-[10px] font-bold">-50%</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="grid lg:grid-cols-3 gap-6 items-stretch animate-in fade-in duration-1000 delay-200">
+            {/* Start */}
+            <div className="group relative rounded-3xl p-8 bg-[#0b0b14]/80 backdrop-blur border border-white/10 hover:border-white/25 hover:-translate-y-2 hover:shadow-2xl transition-all duration-300 flex flex-col">
+              <div className="flex items-center gap-3 mb-2"><Rocket className="w-5 h-5 text-cyan-400" /><h3 className="font-display text-xl font-bold">Start</h3></div>
+              <p className="text-sm text-white/50 mb-8">Para o primeiro site ou landing page.</p>
+              <div className="mb-2 flex items-end gap-1">
+                <span className="text-white/50 text-lg mb-2">R$</span>
+                <span className="font-display text-6xl font-bold">{annual ? '9,90' : '19,90'}</span>
+                <span className="text-white/50 mb-2">/mês</span>
+              </div>
+              <p className="text-xs text-white/40 mb-8 h-4">{annual ? 'Cobrado R$ 118,80/ano · economize R$ 120' : 'Sem fidelidade'}</p>
+              <a href="#contato" className="block text-center py-4 rounded-2xl font-semibold border border-white/15 hover:bg-white hover:text-[#05050a] transition-all mb-8">Contratar Start</a>
+              <ul className="space-y-3.5 text-sm text-white/70 flex-1">
+                {['1 site', '25 GB NVMe', '5 contas de e-mail', 'SSL grátis', 'Backup semanal'].map((feature, i) => (
+                  <li key={i} className="flex items-center gap-3"><Check className="w-4 h-4 text-lime-400" />{feature}</li>
+                ))}
+                <li className="flex items-center gap-3 text-white/30"><XIcon className="w-4 h-4" />Domínio grátis</li>
+              </ul>
+            </div>
+
+            {/* Pro (featured) */}
+            <div className="group relative rounded-3xl p-[1.5px] bg-gradient-to-br from-purple-600 via-cyan-400 to-lime-400 hover:-translate-y-3 transition-all duration-300 shadow-2xl shadow-purple-600/30 lg:scale-105">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10 px-4 py-1.5 rounded-full bg-gradient-to-r from-purple-600 to-cyan-400 text-xs font-bold uppercase tracking-wider shadow-lg flex items-center gap-1.5"><Flame className="w-3.5 h-3.5" />Mais escolhido</div>
+              <div className="relative h-full rounded-[calc(1.5rem-1px)] p-8 bg-gradient-to-b from-[#16102e] to-[#0b0b14] flex flex-col">
+                <div className="flex items-center gap-3 mb-2"><Gem className="w-5 h-5 text-purple-400" /><h3 className="font-display text-xl font-bold">Pro</h3></div>
+                <p className="text-sm text-white/50 mb-8">Para empresas e lojas em crescimento.</p>
+                <div className="mb-2 flex items-end gap-1">
+                  <span className="text-white/50 text-lg mb-2">R$</span>
+                  <span className="font-display text-6xl font-bold bg-gradient-to-r from-purple-400 via-cyan-400 to-lime-400 bg-clip-text text-transparent">{annual ? '19,90' : '39,90'}</span>
+                  <span className="text-white/50 mb-2">/mês</span>
+                </div>
+                <p className="text-xs text-white/40 mb-8 h-4">{annual ? 'Cobrado R$ 238,80/ano · economize R$ 240' : 'Sem fidelidade'}</p>
+                <a href="#contato" className="block text-center py-4 rounded-2xl font-semibold bg-gradient-to-r from-purple-600 to-cyan-500 hover:scale-[1.03] hover:shadow-xl hover:shadow-purple-600/40 transition-all mb-8">Contratar Pro</a>
+                <ul className="space-y-3.5 text-sm text-white/80 flex-1">
+                  {['Sites ilimitados', '100 GB NVMe', 'E-mails ilimitados', 'Domínio grátis no anual', 'Backup diário + CDN', 'Criador de sites com IA'].map((feature, i) => (
+                    <li key={i} className="flex items-center gap-3"><Check className="w-4 h-4 text-lime-400" /><b>{i === 0 ? feature : feature}</b></li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            {/* Business */}
+            <div className="group relative rounded-3xl p-8 bg-[#0b0b14]/80 backdrop-blur border border-white/10 hover:border-white/25 hover:-translate-y-2 hover:shadow-2xl transition-all duration-300 flex flex-col">
+              <div className="flex items-center gap-3 mb-2"><Building2 className="w-5 h-5 text-lime-400" /><h3 className="font-display text-xl font-bold">Business</h3></div>
+              <p className="text-sm text-white/50 mb-8">Recursos dedicados e máxima performance.</p>
+              <div className="mb-2 flex items-end gap-1">
+                <span className="text-white/50 text-lg mb-2">R$</span>
+                <span className="font-display text-6xl font-bold">{annual ? '49,90' : '89,90'}</span>
+                <span className="text-white/50 mb-2">/mês</span>
+              </div>
+              <p className="text-xs text-white/40 mb-8 h-4">{annual ? 'Cobrado R$ 598,80/ano · economize R$ 480' : 'Sem fidelidade'}</p>
+              <a href="#contato" className="block text-center py-4 rounded-2xl font-semibold border border-white/15 hover:bg-white hover:text-[#05050a] transition-all mb-8">Contratar Business</a>
+              <ul className="space-y-3.5 text-sm text-white/70 flex-1">
+                {['Sites ilimitados', '250 GB NVMe Gen5', '4 vCPU · 8 GB RAM dedicados', 'IP dedicado', 'Suporte prioritário VIP', 'SLA 99,99% em contrato'].map((feature, i) => (
+                  <li key={i} className="flex items-center gap-3"><Check className="w-4 h-4 text-lime-400" />{feature}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          <div className="mt-14 flex flex-wrap justify-center gap-x-10 gap-y-4 text-sm text-white/60 animate-in fade-in duration-1000 delay-300">
+            <span className="flex items-center gap-2"><Badge className="w-5 h-5 text-lime-400" />30 dias de garantia</span>
+            <span className="flex items-center gap-2"><CreditCard className="w-5 h-5 text-lime-400" />Pix, boleto e cartão em até 12x</span>
+            <span className="flex items-center gap-2"><Receipt className="w-5 h-5 text-lime-400" />Nota fiscal automática</span>
+            <span className="flex items-center gap-2"><Unlock className="w-5 h-5 text-lime-400" />Cancele quando quiser</span>
+          </div>
+        </div>
+      </section>
+
+      {/* ================= TESTIMONIALS ================= */}
+      <section className="py-28 relative">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-14 animate-in fade-in duration-1000">
+            <div className="max-w-2xl">
+              <span className="inline-block px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider uppercase bg-purple-600/15 text-purple-400 border border-purple-600/30 mb-5">Depoimentos</span>
+              <h2 className="font-display text-4xl sm:text-5xl font-bold tracking-tight">Quem migra, <span className="bg-gradient-to-r from-purple-400 via-cyan-400 to-lime-400 bg-clip-text text-transparent">não volta atrás</span></h2>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setTestimonialIndex((prev) => (prev - 1 + 3) % 3)} className="w-12 h-12 rounded-full bg-white/[0.03] backdrop-blur-20 border border-white/10 hover:bg-white/10 flex items-center justify-center transition hover:scale-110" aria-label="Anterior"><ArrowLeft className="w-5 h-5" /></button>
+              <button onClick={() => setTestimonialIndex((prev) => (prev + 1) % 3)} className="w-12 h-12 rounded-full bg-white text-[#05050a] flex items-center justify-center transition hover:scale-110" aria-label="Próximo"><ArrowRight className="w-5 h-5" /></button>
+            </div>
+          </div>
+
+          <div className="overflow-hidden animate-in fade-in duration-1000 delay-100">
+            <div className="flex transition-transform duration-700 ease-out" style={{ transform: `translateX(-${testimonialIndex * 100}%)` }}>
+              {[
+                {
+                  quote: '"Migramos nossa loja com 40 mil produtos e o tempo de carregamento caiu de 4s para 0,6s. As vendas subiram 28% no primeiro mês."',
+                  author: 'Mariana Rocha',
+                  role: 'CEO · Casa Verdana E-commerce',
+                  image: 'Mariana+Rocha',
+                  result: '+28%',
+                  resultDesc: 'em conversões após migrar para a Cloudx',
+                  gradient: 'from-purple-600/20'
+                },
+                {
+                  quote: '"Tenho uma agência com 120 clientes na revenda. Em 3 anos nunca tive uma queda relevante. O suporte responde em segundos, de madrugada inclusive."',
+                  author: 'Thiago Nunes',
+                  role: 'Fundador · Orbital Digital',
+                  image: 'Thiago+Nunes',
+                  result: '99,99%',
+                  resultDesc: 'com 120 sites de clientes hospedados',
+                  gradient: 'from-cyan-400/20'
+                },
+                {
+                  quote: '"Nossa API roda em VPS Cloudx com deploy via Git. Latência baixíssima para usuários no Brasil e custo 40% menor que na nuvem gringa."',
+                  author: 'Lucas Ferreira',
+                  role: 'CTO · Stackly SaaS',
+                  image: 'Lucas+Ferreira',
+                  result: '-40%',
+                  resultDesc: 'em custo de infraestrutura cloud',
+                  gradient: 'from-lime-400/15'
+                }
+              ].map((testimonial, i) => (
+                <div key={i} className="w-full flex-shrink-0 grid lg:grid-cols-3 gap-6 px-1">
+                  <div className={`lg:col-span-2 relative rounded-3xl p-10 sm:p-12 bg-gradient-to-br ${testimonial.gradient} via-[#0d0b1c] to-[#0b0b14] border border-white/10`}>
+                    <Quote className="w-14 h-14 text-white/20 mb-6" />
+                    <p className="text-2xl sm:text-3xl font-display font-medium leading-snug mb-10">{testimonial.quote}</p>
+                    <div className="flex items-center gap-4">
+                      <img src={`https://ui-avatars.com/api/?name=${testimonial.image}&background=7c3aed&color=fff&size=128`} alt={testimonial.author} loading="lazy" className="w-14 h-14 rounded-full ring-2 ring-purple-600/50" />
+                      <div><p className="font-semibold">{testimonial.author}</p><p className="text-sm text-white/50">{testimonial.role}</p></div>
+                    </div>
+                  </div>
+                  <div className="rounded-3xl p-8 bg-[#0b0b14] border border-white/10 flex flex-col justify-between">
+                    <div>
+                      <p className="text-sm text-white/50 mb-2">Resultado</p>
+                      <p className="font-display text-6xl font-bold bg-gradient-to-r from-purple-400 via-cyan-400 to-lime-400 bg-clip-text text-transparent mb-2">{testimonial.result}</p>
+                      <p className="text-white/60">{testimonial.resultDesc}</p>
+                    </div>
+                    <div className="flex text-yellow-400 mt-8">
+                      {[...Array(5)].map((_, j) => <Star key={j} className="w-5 h-5 fill-yellow-400" />)}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex justify-center gap-2 mt-10">
+            {[0, 1, 2].map((i) => (
+              <button
+                key={i}
+                onClick={() => setTestimonialIndex(i)}
+                className={`h-2.5 rounded-full transition-all duration-300 ${
+                  testimonialIndex === i ? 'w-10 bg-gradient-to-r from-purple-600 to-cyan-400' : 'w-2.5 bg-white/20'
+                }`}
+                aria-label={`Depoimento ${i + 1}`}
+              ></button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ================= FAQ ================= */}
+      <section id="faq" className="py-28 relative">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16 animate-in fade-in duration-1000">
+            <span className="inline-block px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider uppercase bg-cyan-400/15 text-cyan-400 border border-cyan-400/30 mb-5">FAQ</span>
+            <h2 className="font-display text-4xl sm:text-5xl font-bold tracking-tight mb-5">Perguntas frequentes</h2>
+            <p className="text-lg text-white/60">Não encontrou sua resposta? Nosso time responde em menos de 1 minuto.</p>
+          </div>
+
+          <div className="space-y-4 animate-in fade-in duration-1000 delay-100">
+            {[
+              { q: 'A migração do meu site é realmente gratuita?', a: 'Sim! Nossa equipe técnica migra seus sites, e-mails e bancos de dados de qualquer provedor sem custo e sem tempo fora do ar. Basta abrir um chamado após a contratação.' },
+              { q: 'Onde ficam os servidores da Cloudx?', a: 'Nossos servidores estão em datacenters Tier III em São Paulo, garantindo baixa latência para todo o Brasil e total conformidade com a LGPD.' },
+              { q: 'Como funciona a garantia de 30 dias?', a: 'Se por qualquer motivo você não ficar satisfeito nos primeiros 30 dias, devolvemos 100% do valor pago pela hospedagem. Sem perguntas, sem burocracia.' },
+              { q: 'Posso fazer upgrade do meu plano depois?', a: 'Claro! O upgrade é feito em poucos cliques pela Área do Cliente, sem perder arquivos, e-mails ou configurações. Você paga apenas a diferença proporcional.' },
+              { q: 'Quais formas de pagamento vocês aceitam?', a: 'Aceitamos Pix (com ativação imediata), boleto bancário e cartão de crédito em até 12x. A nota fiscal é emitida automaticamente a cada pagamento.' }
+            ].map((item, i) => (
+              <div key={i} className="rounded-2xl border transition-all duration-300" style={{
+                backgroundColor: faqActive === i + 1 ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.02)',
+                borderColor: faqActive === i + 1 ? 'rgba(124,58,237,0.4)' : 'rgba(255,255,255,0.1)',
+                boxShadow: faqActive === i + 1 ? '0 20px 25px rgba(124,58,237,0.1)' : 'none'
+              }}>
+                <button onClick={() => setFaqActive(faqActive === i + 1 ? null : i + 1)} className="w-full px-7 py-6 text-left flex justify-between items-center gap-4">
+                  <span className="font-semibold text-lg">{item.q}</span>
+                  <span className={`w-9 h-9 flex-shrink-0 rounded-full bg-white/5 flex items-center justify-center transition-transform duration-300 ${faqActive === i + 1 ? 'rotate-45 bg-purple-600' : ''}`}><Plus className="w-4 h-4" /></span>
+                </button>
+                {faqActive === i + 1 && (
+                  <div className="px-7 pb-6 text-white/60 leading-relaxed animate-in fade-in duration-300">{item.a}</div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ================= CONTACT / CTA ================= */}
+      <section id="contato" className="relative py-28 overflow-hidden">
+        <div className="absolute inset-0 opacity-50" style={{
+          backgroundImage: 'radial-gradient(circle at 20% 50%, rgba(124,58,237,0.1) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(6,182,212,0.1) 0%, transparent 50%)'
+        }}></div>
+        <div className="absolute -bottom-40 -left-40 w-[500px] h-[500px] rounded-full bg-purple-600 blur-[100px]" style={{ opacity: 0.3 }}></div>
+        <div className="absolute -top-20 -right-40 w-[500px] h-[500px] rounded-full bg-cyan-400 blur-[100px]" style={{ opacity: 0.25 }}></div>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            <div className="animate-in fade-in slide-in-from-left duration-1000">
+              <span className="inline-block px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider uppercase bg-lime-400/15 text-lime-400 border border-lime-400/30 mb-5">Fale conosco</span>
+              <h2 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-6">Pronto para <span className="bg-gradient-to-r from-cyan-400 to-lime-400 bg-clip-text text-transparent">acelerar</span> seu site?</h2>
+              <p className="text-lg text-white/60 leading-relaxed mb-10 max-w-xl">Solicite sua migração gratuita ou tire suas dúvidas com um especialista. Resposta em minutos, 24 horas por dia.</p>
+              <div className="space-y-4">
+                {[
+                  { href: 'https://wa.me/5500000000000', icon: MessageCircle, title: 'WhatsApp 24/7', desc: 'Atendimento humano imediato', color: 'lime' },
+                  { href: 'mailto:contato@cloudx.com.br', icon: Mail, title: 'contato@cloudx.com.br', desc: 'Comercial e parcerias', color: 'cyan' },
+                  { href: '#', icon: LifeBuoy, title: 'Central de Ajuda', desc: 'Tutoriais e abertura de tickets', color: 'purple' }
+                ].map((item, i) => {
+                  const Icon = item.icon;
+                  return (
+                    <a key={i} href={item.href} target={item.href.startsWith('http') ? '_blank' : undefined} rel={item.href.startsWith('http') ? 'noopener' : undefined} className="flex items-center gap-4 p-5 rounded-2xl bg-white/[0.03] border border-white/5 hover:border-white/20 hover:bg-white/[0.05] transition-all group">
+                      <div className={`w-12 h-12 flex-shrink-0 rounded-xl bg-${item.color}-400/15 flex items-center justify-center group-hover:scale-110 transition-transform`}><Icon className={`w-6 h-6 text-${item.color}-400`} /></div>
+                      <div><p className="font-semibold">{item.title}</p><p className="text-sm text-white/55">{item.desc}</p></div>
+                      <ArrowRight className={`w-5 h-5 text-white/40 ml-auto group-hover:text-${item.color}-400 group-hover:rotate-45 transition-all`} />
+                    </a>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="relative animate-in fade-in slide-in-from-right duration-1000 delay-200">
+              <div className="absolute -inset-4 bg-gradient-to-tr from-purple-600/30 to-cyan-400/30 rounded-[2.5rem] blur-2xl"></div>
+              <div className="relative rounded-[2rem] bg-[#0b0b14]/90 backdrop-blur-xl p-8 sm:p-10 shadow-2xl border border-white/10">
+                {!formSent ? (
+                  <form onSubmit={handleFormSubmit} className="space-y-5">
+                    <h3 className="font-display text-2xl font-bold mb-2">Solicite sua migração grátis</h3>
+                    <p className="text-sm text-white/50 mb-4">Preencha e um especialista entra em contato.</p>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <input
+                        value={formData.nome}
+                        onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                        required
+                        type="text"
+                        placeholder="Seu nome"
+                        aria-label="Nome"
+                        className="w-full px-5 py-4 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-cyan-400/60 placeholder-white/30 transition"
+                      />
+                      <input
+                        value={formData.whats}
+                        onChange={(e) => setFormData({ ...formData, whats: e.target.value })}
+                        type="tel"
+                        placeholder="WhatsApp"
+                        aria-label="WhatsApp"
+                        className="w-full px-5 py-4 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-cyan-400/60 placeholder-white/30 transition"
+                      />
+                    </div>
+                    <input
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      required
+                      type="email"
+                      placeholder="Seu melhor e-mail"
+                      aria-label="E-mail"
+                      className="w-full px-5 py-4 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-cyan-400/60 placeholder-white/30 transition"
+                    />
+                    <select
+                      value={formData.interesse}
+                      onChange={(e) => setFormData({ ...formData, interesse: e.target.value })}
+                      aria-label="Interesse"
+                      className="w-full px-5 py-4 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-cyan-400/60 text-white transition"
+                    >
+                      <option className="bg-[#05050a]">Hospedagem de Sites</option>
+                      <option className="bg-[#05050a]">WordPress Gerenciado</option>
+                      <option className="bg-[#05050a]">Servidor VPS</option>
+                      <option className="bg-[#05050a]">Cloud Dedicado</option>
+                      <option className="bg-[#05050a]">E-mail Profissional</option>
+                      <option className="bg-[#05050a]">Revenda de Hospedagem</option>
+                      <option className="bg-[#05050a]">Migração gratuita</option>
+                    </select>
+                    <textarea
+                      value={formData.msg}
+                      onChange={(e) => setFormData({ ...formData, msg: e.target.value })}
+                      rows={4}
+                      placeholder="Conte um pouco sobre seu projeto"
+                      aria-label="Mensagem"
+                      className="w-full px-5 py-4 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-cyan-400/60 placeholder-white/30 transition resize-none"
+                    ></textarea>
+                    <button type="submit" className="w-full group inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl font-semibold bg-gradient-to-r from-purple-600 to-cyan-500 hover:scale-[1.02] transition-all duration-300 shadow-2xl shadow-purple-600/40">
+                      Enviar solicitação <Send className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                    </button>
+                    <p className="text-xs text-white/30 text-center flex items-center justify-center gap-1.5"><Lock className="w-3.5 h-3.5" /> Seus dados estão protegidos conforme a LGPD.</p>
+                  </form>
+                ) : (
+                  <div className="text-center py-12 animate-in fade-in duration-500">
+                    <div className="w-20 h-20 mx-auto rounded-full bg-lime-400/15 flex items-center justify-center mb-6"><CheckCircle2 className="w-10 h-10 text-lime-400" /></div>
+                    <h3 className="font-display text-2xl font-bold mb-3">Recebemos sua solicitação!</h3>
+                    <p className="text-white/60 mb-8">Obrigado, <span className="text-white font-semibold">{formData.nome}</span>. Um especialista Cloudx falará com você em instantes.</p>
+                    <button onClick={() => { setFormSent(false); setFormData({ nome: '', email: '', whats: '', interesse: 'Hospedagem de Sites', msg: '' }); }} className="px-6 py-3 rounded-xl bg-white/[0.03] backdrop-blur-20 border border-white/10 hover:bg-white/10 font-semibold transition">Enviar outra mensagem</button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ================= FOOTER ================= */}
+      <footer className="relative border-t border-white/5 bg-black/40 pt-20 pb-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid md:grid-cols-2 lg:grid-cols-12 gap-12 mb-16">
+            <div className="lg:col-span-4">
+              <a href="#home" className="inline-flex items-center group mb-6" aria-label="Cloudx - Voltar ao topo">
+                <img src="./images/1790969492713.png" alt="Cloudx logo horizontal branca" className="h-10 w-auto object-contain filter drop-shadow-lg hover:drop-shadow-2xl transition-all group-hover:scale-105" />
+              </a>
+              <p className="text-white/50 leading-relaxed mb-6 max-w-sm">Hospedagem de sites, WordPress, VPS e Cloud de alta performance, com infraestrutura no Brasil e suporte humano 24/7.</p>
+              <div className="flex gap-3">
+                <a href="#" aria-label="Instagram" className="w-10 h-10 rounded-xl bg-white/[0.03] backdrop-blur-20 border border-white/10 flex items-center justify-center hover:bg-white/10 hover:scale-110 transition"><Mail className="w-4 h-4" /></a>
+                <a href="#" aria-label="LinkedIn" className="w-10 h-10 rounded-xl bg-white/[0.03] backdrop-blur-20 border border-white/10 flex items-center justify-center hover:bg-white/10 hover:scale-110 transition"><Mail className="w-4 h-4" /></a>
+                <a href="#" aria-label="YouTube" className="w-10 h-10 rounded-xl bg-white/[0.03] backdrop-blur-20 border border-white/10 flex items-center justify-center hover:bg-white/10 hover:scale-110 transition"><Mail className="w-4 h-4" /></a>
+                <a href="#" aria-label="Facebook" className="w-10 h-10 rounded-xl bg-white/[0.03] backdrop-blur-20 border border-white/10 flex items-center justify-center hover:bg-white/10 hover:scale-110 transition"><Mail className="w-4 h-4" /></a>
+              </div>
+            </div>
+            <div className="lg:col-span-2">
+              <h4 className="font-semibold mb-5">Produtos</h4>
+              <ul className="space-y-3 text-sm text-white/50">
+                <li><a href="#produtos" className="hover:text-white transition">Hospedagem de Sites</a></li>
+                <li><a href="#produtos" className="hover:text-white transition">WordPress</a></li>
+                <li><a href="#produtos" className="hover:text-white transition">Servidor VPS</a></li>
+                <li><a href="#produtos" className="hover:text-white transition">Cloud Dedicado</a></li>
+                <li><a href="#produtos" className="hover:text-white transition">E-mail Profissional</a></li>
+              </ul>
+            </div>
+            <div className="lg:col-span-2">
+              <h4 className="font-semibold mb-5">Empresa</h4>
+              <ul className="space-y-3 text-sm text-white/50">
+                <li><a href="#infra" className="hover:text-white transition">Infraestrutura</a></li>
+                <li><a href="#planos" className="hover:text-white transition">Planos</a></li>
+                <li><a href="#dominios" className="hover:text-white transition">Domínios</a></li>
+                <li><a href="#produtos" className="hover:text-white transition">Revenda</a></li>
+                <li><a href="#contato" className="hover:text-white transition">Contato</a></li>
+              </ul>
+            </div>
+            <div className="lg:col-span-4">
+              <h4 className="font-semibold mb-5">Receba ofertas exclusivas</h4>
+              <p className="text-sm text-white/50 mb-4">Cupons, novidades e dicas de performance direto no seu e-mail.</p>
+              <form onSubmit={(e) => { e.preventDefault(); setNewsletterOk(true); }} className="flex gap-2 p-1.5 rounded-2xl bg-white/5 border border-white/10 focus-within:border-cyan-400/60 transition">
+                <input type="email" required placeholder="seu@email.com" aria-label="E-mail para newsletter" className="flex-1 bg-transparent px-4 py-3 outline-none placeholder-white/30 text-sm min-w-0" />
+                <button type="submit" className="px-5 py-3 rounded-xl bg-white text-[#05050a] text-sm font-semibold hover:scale-105 transition">{newsletterOk ? 'Inscrito ✓' : 'Assinar'}</button>
+              </form>
+              <div className="mt-6 flex items-center gap-2 text-xs text-white/40"><span className="relative w-2 h-2 rounded-full bg-lime-400 animate-pulse"></span> Todos os sistemas operacionais</div>
+            </div>
+          </div>
+          <div className="pt-8 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-white/40">
+            <p>© 2026 Cloudx. Todos os direitos reservados.</p>
+            <div className="flex flex-wrap justify-center gap-6">
+              <a href="#" className="hover:text-white transition">Termos de uso</a>
+              <a href="#" className="hover:text-white transition">Política de privacidade</a>
+              <a href="#" className="hover:text-white transition">LGPD</a>
+            </div>
+          </div>
+        </div>
+      </footer>
+
+      {/* WhatsApp flutuante */}
+      <a href="https://wa.me/5500000000000" target="_blank" rel="noopener" aria-label="Fale conosco no WhatsApp" className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-gradient-to-br from-lime-400 to-cyan-400 text-[#05050a] flex items-center justify-center shadow-2xl shadow-cyan-400/40 hover:scale-110 transition animate-bounce">
+        <MessageCircle className="w-7 h-7" />
+      </a>
+
+      <style>{`
+        @keyframes marquee {
+          from { transform: translateX(0); }
+          to { transform: translateX(-50%); }
+        }
+        .animate-marquee {
+          animation: marquee 35s linear infinite;
+        }
+      `}</style>
+    </div>
+  );
+}
+<!-- SITEXPRES_REACT_END --></script>
+  <iframe src="https://sugestodesubdom.sitexpres.com.br" title="Preview"></iframe>
+</body>
+</html>
