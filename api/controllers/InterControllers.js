@@ -20,8 +20,15 @@ const CHAVE_PIX = process.env.INTER_CHAVE_PIX;
 /* -----------------------------------------
    1) GERAR TOKEN OAUTH2
 --------------------------------------------*/
+let cachedToken = null;
+let tokenExpirationTime = null;
+
 async function gerarToken() {
-    console.log("Gerando token Inter...");
+    if (cachedToken && tokenExpirationTime && (Date.now() + 60000 < tokenExpirationTime)) {
+        return cachedToken;
+    }
+
+    console.log("Gerando novo token Inter...");
 
     const data = new URLSearchParams({
         client_id: CLIENT_ID,
@@ -52,7 +59,11 @@ async function gerarToken() {
                     return reject(new Error(`Erro ao gerar token (Status: ${res.statusCode}). Verifique se o CLIENT_ID, SECRET e Certificados estão corretos.`));
                 }
                 try {
-                    resolve(JSON.parse(body));
+                    const tokenData = JSON.parse(body);
+                    cachedToken = tokenData;
+                    // Token validity in seconds (default is 3600), converted to milliseconds
+                    tokenExpirationTime = Date.now() + ((tokenData.expires_in || 3600) * 1000);
+                    resolve(tokenData);
                 } catch (err) {
                     reject(new Error(`Erro ao fazer parse do JSON (Token): ${err.message}. Body: ${body}`));
                 }
