@@ -1038,7 +1038,7 @@ export const restauracao_versao = async (req, res) => {
     if (!fsSync.existsSync(tmpBase)) {
       fsSync.mkdirSync(tmpBase, { recursive: true });
     }
-    const tmpDirName = \`restauracao_\${id_projeto}_\${Date.now()}\`;
+    const tmpDirName = `restauracao_${id_projeto}_${Date.now()}`;
     const tmpDirPath = path.join(tmpBase, tmpDirName);
     
     let distPath = null;
@@ -1055,7 +1055,7 @@ export const restauracao_versao = async (req, res) => {
           const indexHtmlPath = path.join(tmpDirPath, "index.html");
           if (fsSync.existsSync(indexHtmlPath)) {
             let indexHtmlContent = await fs.readFile(indexHtmlPath, 'utf8');
-            indexHtmlContent = indexHtmlContent.replace(/<title>.*?<\\/title>/i, \`<title>\${siteNome}</title>\`);
+            indexHtmlContent = indexHtmlContent.replace(/<title>.*?<\/title>/i, `<title>${siteNome}</title>`);
             await fs.writeFile(indexHtmlPath, indexHtmlContent, 'utf8');
           }
         }
