@@ -104,26 +104,37 @@ ${prompt}
   // Modo econômico: a IA devolve só blocos SEARCH/REPLACE (o código vai UMA vez, com cache)
   const systemPromptBlocos = `
 Você é um Engenheiro UX SÊNIOR especialista em EDITAR componentes React (App.jsx) existentes.
-Faça APENAS as modificações pedidas, mantendo todo o resto intacto.
+Faça APENAS as modificações pedidas pelo usuário, mantendo todo o resto intacto.
 
-⚠️ NÃO retorne o arquivo inteiro. Retorne SOMENTE blocos de edição neste formato exato:
+⚠️ OBRIGATÓRIO: NÃO retorne o arquivo inteiro. Retorne SOMENTE os blocos de edição no formato exato abaixo. Se você não usar o formato, o sistema irá falhar.
 
 <<<<<<< SEARCH
-(trecho EXATO copiado do código atual, com 2-3 linhas de contexto para ser único)
+[Copie aqui o trecho exato do código original que deseja alterar, incluindo 2 ou 3 linhas acima e abaixo para contexto]
 =======
-(trecho novo que substitui o anterior)
+[Escreva aqui o novo código que irá substituir o trecho acima]
 >>>>>>> REPLACE
 
-REGRAS:
-- Pode usar vários blocos, na ordem em que aparecem no arquivo. Cada SEARCH deve existir exatamente uma vez no código.
-- Copie o SEARCH caractere por caractere (indentação inclusa). Não use "..." nem comentários no lugar de código.
-- Para inserir algo, use no SEARCH uma linha existente próxima e repita-a no REPLACE junto com o novo conteúdo.
-- Para apagar, deixe o REPLACE vazio.
-- Se precisar de novo import/ícone, edite a linha de import com um bloco.
-- Sem explicações, sem markdown, sem texto fora dos blocos.
+EXEMPLO DE USO:
+<<<<<<< SEARCH
+    <footer className="text-gray-500">
+      <p>Copyright 2024</p>
+    </footer>
+=======
+    <footer className="text-gray-500 flex justify-between">
+      <p>Copyright 2024</p>
+      <a href="/termos-de-uso">Termos de Uso</a>
+    </footer>
+>>>>>>> REPLACE
+
+REGRAS CRÍTICAS:
+- Pode usar vários blocos, na ordem em que aparecem no arquivo.
+- O bloco SEARCH deve existir EXATAMENTE igual no código original (copie e cole).
+- NUNCA use "..." (reticências) para omitir código.
+- NUNCA retorne o código inteiro do componente, APENAS os blocos alterados.
+- Se não for necessário mudar uma linha, não mude.
 - ÍCONES: NUNCA importe ícones de redes sociais do 'lucide-react' (Facebook, Instagram, Linkedin, Youtube, Twitter).
 
-CÓDIGO ATUAL:
+CÓDIGO ATUAL (base para o SEARCH):
 ${baseHTML}
 `;
 

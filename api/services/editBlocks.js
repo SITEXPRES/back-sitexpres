@@ -1,7 +1,7 @@
 // Edição por blocos SEARCH/REPLACE: a IA devolve só o que mudou e o backend aplica no código atual.
 // Reduz drasticamente os tokens de saída (e evita reescrever o arquivo inteiro).
 
-const BLOCK_RE = /<<<<<<< SEARCH\r?\n([\s\S]*?)\r?\n=======\r?\n([\s\S]*?)>>>>>>> REPLACE/g;
+const BLOCK_RE = /<{4,9}\s*SEARCH\r?\n([\s\S]*?)\r?\n={4,9}\r?\n([\s\S]*?)>{4,9}\s*REPLACE/gi;
 
 export function parseEditBlocks(text) {
   const blocks = [];

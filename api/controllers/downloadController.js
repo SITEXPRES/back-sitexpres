@@ -23,7 +23,20 @@ export const downloadSite = async (req, res) => {
 
     res.attachment(`site-${id}.zip`);
     
-    const archive = archiver("zip", { zlib: { level: 9 } });
+    let archive;
+    if (archiver && archiver.ZipArchive) {
+      archive = new archiver.ZipArchive({ zlib: { level: 9 } });
+    } else if (archiver && archiver.default && archiver.default.ZipArchive) {
+      archive = new archiver.default.ZipArchive({ zlib: { level: 9 } });
+    } else if (typeof archiver === 'function') {
+      archive = archiver('zip', { zlib: { level: 9 } });
+    } else if (archiver && typeof archiver.create === 'function') {
+      archive = archiver.create('zip', { zlib: { level: 9 } });
+    } else if (archiver && typeof archiver.default === 'function') {
+      archive = archiver.default('zip', { zlib: { level: 9 } });
+    } else {
+      throw new Error("Archiver não é suportado: " + typeof archiver);
+    }
     
     archive.on("error", (err) => {
       console.error("Erro no archiver:", err);
