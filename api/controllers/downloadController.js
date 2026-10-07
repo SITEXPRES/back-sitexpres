@@ -16,9 +16,9 @@ export const downloadSite = async (req, res) => {
       return res.download(zipPath, `site-${id}.zip`);
     }
 
-    // 2. Fallback: Gerar ZIP sob demanda (apenas HTML + imagens básicas)
+    // 2. Fallback: Gerar ZIP sob demanda
     const siteRes = await pool.query(
-      `SELECT html_content FROM generated_sites WHERE id_projeto = $1 AND status = 'ativo' ORDER BY created_at DESC LIMIT 1`,
+      `SELECT html_content, js_content FROM generated_sites WHERE id_projeto = $1 AND status = 'ativo' ORDER BY created_at DESC LIMIT 1`,
       [id]
     );
 
@@ -26,10 +26,11 @@ export const downloadSite = async (req, res) => {
       return res.status(404).json({ success: false, message: "Site não encontrado para download" });
     }
 
-    const html = desatrelarHtmlSitexpress(siteRes.rows[0].html_content);
+    const { html_content, js_content } = siteRes.rows[0];
+    const html = desatrelarHtmlSitexpress(html_content);
     const arquivosExtras = await coletarArquivosProjeto(id, html, null, pool);
 
-    res.attachment(`site-${id}.zip`);
+    res.attachment(`site-${id}-source.zip`);
     
     let archive;
     if (archiver && archiver.ZipArchive) {
@@ -55,11 +56,39 @@ export const downloadSite = async (req, res) => {
 
     archive.pipe(res);
 
-    archive.append(html, { name: "index.html" });
-    
-    if (Array.isArray(arquivosExtras)) {
-      for (const arq of arquivosExtras) {
-        archive.file(arq.localPath, { name: `images/${arq.remoteName}` });
+    if (js_content) {
+      // É um projeto Vite/React
+      const templatePath = path.join(process.cwd(), "templates", "vite-base");
+      if (fs.existsSync(templatePath)) {
+        archive.directory(templatePath, false);
+      }
+      archive.append(js_content, { name: "src/App.jsx" });
+      
+      const readme = `PROJETO REACT/VITE - SITEXPRESS
+Este é o código fonte do seu site gerado por inteligência artificial.
+
+Para rodar este projeto na sua máquina local:
+1. Tenha o Node.js instalado (https://nodejs.org).
+2. Abra o terminal na pasta deste projeto extraído.
+3. Rode o comando: npm install
+4. Rode o comando: npm run dev
+
+Seu site estará rodando no endereço http://localhost:5173
+`;
+      archive.append(readme, { name: "LEIA-ME.txt" });
+
+      if (Array.isArray(arquivosExtras)) {
+        for (const arq of arquivosExtras) {
+          archive.file(arq.localPath, { name: `public/images/${arq.remoteName}` });
+        }
+      }
+    } else {
+      // HTML legado
+      archive.append(html, { name: "index.html" });
+      if (Array.isArray(arquivosExtras)) {
+        for (const arq of arquivosExtras) {
+          archive.file(arq.localPath, { name: `images/${arq.remoteName}` });
+        }
       }
     }
     
