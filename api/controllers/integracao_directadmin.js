@@ -93,7 +93,12 @@ export async function enviarHTMLSubdominio(host, usuario, senha, subdominio, htm
     // Envia o arquivo index.html
     await client.uploadFrom(htmlStream, `${remoteDir}/index.html`);
 
-    console.log(`✅ HTML enviado com sucesso para ${subdominio}!`);
+    // Envia o arquivo .htaccess para permitir roteamento SPA
+    const htaccessContent = "<IfModule mod_rewrite.c>\n  RewriteEngine On\n  RewriteBase /\n  RewriteRule ^index\\.html$ - [L]\n  RewriteCond %{REQUEST_FILENAME} !-f\n  RewriteCond %{REQUEST_FILENAME} !-d\n  RewriteRule . /index.html [L]\n</IfModule>";
+    const htaccessStream = Readable.from([htaccessContent]);
+    await client.uploadFrom(htaccessStream, `${remoteDir}/.htaccess`);
+
+    console.log(`✅ HTML e .htaccess enviados com sucesso para ${subdominio}!`);
 
     // Envia arquivos extras (como imagens, logos e assets) para desatrelar da Sitexpres
     if (Array.isArray(arquivosExtras) && arquivosExtras.length > 0) {
@@ -184,7 +189,12 @@ export async function enviarDiretorioSubdominio(host, usuario, senha, subdominio
       console.warn(`[FTP] ⚠️ Não foi possível listar arquivos remotos após upload:`, listErr.message);
     }
 
-    console.log(`✅ Diretório enviado com sucesso para ${subdominio}!`);
+    // Envia o arquivo .htaccess para permitir roteamento no SPA
+    const htaccessContent = "<IfModule mod_rewrite.c>\n  RewriteEngine On\n  RewriteBase /\n  RewriteRule ^index\\.html$ - [L]\n  RewriteCond %{REQUEST_FILENAME} !-f\n  RewriteCond %{REQUEST_FILENAME} !-d\n  RewriteRule . /index.html [L]\n</IfModule>";
+    const htaccessStream = Readable.from([htaccessContent]);
+    await client.uploadFrom(htaccessStream, `${remoteDir}/.htaccess`);
+
+    console.log(`✅ Diretório e .htaccess enviados com sucesso para ${subdominio}!`);
   } catch (err) {
     console.error("❌ Erro ao enviar Diretório:", err);
     throw err;
