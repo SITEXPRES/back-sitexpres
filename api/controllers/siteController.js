@@ -33,7 +33,7 @@ const USE_GEMINI = false;
 
 //
 const MODEL = "claude-haiku-4-5-20251001";
-const MAX_TOKENS = 20000;
+const MAX_TOKENS = 64000;
 
 // Função para gerar cada parte do site
 // Função para limpar blocos de markdown ou tags extras

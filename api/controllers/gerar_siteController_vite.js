@@ -21,7 +21,7 @@ const anthropic = new Anthropic({
 });
 
 // Baseline de tokens para cálculo de progresso
-const MAX_TOKENS = 6000;
+const MAX_TOKENS = 64000;
 
 function limparRetorno(codigo) {
   // Remove blocos de markdown com qualquer linguagem (jsx, js, tsx, html, javascript, etc.)
@@ -66,6 +66,8 @@ REGRAS:
    - Para imagens complementares de alta qualidade, use 'https://source.unsplash.com/...' ou 'https://picsum.photos/...'.
    - NUNCA use domínios como back.sitexpres.com.br!
 7. O código deve ser self-contained em um único arquivo (incluindo sub-componentes se necessário).
+8. ECONOMIA DE TOKENS EM ARRAYS REPETITIVOS: Para seções gigantes como tabelas de planos de preços, galerias com muitas fotos, mega-menus, listas de dezenas de depoimentos ou parceiros, **escreva apenas 1 ou 2 itens de exemplo no código** e omita o restante usando comentários (ex: "// Restante dos planos originais omitidos para poupar espaço").
+9. ROTEAMENTO: Se o usuário pedir para criar uma NOVA PÁGINA, você DEVE gerar o componente para ela E registrá-la no objeto de rotas \`routes\` ao final do arquivo!
 
 Analise o prompt do usuário e gere a melhor interface possível para o cenário descrito.
 `;
@@ -80,6 +82,8 @@ O novo componente deve manter o mesmo visual ou melhorá-lo, e deve obrigatoriam
 
 ⚠️ RETORNE APENAS O CÓDIGO REACT ATUALIZADO (JSX). NUNCA retorne HTML puro (sem <!DOCTYPE html>). Sem explicações, sem markdown.
 ⚠️ ÍCONES: NUNCA importe ícones de redes sociais do 'lucide-react' (ex: Facebook, Instagram, Linkedin, Youtube, Twitter). Eles NÃO estão exportados e causarão erro de build!
+⚠️ ECONOMIA DE TOKENS: Em arrays e mapeamentos repetitivos (planos de hospedagem, tabelas de preços, dezenas de depoimentos, parceiros, perguntas frequentes, etc), caso a alteração do usuário NÃO envolva diretamente esses itens, MANTENHA O CÓDIGO CURTO listando apenas 1 ou 2 exemplos e colocando um comentário \`// [demais itens mantidos]\`.
+⚠️ NOVA PÁGINA: Se for criar uma página nova, inclua o componente e obrigatoriamente registre-o nas rotas (routes) no final do código.
 
 CÓDIGO HTML ATUAL:
 ${baseHTML}
@@ -93,6 +97,8 @@ Faça APENAS as modificações solicitadas pelo usuário, mantendo todo o resto 
 
 ⚠️ RETORNE APENAS O CÓDIGO REACT ATUALIZADO. Sem explicações, sem markdown, apenas código válido.
 ⚠️ ÍCONES: NUNCA importe ícones de redes sociais do 'lucide-react' (ex: Facebook, Instagram, Linkedin, Youtube, Twitter). Eles NÃO estão exportados e causarão erro de build!
+⚠️ ECONOMIA DE TOKENS: Em arrays e componentes repetitivos (ex: lista de dezenas de planos, faq, depoimentos, galerias gigantes), se a alteração NÃO for no meio deles, retorne o código com apenas 1 item de exemplo e diga \`// restante dos depoimentos originais omitidos para poupar espaço\`.
+⚠️ CRIAR PÁGINA: Se o prompt pedir para adicionar nova página, crie o componente da página e REGISTRE OBRIGATORIAMENTE no objeto de rotas \`const routes\` no final do arquivo.
 
 CÓDIGO ATUAL:
 ${baseHTML}

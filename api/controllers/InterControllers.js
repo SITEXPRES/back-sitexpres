@@ -724,6 +724,9 @@ export const criarCobranca = async (req, res) => {
         }
         // 2. Verifica se o valor corresponde à quantidade de créditos * 1.00
         else {
+            if (creditos < 10) {
+                return res.status(400).json({ erro: "A compra mínima avulsa é de 10 créditos." });
+            }
             const valorEsperado = creditos * precoPorCredito;
             if (Math.abs(valorNumerico - valorEsperado) < 0.01) {
                 valorValido = true;
@@ -866,6 +869,9 @@ export const criarCobrancaUnica = async (req, res) => {
     }
     // 2. Verifica se o valor corresponde à quantidade de créditos * 1.00
     else {
+        if (creditos < 10) {
+            return res.status(400).json({ erro: "A compra mínima avulsa é de 10 créditos." });
+        }
         const valorEsperado = creditos * precoPorCredito;
         if (Math.abs(valorNumerico - valorEsperado) < 0.01) {
             valorValido = true;

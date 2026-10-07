@@ -55,6 +55,9 @@ export async function createOrder(req, res) {
             return res.status(400).json({ error: "Tentativa de fraude detectada: o plano de R$29,90 só permite a compra exata de 100 créditos." });
         }
     } else {
+        if (creditosParaValidar < 10) {
+            return res.status(400).json({ error: "A compra mínima avulsa é de 10 créditos." });
+        }
         const valorEsperado = creditosParaValidar * 1.00;
         if (Math.abs(valorParaValidar - valorEsperado) < 0.01) {
             valorValido = true;
