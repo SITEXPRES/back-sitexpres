@@ -8,7 +8,15 @@ import { desatrelarHtmlSitexpress, coletarArquivosProjeto } from "../utils/siteA
 
 export const downloadSite = async (req, res) => {
   const { id } = req.params;
+  
   try {
+    // 1. Tentar enviar o ZIP pré-gerado (que contém todo o build do Vite com assets)
+    const zipPath = path.join(process.cwd(), 'uploads', 'zips', `${id}.zip`);
+    if (fs.existsSync(zipPath)) {
+      return res.download(zipPath, `site-${id}.zip`);
+    }
+
+    // 2. Fallback: Gerar ZIP sob demanda (apenas HTML + imagens básicas)
     const siteRes = await pool.query(
       `SELECT html_content FROM generated_sites WHERE id_projeto = $1 AND status = 'ativo' ORDER BY created_at DESC LIMIT 1`,
       [id]

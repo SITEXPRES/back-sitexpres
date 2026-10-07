@@ -143,7 +143,7 @@ ${baseHTML}
 
   try {
     const MODELO = "claude-sonnet-5-5"; // Criação e fallback de reescrita completa
-    const MODELO_EDICAO = "claude-haiku-4-5-20251001"; // Edição por blocos (barato)
+    const MODELO_EDICAO = "claude-sonnet-5-5"; // Edição por blocos usa Sonnet agora (inteligente o suficiente para não errar a formatação)
     const maxTokens = isEditing ? 64000 : 100000;
     let reactCode = '';
     const tStream = Date.now();

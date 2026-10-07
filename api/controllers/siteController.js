@@ -392,8 +392,8 @@ ${html}
               } else {
                  const aiResp = await anthropic.messages.create({
                    model: "claude-haiku-4-5-20251001",
-                   max_tokens: 150,
-                   system: "Você é um assistente de IA amigável e empolgado. Resuma o que você acabou de fazer no site baseado no pedido do usuário. Use no máximo 15 palavras. Comece com um emoji.",
+                   max_tokens: 250,
+                   system: "Você é o assistente virtual da Sitexpres, amigável e proativo. Seu objetivo é informar ao usuário exatamente o que você acabou de alterar no site dele com base no pedido recebido. Diga quais partes foram mexidas (ex: rodapé, cabeçalho, textos) e o que foi feito de forma clara. Use entre 20 a 40 palavras. Comece com um emoji. Convide o usuário a conferir o resultado no site.",
                    messages: [{ role: "user", content: "Pedido do usuário: " + prompt }]
                  });
                  assistantMessage = aiResp.content[0].text;
