@@ -707,7 +707,7 @@ export const criarCobranca = async (req, res) => {
 
         const valorNumerico = parseFloat(valor);
         const creditos = parseInt(qtd_creditos);
-        const precoPorCredito = 0.85;
+        const precoPorCredito = 1.00;
         const valorPlanoEspecial = 29.90;
         const precoCreditoPlano = 0.60; // Apenas informativo, a validação é pelo valor total do plano
 
@@ -716,9 +716,13 @@ export const criarCobranca = async (req, res) => {
 
         // 1. Verifica se é o plano especial de 29.90
         if (Math.abs(valorNumerico - valorPlanoEspecial) < 0.01) {
-            valorValido = true;
+            if (creditos === 100) {
+                valorValido = true;
+            } else {
+                return res.status(400).json({ erro: "Tentativa de fraude detectada: o plano de R$29,90 só permite a compra exata de 100 créditos." });
+            }
         }
-        // 2. Verifica se o valor corresponde à quantidade de créditos * 0.85
+        // 2. Verifica se o valor corresponde à quantidade de créditos * 1.00
         else {
             const valorEsperado = creditos * precoPorCredito;
             if (Math.abs(valorNumerico - valorEsperado) < 0.01) {
@@ -728,7 +732,7 @@ export const criarCobranca = async (req, res) => {
 
         if (!valorValido) {
             return res.status(400).json({
-                erro: "Valor incorreto. O valor deve ser 29.90 (Plano) ou corresponder a qtd_creditos * 0.85."
+                erro: "Valor incorreto. O valor deve ser 29.90 (Plano) ou corresponder a qtd_creditos * 1.00."
             });
         }
 
@@ -846,7 +850,7 @@ export const criarCobrancaUnica = async (req, res) => {
 
     const valorNumerico = parseFloat(valor);
     const creditos = parseInt(qtd_creditos);
-    const precoPorCredito = 0.85;
+    const precoPorCredito = 1.00;
     const valorPlanoEspecial = 29.90;
 
     // Validação do valor
@@ -854,9 +858,13 @@ export const criarCobrancaUnica = async (req, res) => {
 
     // 1. Verifica se é o plano especial de 29.90
     if (Math.abs(valorNumerico - valorPlanoEspecial) < 0.01) {
-        valorValido = true;
+        if (creditos === 100) {
+            valorValido = true;
+        } else {
+            return res.status(400).json({ erro: "Tentativa de fraude detectada: o plano de R$29,90 só permite a compra exata de 100 créditos." });
+        }
     }
-    // 2. Verifica se o valor corresponde à quantidade de créditos * 0.85
+    // 2. Verifica se o valor corresponde à quantidade de créditos * 1.00
     else {
         const valorEsperado = creditos * precoPorCredito;
         if (Math.abs(valorNumerico - valorEsperado) < 0.01) {
@@ -866,7 +874,7 @@ export const criarCobrancaUnica = async (req, res) => {
 
     if (!valorValido) {
         return res.status(400).json({
-            erro: "Valor incorreto. O valor deve ser 29.90 (Plano) ou corresponder a qtd_creditos * 0.85."
+            erro: "Valor incorreto. O valor deve ser 29.90 (Plano) ou corresponder a qtd_creditos * 1.00."
         });
     }
 

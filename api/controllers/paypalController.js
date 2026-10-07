@@ -41,6 +41,31 @@ async function getAccessToken() {
 
 export async function createOrder(req, res) {
   try {
+    // ----------------------------------------
+    // VALIDAÇÃO DE PREÇO VS CRÉDITOS (SEGURANÇA)
+    // ----------------------------------------
+    const valorParaValidar = parseFloat(req.body.value || "29.90");
+    const creditosParaValidar = parseInt(req.body.qtd_creditos || 10);
+    
+    let valorValido = false;
+    if (Math.abs(valorParaValidar - 29.90) < 0.01) {
+        if (creditosParaValidar === 100) {
+            valorValido = true;
+        } else {
+            return res.status(400).json({ error: "Tentativa de fraude detectada: o plano de R$29,90 só permite a compra exata de 100 créditos." });
+        }
+    } else {
+        const valorEsperado = creditosParaValidar * 1.00;
+        if (Math.abs(valorParaValidar - valorEsperado) < 0.01) {
+            valorValido = true;
+        }
+    }
+
+    if (!valorValido) {
+        return res.status(400).json({ error: "Valor incorreto. O valor deve ser 29.90 (Plano) ou corresponder a qtd_creditos * 1.00." });
+    }
+    // ----------------------------------------
+
     const request = new checkoutNodeJssdk.orders.OrdersCreateRequest();
     request.prefer("return=representation");
 
