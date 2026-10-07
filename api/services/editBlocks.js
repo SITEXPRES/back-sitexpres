@@ -11,20 +11,37 @@ export function parseEditBlocks(text) {
   return blocks;
 }
 
-function applyFuzzy(lines, searchLines, replaceText) {
-  // fallback: compara linhas ignorando indentação/espaços nas pontas
-  const norm = (l) => l.trim();
-  const s = searchLines.map(norm);
-  if (!s.length || s.every((l) => l === '')) return null;
-  for (let i = 0; i <= lines.length - s.length; i++) {
-    let ok = true;
-    for (let j = 0; j < s.length; j++) {
-      if (norm(lines[i + j]) !== s[j]) { ok = false; break; }
-    }
-    if (ok) {
-      return [...lines.slice(0, i), ...replaceText.split('\n'), ...lines.slice(i + s.length)];
+function applyUltraFuzzy(original, search, replaceText) {
+  // Remove TODOS os espaços/quebras de linha para busca
+  const stripSpaces = (str) => str.replace(/\s+/g, '');
+  const searchStripped = stripSpaces(search);
+  
+  if (searchStripped.length === 0) return null;
+
+  // Cria um mapa: índice da string "espremida" -> índice original no arquivo
+  let strippedIdx = 0;
+  const indexMap = [];
+  for (let i = 0; i < original.length; i++) {
+    if (!/\s/.test(original[i])) {
+      indexMap[strippedIdx] = i;
+      strippedIdx++;
     }
   }
+
+  const originalStripped = stripSpaces(original);
+  const matchIdx = originalStripped.indexOf(searchStripped);
+
+  if (matchIdx !== -1) {
+    // Encontrou! Mapeia de volta para os índices do arquivo original
+    const startOriginalIdx = indexMap[matchIdx];
+    const endOriginalIdx = indexMap[matchIdx + searchStripped.length - 1];
+    
+    // Substitui exatamente aquele bloco (preservando o restante do arquivo)
+    const before = original.slice(0, startOriginalIdx);
+    const after = original.slice(endOriginalIdx + 1);
+    return before + replaceText + after;
+  }
+
   return null;
 }
 
@@ -39,14 +56,23 @@ export function applyEditBlocks(original, blocks) {
   for (const b of blocks) {
     const search = b.search.replace(/\r\n/g, '\n');
     const replace = b.replace.replace(/\r\n/g, '\n');
+    
+    // Tentativa 1: Exata
     const idx = code.indexOf(search);
     if (idx !== -1 && search.trim() !== '') {
       code = code.slice(0, idx) + replace + code.slice(idx + search.length);
       applied++;
       continue;
     }
-    const res = applyFuzzy(code.split('\n'), search.split('\n'), replace);
-    if (res) { code = res.join('\n'); applied++; } else failed++;
+    
+    // Tentativa 2: "Ultra Fuzzy" - Salva a vida se a IA errar espaços ou pular linhas!
+    const res = applyUltraFuzzy(code, search, replace);
+    if (res) { 
+      code = res; 
+      applied++; 
+    } else {
+      failed++;
+    }
   }
   return { code, applied, failed };
 }
