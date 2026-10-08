@@ -252,14 +252,86 @@ export const newsite = async (req, res) => {
             ? `${promptWithUrls}\n[INSTRUÇÃO DE IMAGENS/LOGOS: O usuário enviou ${uploadedFiles.length} imagem(ns). Utilize os caminhos relativos abaixo nas tags <img> correspondentes. O nome original do arquivo indica o propósito de cada imagem (ex: "logo.png" → use como logo, "footer.jpg" → use no footer, "banner.jpg" → use como banner):\n${uploadedFiles.map((f, i) => `- Arquivo "${f.originalname}" → caminho: "./images/${f.filename}" (ex: <img src="./images/${f.filename}" alt="${f.originalname.replace(/\.[^.]+$/, '')}">)`).join('\n')}\nNUNCA utilize links absolutos apontando para back.sitexpres.com.br nem links externos para esses arquivos!]`
             : promptWithUrls;
 
+          let historyText = "";
+          let chatHistory = [];
+          if (!primeiraVez) {
+            try {
+              const pastPrompts = await client.query(
+                `SELECT prompt, assistant_message FROM site_prompts
+                 WHERE id_projeto = $1
+                 ORDER BY created_at ASC LIMIT 10`,
+                [id_projeto]
+              );
+              if (pastPrompts.rows.length > 0) {
+                historyText = "\n\n[HISTÓRICO DA CONVERSA]:\n" + pastPrompts.rows.map(p => `Usuário: ${p.prompt}\nAssistente: ${p.assistant_message || ""}`).join("\n\n") + "\n\n";
+                
+                pastPrompts.rows.forEach(p => {
+                  chatHistory.push({ role: "user", content: p.prompt });
+                  if (p.assistant_message) {
+                    chatHistory.push({ role: "assistant", content: p.assistant_message });
+                  }
+                });
+              }
+            } catch (err) {
+              console.error("Erro ao buscar histórico:", err);
+            }
+          }
+
+          let isQuestionOnly = false;
+          let questionAnswer = "";
+
+          if (!primeiraVez) {
+            logStep(jobId, '🤖 Classificando intenção (modificação vs pergunta)...');
+            try {
+               const intentResp = await anthropic.messages.create({
+                 model: "claude-haiku-4-5-20251001",
+                 max_tokens: 300,
+                 system: "Você é um avaliador de intenção. Avalie se o usuário quer modificar o site (ex: adicione, mude cor, crie botão, apague, remova, etc) ou se está apenas fazendo uma pergunta ou batendo papo (ex: quantas imagens tem?, qual a cor atual?, por que fez isso?). Se for APENAS pergunta/bate-papo, responda EXATAMENTE com [PERGUNTA] seguido da resposta amigável (sempre comece a resposta com um emoji). Se for qualquer tipo de modificação, responda EXATAMENTE com [MODIFICACAO].",
+                 messages: [...chatHistory, { role: "user", content: prompt }]
+               });
+               const intentText = intentResp.content[0].text.trim();
+               if (intentText.startsWith("[PERGUNTA]")) {
+                 isQuestionOnly = true;
+                 questionAnswer = intentText.replace("[PERGUNTA]", "").trim();
+                 logStep(jobId, '✅ Intenção: PERGUNTA. Resposta gerada.');
+               } else {
+                 logStep(jobId, '✅ Intenção: MODIFICAÇÃO.');
+               }
+            } catch (err) {
+               console.error("Erro na classificação de intenção:", err);
+            }
+          }
+
           finalPrompt = primeiraVez
             ? fullPrompt
-            : `Faça as alterações solicitadas: ${fullPrompt}`;
-
+            : `[Contexto do Pedido]\nHistórico:\n${historyText}\n\nFaça as alterações solicitadas: ${fullPrompt}`;
 
           // ─── LIBERA O CLIENT antes da IA (operação longa!) ──────────────────
           client.release();
           client = null;
+
+          if (isQuestionOnly) {
+             logStep(jobId, '🔗 Reconectando ao BD para salvar apenas a mensagem (sem gerar código)...');
+             client = await pool.connect();
+             const novoId = existing.rows[0].id;
+             try {
+               await client.query(
+                 `INSERT INTO site_prompts (user_id, id_projeto, prompt, id_site_gererate, status, assistant_message)
+                  VALUES ($1, $2, $3, $4, $5, $6)`,
+                 [userId, id_projeto, prompt, novoId, 'ativo', questionAnswer]
+               );
+             } catch (e) {
+               console.error("Erro ao inserir site_prompts para pergunta:", e);
+             }
+             client.release();
+             client = null;
+             
+             jobs[jobId].progress = 100;
+             jobs[jobId] = { status: "done", result: { html_content: baseHTML, assistant_message: questionAnswer }, error: null };
+             logStep(jobId, `🎉 Job concluído (Apenas Resposta)`);
+             return;
+          }
+
           logStep(jobId, '🔓 Conexão com BD liberada — iniciando chamada à IA...');
 
           // ─── FASE 2: chamada à IA (sem conexão BD aberta) ───────────────────
@@ -393,8 +465,8 @@ ${html}
                  const aiResp = await anthropic.messages.create({
                    model: "claude-haiku-4-5-20251001",
                    max_tokens: 250,
-                   system: "Você é o assistente virtual da Sitexpres, amigável e proativo. Seu objetivo é informar ao usuário exatamente o que você acabou de alterar no site dele com base no pedido recebido. Diga quais partes foram mexidas (ex: rodapé, cabeçalho, textos) e o que foi feito de forma clara. Use entre 20 a 40 palavras. Comece com um emoji. Convide o usuário a conferir o resultado no site.",
-                   messages: [{ role: "user", content: "Pedido do usuário: " + prompt }]
+                   system: "Você é o assistente virtual da Sitexpres, amigável e proativo. Se o usuário pediu uma alteração, informe o que você acabou de alterar no site dele com base no pedido recebido (ex: rodapé, cabeçalho, textos) de forma clara, usando entre 20 a 40 palavras, e convide-o a conferir o resultado. Se o usuário fizer uma pergunta, responda de forma natural com base no contexto do chat. (Mesmo que não saiba detalhes muito técnicos do código gerado, dê uma resposta coerente e prestativa). Sempre comece com um emoji.",
+                   messages: [...chatHistory, { role: "user", content: "Pedido atual: " + prompt }]
                  });
                  assistantMessage = aiResp.content[0].text;
               }
