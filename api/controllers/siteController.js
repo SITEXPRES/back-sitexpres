@@ -1003,6 +1003,7 @@ export const restauracao_versao = async (req, res) => {
   try {
     const { id, id_projeto, id_site_gererate } = req.body;
 
+    console.log('==== Restore Version ====')
     console.log("Dados recebidos:", { id, id_projeto, id_site_gererate });
 
     // Colocando todos os site_prompts como inativo

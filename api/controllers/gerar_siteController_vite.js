@@ -62,7 +62,7 @@ REGRAS:
 4. Crie uma interface moderna, clean, com micro-interações, hover states e design premium.
 5. ÍCONES: NUNCA importe ícones de redes sociais do 'lucide-react' (ex: Facebook, Instagram, Linkedin, Youtube, Twitter). Eles não estão exportados e causarão erro no build! Se precisar, use SVGs inline ou apenas texto (ex: "Instagram").
 6. Imagens e Logos:
-   - Se o prompt solicitar imagem ou logo enviado pelo usuário, use estritamente o caminho relativo informado (ex: "./images/arquivo.png").
+   - Se o prompt solicitar imagem ou logo enviado pelo usuário, use estritamente o caminho ABSOLUTO (ex: "/images/arquivo.png"). NUNCA use caminhos relativos (./images/) para imagens, pois isso quebra as rotas internas!
    - Para imagens complementares de alta qualidade, use 'https://source.unsplash.com/...' ou 'https://picsum.photos/...'.
    - NUNCA use domínios como back.sitexpres.com.br!
 7. O código deve ser self-contained em um único arquivo (incluindo sub-componentes se necessário).
@@ -286,6 +286,8 @@ export default function App() {
     }
 
     // 2. Sobrescrever App.jsx com o componente gerado pela IA
+    // Força a conversão de caminhos relativos de imagens para absolutos (SPA routing fix)
+    reactCode = reactCode.replace(/(["'])\.\/images\//g, '$1/images/');
     await fs.writeFile(path.join(tmpDirPath, "src", "App.jsx"), reactCode, 'utf8');
 
     // 3. Executar npm install (caso falte) e build
