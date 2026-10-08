@@ -685,7 +685,7 @@ export const getPromts = async (req, res) => {
     const { id_projeto } = req.params;
 
     const result = await pool.query(
-      `SELECT id, id_projeto, prompt, created_at,id_site_gererate,status
+      `SELECT id, id_projeto, prompt, created_at,id_site_gererate,status,assistant_message
        FROM public.site_prompts
        WHERE id_projeto = $1
        ORDER BY created_at DESC`,
