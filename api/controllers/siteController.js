@@ -333,7 +333,7 @@ export const newsite = async (req, res) => {
              client = null;
              
              jobs[jobId].progress = 100;
-             jobs[jobId] = { status: "done", result: { html_content: baseHTML, assistant_message: questionAnswer }, error: null };
+             jobs[jobId] = { status: "done", result: { html_content: existing.rows[0].html_content, assistant_message: questionAnswer }, error: null };
              logStep(jobId, `🎉 Job concluído (Apenas Resposta)`);
              return;
           }
