@@ -578,7 +578,7 @@ ${html}
 
           const totalMs = Date.now() - jobStartTime;
           logStep(jobId, `🎉 Job concluído com SUCESSO em ${(totalMs / 1000).toFixed(1)}s`);
-          jobs[jobId] = { status: "done", result: insertSite.rows[0], error: null };
+          jobs[jobId] = { status: "done", result: { ...insertSite.rows[0], assistant_message: assistantMessage }, error: null };
 
         } catch (error) {
           const totalMs = Date.now() - jobStartTime;
