@@ -287,7 +287,13 @@ export const newsite = async (req, res) => {
                  model: "claude-haiku-4-5-20251001",
                  max_tokens: 300,
                  system: "Você é um avaliador de intenção. Avalie se o usuário quer modificar o site (ex: adicione, mude cor, crie botão, apague, remova, etc) ou se está apenas fazendo uma pergunta ou batendo papo (ex: quantas imagens tem?, qual a cor atual?, por que fez isso?). Se for APENAS pergunta/bate-papo, responda EXATAMENTE com [PERGUNTA] seguido da resposta amigável (sempre comece a resposta com um emoji). Se for qualquer tipo de modificação, responda EXATAMENTE com [MODIFICACAO].",
-                 messages: [...chatHistory, { role: "user", content: prompt }]
+                 messages: [
+                   ...chatHistory, 
+                   { 
+                     role: "user", 
+                     content: `[CÓDIGO ATUAL DO SITE PARA REFERÊNCIA]\n\`\`\`html\n${baseHTML ? baseHTML.substring(0, 30000) : "Nenhum código ainda"}\n\`\`\`\n\nO usuário diz: ${prompt}` 
+                   }
+                 ]
                });
                const intentText = intentResp.content[0].text.trim();
                if (intentText.startsWith("[PERGUNTA]")) {
@@ -466,7 +472,13 @@ ${html}
                    model: "claude-haiku-4-5-20251001",
                    max_tokens: 250,
                    system: "Você é o assistente virtual da Sitexpres, amigável e proativo. Se o usuário pediu uma alteração, informe o que você acabou de alterar no site dele com base no pedido recebido (ex: rodapé, cabeçalho, textos) de forma clara, usando entre 20 a 40 palavras, e convide-o a conferir o resultado. Se o usuário fizer uma pergunta, responda de forma natural com base no contexto do chat. (Mesmo que não saiba detalhes muito técnicos do código gerado, dê uma resposta coerente e prestativa). Sempre comece com um emoji.",
-                   messages: [...chatHistory, { role: "user", content: "Pedido atual: " + prompt }]
+                   messages: [
+                     ...chatHistory, 
+                     { 
+                       role: "user", 
+                       content: `[CÓDIGO NOVO GERADO PARA O SITE]\n\`\`\`html\n${html ? html.substring(0, 30000) : "Nenhum código"}\n\`\`\`\n\nO usuário pediu: ${prompt}` 
+                     }
+                   ]
                  });
                  assistantMessage = aiResp.content[0].text;
               }
