@@ -35,15 +35,21 @@ export async function gerarAplicacaoPromax(userPrompt) {
   console.log(`[PROMAX_AI] 🧠 Solicitando geração de aplicação para Claude (${model})...`);
   console.log(`[PROMAX_AI] 📝 Prompt do usuário: "${userPrompt}"`);
 
-  const response = await anthropic.messages.create({
+  const stream = anthropic.messages.stream({
     model: model,
-    max_tokens: 8192,
-    temperature: 0.2, // Baixa temperatura para garantir precisão e JSON estrito
+    max_tokens: 32000,
+    thinking: { type: "between_tools" },
     system: PROMAX_SYSTEM_PROMPT,
     messages: buildPromaxMessages(userPrompt)
   });
 
-  const rawContent = response.content[0]?.text || "";
+  let rawContent = "";
+  for await (const chunk of stream) {
+    if (chunk.type === "content_block_delta" && chunk.delta?.text) {
+      rawContent += chunk.delta.text;
+    }
+  }
+
   console.log(`[PROMAX_AI] 📥 Resposta recebida da IA (${rawContent.length} chars). Validando JSON...`);
 
   try {
