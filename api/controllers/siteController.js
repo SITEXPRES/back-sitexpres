@@ -489,6 +489,7 @@ Se for MODIFICAÇÃO, responda EXATAMENTE com [MODIFICACAO].`,
           // ─── FASE 2: chamada à IA (sem conexão BD aberta) ───────────────────
           let html, distPath, tmpDirPath, hasError;
           let promaxMetadataToSave = null;
+          let promaxRawFilesToSave = null;
           let assistantMessageOverride = null;
           const isTestMode = finalPrompt.includes("[teste]");
 
@@ -503,11 +504,29 @@ Se for MODIFICAÇÃO, responda EXATAMENTE com [MODIFICACAO].`,
             logStep(jobId, '🚀 [PROMAX] Intenção identificada: Sistema Fullstack com PostgreSQL. Acionando Maestro...');
             jobs[jobId].progress = 25;
 
+            // 🔄 Carrega arquivos e código anterior caso seja uma edição de sistema existente
+            let existingFiles = null;
+            if (projectMetadata?.raw_files && Array.isArray(projectMetadata.raw_files) && projectMetadata.raw_files.length > 0) {
+              existingFiles = projectMetadata.raw_files;
+              logStep(jobId, `📦 [PROMAX] Arquivos anteriores carregados do metadata (${existingFiles.length} arquivos)`);
+            } else if (existing?.rows?.[0]?.js_content) {
+              try {
+                const parsed = JSON.parse(existing.rows[0].js_content);
+                if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].path) {
+                  existingFiles = parsed;
+                  logStep(jobId, `📦 [PROMAX] Arquivos anteriores carregados do histórico do BD (${existingFiles.length} arquivos)`);
+                }
+              } catch (e) {
+                // Não era JSON (era HTML legado)
+              }
+            }
+
             const resultadoPromax = await executarFluxoPromax({
               prompt: finalPrompt,
               id_projeto,
               userId,
-              existingMetadata: projectMetadata
+              existingMetadata: projectMetadata,
+              existingFiles: existingFiles
             });
 
             jobs[jobId].progress = 85;
@@ -531,6 +550,7 @@ Se for MODIFICAÇÃO, responda EXATAMENTE com [MODIFICACAO].`,
             distPath = null;
             tmpDirPath = null;
             hasError = false;
+            promaxRawFilesToSave = resultadoPromax.rawFiles || [];
 
             promaxMetadataToSave = {
               is_promax: true,
@@ -546,15 +566,25 @@ Se for MODIFICAÇÃO, responda EXATAMENTE com [MODIFICACAO].`,
               tecnologia: resultadoPromax.tecnologia || 'Node.js 18 + Express + PostgreSQL 15 + Tailwind CSS',
               descricao: resultadoPromax.descricao || '',
               files: resultadoPromax.files || [],
+              raw_files: resultadoPromax.rawFiles || [],
               created_at: new Date().toISOString()
             };
 
-            assistantMessageOverride = `🎉 Uau! Seu sistema corporativo com banco de dados PostgreSQL foi gerado e colocado no ar com sucesso!
+            if (!primeiraVez && projectMetadata?.is_promax) {
+              assistantMessageOverride = `⚡ **Sistema Atualizado com Sucesso!**
+
+Suas alterações foram aplicadas diretamente no container da sua aplicação (porta ${resultadoPromax.port}), mantendo todos os dados do seu banco de dados PostgreSQL intactos.
+
+🌐 **Acesse aqui:** [${finalUrl}](${finalUrl})
+🐘 **Banco de Dados:** Conectado ao PostgreSQL (${resultadoPromax.db.name}) existente.`;
+            } else {
+              assistantMessageOverride = `🎉 Uau! Seu sistema corporativo com banco de dados PostgreSQL foi gerado e colocado no ar com sucesso!
 
 🌐 **Acesse aqui:** [${finalUrl}](${finalUrl})
 🐘 **Banco de Dados:** PostgreSQL 15 configurado e conectado na VPS.
 
 *Dica: Você pode me perguntar a qualquer momento quais são as credenciais do banco ou como conectar nele!*`;
+            }
 
             jobs[jobId].progress = 95;
             logStep(jobId, `✅ [PROMAX] Maestro concluiu deploy em ${resultadoPromax.tempoTotalSegundos}s`);
@@ -684,12 +714,16 @@ ${html}
 </body>
 </html>`;
 
+          const jsContentToSave = promaxRawFilesToSave
+            ? JSON.stringify(promaxRawFilesToSave)
+            : html;
+
           const insertSite = await client.query(
             `INSERT INTO generated_sites 
            (user_id, name, prompt, html_content, id_projeto, image_path, subdominio, status, js_content)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
            RETURNING id, name, prompt, html_content, created_at`,
-            [userId, `Site de ${nomeSubdominio}`, prompt, previewHtml, id_projeto, relativeImageURL || (existing.rows[0]?.image_path ? desatrelarHtmlSitexpress(existing.rows[0].image_path) : null), nomeSubdominio, 'ativo', html]
+            [userId, `Site de ${nomeSubdominio}`, prompt, previewHtml, id_projeto, relativeImageURL || (existing.rows[0]?.image_path ? desatrelarHtmlSitexpress(existing.rows[0].image_path) : null), nomeSubdominio, 'ativo', jsContentToSave]
           );
 
           const novoId = insertSite.rows[0].id;

@@ -110,7 +110,39 @@ A aplicação é auto-suficiente em um único container Node.js de alta performa
 /**
  * Função utilitária para montar as mensagens para a API da Anthropic ou Gemini
  */
-export function buildPromaxMessages(userPrompt) {
+export function buildPromaxMessages(userPrompt, existingContext = null) {
+  if (existingContext) {
+    let contextStr = `\n[SISTEMA ATUAL JÁ EXISTENTE EM PRODUÇÃO]`;
+    if (existingContext.projectName) contextStr += `\n- Nome do Projeto: ${existingContext.projectName}`;
+    if (existingContext.descricao) contextStr += `\n- Descrição do Sistema Atual: ${existingContext.descricao}`;
+    if (existingContext.database) {
+      contextStr += `\n- Banco de Dados Atual: PostgreSQL (${existingContext.database.name || 'db_app'})`;
+    }
+    if (existingContext.codigoAtual) {
+      contextStr += `\n- Código Atual do Backend (index.js):\n\`\`\`javascript\n${existingContext.codigoAtual.substring(0, 15000)}\n\`\`\``;
+    }
+    if (existingContext.htmlAtual) {
+      contextStr += `\n- Código Atual do Frontend (public/index.html):\n\`\`\`html\n${existingContext.htmlAtual.substring(0, 15000)}\n\`\`\``;
+    }
+
+    return [
+      {
+        role: "user",
+        content: `Você está ATUALIZANDO um sistema existente já em produção com PostgreSQL.${contextStr}
+
+[NOVA SOLICITAÇÃO DO CLIENTE / EDIÇÃO]
+"${userPrompt}"
+
+[DIRETRIZES CRÍTICAS PARA ESTA EDIÇÃO]
+1. PRESERVAÇÃO DE DADOS: O banco PostgreSQL já está rodando em produção. NUNCA gere "DROP TABLE". Mantenha todas as tabelas já existentes (ex: clientes, corretores, imóveis, vendas, etc.) e use "CREATE TABLE IF NOT EXISTS" ou migrações seguras para novas tabelas solicitadas (ex: users / logins).
+2. PRESERVAÇÃO DAS TELAS: Mantenha todas as telas, cards, gráficos, abas e tabelas anteriores do sistema. Apenas ADICIONE ou AJUSTE o que o usuário solicitou (ex: se pediu login, adicione a tela/modal de login, autenticação por token ou sessão e dados de login no banco, mantendo todo o resto do sistema acessível após o login).
+3. RETORNE OS ARQUIVOS COMPLETOS: Retorne "package.json", "index.js" e "public/index.html" com a versão final e completa com as melhorias implementadas.
+
+Lembre-se de retornar ESTRITAMENTE o JSON no formato solicitado, sem blocos de texto adicionais.`
+      }
+    ];
+  }
+
   return [
     {
       role: "user",

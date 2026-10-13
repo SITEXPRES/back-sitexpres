@@ -39,8 +39,8 @@ export async function provisionDatabaseOnVPS(projectName, dbUser, dbPass) {
 /**
  * 2. Faz o Deploy dos arquivos da Aplicação na VPS via JSON
  */
-export async function deployAppOnVPS(name_app, tecnologia, files, env) {
-  console.log(`[MAESTRO] 🚀 Solicitando subida do Container da Aplicação na VPS: ${name_app}...`);
+export async function deployAppOnVPS(name_app, tecnologia, files, env, port = null) {
+  console.log(`[MAESTRO] 🚀 Solicitando subida do Container da Aplicação na VPS: ${name_app}... (porta alvo: ${port || 'automática'})`);
   
   const res = await fetch(`${VPS_HOST}/api/v1/deploy/app`, {
     method: 'POST',
@@ -52,7 +52,8 @@ export async function deployAppOnVPS(name_app, tecnologia, files, env) {
       name_app,
       tecnologia: tecnologia || 'node',
       files,
-      env
+      env,
+      port: port ? parseInt(port, 10) : undefined
     })
   });
 
@@ -67,18 +68,71 @@ export async function deployAppOnVPS(name_app, tecnologia, files, env) {
 }
 
 /**
+ * Busca arquivos existentes de uma aplicação no disco da VPS
+ */
+export async function fetchAppFilesFromVPS(name_app) {
+  try {
+    const res = await fetch(`${VPS_HOST}/api/v1/deploy/files?name_app=${encodeURIComponent(name_app)}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${VPS_TOKEN}`
+      }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.files || [];
+    }
+  } catch (e) {
+    console.warn(`[MAESTRO] ⚠️ Aviso ao buscar arquivos existentes na VPS:`, e.message);
+  }
+  return [];
+}
+
+/**
  * 3. O MAESTRO: Orquestração completa de ponta a ponta
  * @param {Object} params
  * @param {string} params.prompt - O pedido do usuário (ex: "Gere um CRM de vendas")
  * @param {string} params.id_projeto - ID único do projeto
  * @param {number|string} params.userId - ID do usuário
  * @param {boolean} [params.mockCode] - Permite passar código pré-gerado para teste rápido
+ * @param {Object} [params.existingMetadata] - Metadados do projeto existente se for edição
+ * @param {Array} [params.existingFiles] - Arquivos prévios do projeto se já salvos
  */
-export async function executarFluxoPromax({ prompt, id_projeto, userId, mockCode = null, existingMetadata = null }) {
+export async function executarFluxoPromax({ prompt, id_projeto, userId, mockCode = null, existingMetadata = null, existingFiles = null }) {
   const startTime = Date.now();
   console.log(`\n================================================================`);
   console.log(`🎼 [MAESTRO] INICIANDO ORQUESTRAÇÃO PROMAX | Projeto: ${id_projeto}`);
   console.log(`================================================================\n`);
+
+  // Define nome único e imutável do projeto
+  const uniqueProjectName = existingMetadata?.projectName || `crm_${id_projeto || Math.floor(Math.random() * 1000)}`;
+
+  // PASSO 0: Se for edição, monta o contexto com o código anterior
+  let existingContext = null;
+  if (existingMetadata) {
+    console.log(`[MAESTRO] 🔄 Identificado sistema Promax existente: ${uniqueProjectName}. Coletando código anterior...`);
+    let vpsFiles = [];
+    try {
+      vpsFiles = await fetchAppFilesFromVPS(uniqueProjectName);
+    } catch (e) {}
+
+    const indexJs = (existingFiles && Array.isArray(existingFiles) ? existingFiles.find(f => f.path === 'index.js')?.content : null) 
+      || vpsFiles.find(f => f.path === 'index.js')?.content 
+      || null;
+
+    const indexHtml = (existingFiles && Array.isArray(existingFiles) ? existingFiles.find(f => f.path === 'public/index.html')?.content : null) 
+      || vpsFiles.find(f => f.path === 'public/index.html')?.content 
+      || null;
+
+    existingContext = {
+      projectName: uniqueProjectName,
+      descricao: existingMetadata.descricao,
+      database: existingMetadata.database,
+      codigoAtual: indexJs,
+      htmlAtual: indexHtml
+    };
+    console.log(`[MAESTRO] 🔄 Contexto existente preparado (index.js: ${!!indexJs}, html: ${!!indexHtml})`);
+  }
 
   // PASSO 1: Geração de Código pela IA (ou uso de mock para teste)
   let appData;
@@ -86,20 +140,19 @@ export async function executarFluxoPromax({ prompt, id_projeto, userId, mockCode
     console.log(`[MAESTRO] 🧪 Usando código fornecido (modo teste)...`);
     appData = mockCode;
   } else {
-    console.log(`[MAESTRO] 🧠 Solicitando código à IA Claude...`);
-    appData = await gerarAplicacaoPromax(prompt);
+    console.log(`[MAESTRO] 🧠 Solicitando código à IA Claude (Modo: ${existingContext ? 'EDIÇÃO INCREMENTAL' : 'CRIAÇÃO INICIAL'})...`);
+    appData = await gerarAplicacaoPromax(prompt, existingContext);
   }
 
-  const sanitizedSlug = (appData.name_app || 'crm_app').replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
-  const uniqueProjectName = existingMetadata?.projectName || `${sanitizedSlug}_${id_projeto || Math.floor(Math.random() * 1000)}`;
+  const finalProjectName = existingMetadata?.projectName || (appData.name_app ? `${appData.name_app.replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase()}_${id_projeto}` : uniqueProjectName);
 
   // PASSO 2: Provisionamento do Banco de Dados (ou reuso do banco existente)
   let dbResult;
   if (existingMetadata?.database) {
     console.log(`[MAESTRO] ♻️ Reutilizando banco de dados existente: ${existingMetadata.database.name}`);
     dbResult = {
-      container: existingMetadata.containers?.db || `sitexpress-${uniqueProjectName}-db`,
-      internalHost: existingMetadata.containers?.db || `sitexpress-${uniqueProjectName}-db`,
+      container: existingMetadata.containers?.db || `sitexpress-${finalProjectName}-db`,
+      internalHost: existingMetadata.containers?.db || `sitexpress-${finalProjectName}-db`,
       internalPort: 5432,
       externalPort: existingMetadata.database.port_externa || existingMetadata.database.porta_externa,
       dbUser: existingMetadata.database.user,
@@ -109,7 +162,7 @@ export async function executarFluxoPromax({ prompt, id_projeto, userId, mockCode
   } else {
     const dbUser = `usr_${Math.floor(Math.random() * 9000 + 1000)}`;
     const dbPass = `pwd_${Math.random().toString(36).substring(2, 12)}`;
-    dbResult = await provisionDatabaseOnVPS(uniqueProjectName, dbUser, dbPass);
+    dbResult = await provisionDatabaseOnVPS(finalProjectName, dbUser, dbPass);
   }
 
   // PASSO 3: Injeção de Variáveis de Ambiente (.env) para conexão interna
@@ -124,26 +177,31 @@ export async function executarFluxoPromax({ prompt, id_projeto, userId, mockCode
     DATABASE_URL: `postgres://${dbResult.dbUser}:${dbResult.dbPass}@${dbResult.internalHost}:${dbResult.internalPort || 5432}/${dbResult.dbName}`
   };
 
-  // PASSO 4: Deploy da Aplicação no Docker
-  const appResult = await deployAppOnVPS(uniqueProjectName, appData.tecnologia || 'node', appData.files, appEnv);
+  // PASSO 4: Deploy da Aplicação no Docker (REUTILIZA A MESMA PORTA se for edição!)
+  const existingPort = existingMetadata?.port || null;
+  const appResult = await deployAppOnVPS(finalProjectName, appData.tecnologia || 'node', appData.files, appEnv, existingPort);
 
   // PASSO 5: Configuração de Subdomínio e Proxy Reverso no DirectAdmin
   let proxyResult = null;
-  const subdominioLimpo = (existingMetadata?.projectName || `${sanitizedSlug}-${id_projeto || Math.floor(Math.random() * 1000)}`)
-    .replace(/[^a-zA-Z0-9-]/g, '')
-    .toLowerCase()
-    .slice(0, 28);
+  const subdominioLimpo = (existingMetadata?.subdominio)
+    || (existingMetadata?.url_dominio ? existingMetadata.url_dominio.replace(/^https?:\/\//, '').replace(/\.sitexpres\.com\.br.*$/, '') : null)
+    || (finalProjectName).replace(/[^a-zA-Z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').toLowerCase().slice(0, 28);
 
-  try {
-    console.log(`[MAESTRO] 🌐 Configurando Proxy Reverso no DirectAdmin: ${subdominioLimpo}.sitexpres.com.br...`);
-    proxyResult = await configurarProxySubdominio({
-      subdominio: subdominioLimpo,
-      portaVps: appResult.port,
-      dominioPrincipal: 'sitexpres.com.br',
-      ipVps: '143.208.9.235'
-    });
-  } catch (proxyError) {
-    console.warn(`[MAESTRO] ⚠️ Falha na configuração do proxy DirectAdmin (a URL direta da VPS permanece funcional):`, proxyError.message);
+  if (existingMetadata?.url_dominio && existingMetadata?.port === appResult.port) {
+    console.log(`[MAESTRO] 🌐 Mantendo proxy existente no DirectAdmin: ${existingMetadata.url_dominio} -> porta ${appResult.port}`);
+    proxyResult = { url: existingMetadata.url_dominio, subdominio: subdominioLimpo };
+  } else {
+    try {
+      console.log(`[MAESTRO] 🌐 Configurando Proxy Reverso no DirectAdmin: ${subdominioLimpo}.sitexpres.com.br -> porta ${appResult.port}...`);
+      proxyResult = await configurarProxySubdominio({
+        subdominio: subdominioLimpo,
+        portaVps: appResult.port,
+        dominioPrincipal: 'sitexpres.com.br',
+        ipVps: '143.208.9.235'
+      });
+    } catch (proxyError) {
+      console.warn(`[MAESTRO] ⚠️ Falha na configuração do proxy DirectAdmin (a URL direta da VPS permanece funcional):`, proxyError.message);
+    }
   }
 
   const durationSec = ((Date.now() - startTime) / 1000).toFixed(2);
@@ -159,7 +217,7 @@ export async function executarFluxoPromax({ prompt, id_projeto, userId, mockCode
     success: true,
     tokens_usados: appData.tokens_usados || 25000,
     tempoTotalSegundos: durationSec,
-    projectName: uniqueProjectName,
+    projectName: finalProjectName,
     url_dominio: proxyResult?.url || existingMetadata?.url_dominio || null,
     url_direta: `http://143.208.9.235:${appResult.port}`,
     port: appResult.port,
@@ -176,6 +234,7 @@ export async function executarFluxoPromax({ prompt, id_projeto, userId, mockCode
     },
     descricao: appData.descricao || '',
     tecnologia: appData.tecnologia || 'Node.js 18 + Express + PostgreSQL 15 + Tailwind CSS',
-    files: appData.files ? appData.files.map(f => f.path) : []
+    files: appData.files ? appData.files.map(f => f.path) : [],
+    rawFiles: appData.files || []
   };
 }

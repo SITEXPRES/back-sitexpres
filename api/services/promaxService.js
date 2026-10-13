@@ -30,17 +30,20 @@ function cleanJsonOutput(text) {
  * @param {string} userPrompt - Pedido do usuário (ex: "Gere um CRM para imobiliária")
  * @returns {Promise<Object>} - Objeto contendo name_app, tecnologia, files, etc.
  */
-export async function gerarAplicacaoPromax(userPrompt) {
+export async function gerarAplicacaoPromax(userPrompt, existingContext = null) {
   const model = "claude-sonnet-5-5";
   console.log(`[PROMAX_AI] 🧠 Solicitando geração de aplicação para Claude (${model})...`);
   console.log(`[PROMAX_AI] 📝 Prompt do usuário: "${userPrompt}"`);
+  if (existingContext) {
+    console.log(`[PROMAX_AI] 🔄 Modo Edição Incremental ativo para o projeto: ${existingContext.projectName}`);
+  }
 
   const stream = anthropic.messages.stream({
     model: model,
     max_tokens: 32000,
     thinking: { type: "between_tools" },
     system: PROMAX_SYSTEM_PROMPT,
-    messages: buildPromaxMessages(userPrompt)
+    messages: buildPromaxMessages(userPrompt, existingContext)
   });
 
   let rawContent = "";
