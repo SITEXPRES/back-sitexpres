@@ -413,11 +413,17 @@ export const newsite = async (req, res) => {
               const intentResp = await anthropic.messages.create({
                 model: "claude-haiku-4-5-20251001",
                 max_tokens: 650,
-                system: `Você é o assistente técnico virtual da Sitexpres. Avalie se o usuário quer modificar o sistema/site (ex: adicione campo, mude cor, crie botão, apague, altere) ou se está apenas fazendo uma pergunta ou pedindo informações (ex: quais as credenciais do banco?, qual a senha?, como conectar?, como foi feita a api?, qual a porta?, quantas imagens tem?).${promaxInfoContext}
+                system: `Você é o assistente técnico virtual da Sitexpres. Avalie a mensagem do usuário dentro do contexto da conversa:
+
+1. Se for PERGUNTA, DÚVIDA INFORMATIVA ou RESPOSTA CONVERSACIONAL / CONFIRMAÇÃO (ex: "Sim", "Não", "Ok", "Beleza", "Entendido", "Pode ser", "Combinado", "Vou mandar", "Obrigado", "Bom dia", ou qualquer resposta concordando/conversando sem conter instruções concretas de código):
+   - Responda EXATAMENTE com [PERGUNTA] seguido de uma resposta amigável, natural e prestativa no contexto do chat (sempre comece com um emoji).
+   - Exemplo: se você acabou de pedir para o usuário enviar uma imagem/arquivo e ele respondeu "Sim", "Ok" ou "Beleza", responda: "🎨 Ótimo! Pode anexar a imagem clicando no ícone de anexo 📎 aqui no chat. Assim que você enviar, aplico a alteração diretamente no seu site!"
+   - NUNCA responda [MODIFICACAO] se o usuário apenas disse "Sim", "Ok" ou agradeceu sem descrever uma nova alteração de código ou sem anexar o arquivo solicitado!
+   - Se o usuário perguntar sobre banco de dados, portas, rotas ou dados técnicos, utilize os dados da FICHA TÉCNICA.${promaxInfoContext}
 ${REGRAS_SEGURANCA_SYSTEM_PROMPT}
-Se for PERGUNTA ou DÚVIDA INFORMATIVA, responda EXATAMENTE com [PERGUNTA] seguido de uma resposta amigável, clara, prestativa e formatada em Markdown contendo os dados solicitados (sempre comece com um emoji e use tópicos ou tabelas limpas). Se o usuário perguntar sobre o banco de dados do seu próprio sistema, portas, rotas, como foi feita a API ou detalhes técnicos, utilize os dados da FICHA TÉCNICA.
-NUNCA invente nem forneça credenciais de hospedagem (DirectAdmin/FTP/cPanel), acessos SSH, senhas da VPS ou dados do sistema central.
-Se for MODIFICAÇÃO, responda EXATAMENTE com [MODIFICACAO].`,
+
+2. Se for uma MODIFICAÇÃO REAL no site/sistema (ex: "mude a cor", "adicione botão", "troque o texto X por Y", "remova o rodapé", "coloque a logo em anexo"):
+   - Responda EXATAMENTE com [MODIFICACAO].`,
                 messages: [
                   ...chatHistory,
                   {
@@ -740,7 +746,7 @@ ${html}
                 const aiResp = await anthropic.messages.create({
                   model: "claude-haiku-4-5-20251001",
                   max_tokens: 250,
-                  system: "Você é o assistente virtual da Sitexpres, amigável e proativo. Se o usuário pediu uma alteração, informe o que você acabou de alterar no site dele com base no pedido recebido (ex: rodapé, cabeçalho, textos) de forma clara, usando entre 20 a 40 palavras, e convide-o a conferir o resultado. Se o usuário fizer uma pergunta, responda de forma natural com base no contexto do chat. (Mesmo que não saiba detalhes muito técnicos do código gerado, dê uma resposta coerente e prestativa). Sempre comece com um emoji.",
+                  system: `Você é o assistente virtual da Sitexpres, amigável e proativo. Informe de forma clara e objetiva o que você acabou de alterar no site dele com base ESTRITAMENTE no pedido atual do usuário ("${prompt}"), usando entre 20 a 40 palavras, e convide-o a conferir o resultado. NUNCA mencione alterações antigas (como favicon, logo, rodapé) a menos que o usuário tenha pedido especificamente isso no pedido atual! Sempre comece com um emoji.`,
                   messages: [
                     ...chatHistory,
                     {
