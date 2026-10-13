@@ -11,40 +11,42 @@ export const MENSAGEM_RECUSA_SEGURANCA =
  * Padrões de risco que tentam comprometer a infraestrutura, hospedagem ou servidor
  */
 const PADROES_AMEACA = [
-  // 1. Hospedagem e Painéis de Controle
-  /\b(directadmin|direct\s*admin|cpanel|c-panel|whm|plesk)\b/i,
-  /\b(ftp|sftp)\b/i,
-  /\b(senha|senhas|user|usuario|login|acesso|acessos|credencial|credenciais|porta)\b.*?\b(hospedag|painel|directadmin|cpanel|srv3br|hosting)/i,
-  /\b(hospedag|painel|directadmin|cpanel|srv3br|hosting)\b.*?\b(senha|senhas|user|usuario|login|acesso|acessos|credencial|credenciais|porta)/i,
-  /\b(srv3br|srv3br\.com\.br|ftp\.sitexpres\.com\.br)\b/i,
+  
+  // 1. Extração de Credenciais / Acessos de Hospedagem e Painéis de Controle
+  /\b(senha|senhas|user|usuario|usuário|login|credencial|credenciais|acesso|acessos|chave|token)\b.*?\b(directadmin|direct\s*admin|cpanel|c-panel|whm|plesk|ftp|sftp|srv3br|hospedag|hosting)\b/i,
+  /\b(directadmin|direct\s*admin|cpanel|c-panel|whm|plesk|ftp|sftp|srv3br|hospedag|hosting)\b.*?\b(senha|senhas|user|usuario|usuário|login|credencial|credenciais|acesso|acessos|chave|token)\b/i,
+  /\b(qual|quais|como\s*(acessar|conectar|entrar|logar))\b.*?\b(directadmin|cpanel|whm|plesk|ftp|sftp|hospedag|srv3br)\b/i,
+  /\b(srv3br\.com\.br|ftp\.sitexpres\.com\.br)\b/i,
   /\bporta\s*(2222|21)\b/i,
 
-  // 2. Servidor VPS, SSH e Root
-  /\b(ssh|root|sudo)\b/i,
-  /\b(senha|senhas|chave|chaves|acesso|acessos|login|credencial|credenciais)\b.*?\b(vps|servidor|host|maquina)/i,
-  /\b(vps|servidor|host|maquina)\b.*?\b(senha|senhas|chave|chaves|acesso|acessos|login|credencial|credenciais)/i,
-  /\b(id_rsa|authorized_keys|known_hosts|\/etc\/passwd|\/etc\/shadow|\/root)\b/i,
+  // 2. Extração de Credenciais / Acessos ao Servidor VPS, SSH e Root
+  /\b(senha|senhas|chave|chaves|acesso|acessos|login|credencial|credenciais)\b.*?\b(vps|servidor|host|maquina|máquina|ssh|root)\b/i,
+  /\b(vps|servidor|host|maquina|máquina|ssh|root)\b.*?\b(senha|senhas|chave|chaves|acesso|acessos|login|credencial|credenciais)\b/i,
+  /\b(conectar|acessar|entrar)\s*(no|na|ao|via)\s*(ssh|root|terminal\s*da\s*vps|servidor\s*vps)\b/i,
+  /\b(id_rsa|authorized_keys|known_hosts|\/etc\/passwd|\/etc\/shadow|\/root\b)/i,
   /\bporta\s*(22|9001)\b/i,
-  /\bacesso\s*(ao|no|do)\s*servidor\b/i,
-  /\b(terminal|shell|bash|console)\s*(do\s*servidor|da\s*vps|remoto)\b/i,
+  /\b(terminal|shell|bash|console)\s*(do\s*servidor|da\s*vps|remoto\s*do\s*host)\b/i,
 
-  // 3. Tokens, Chaves de API e Segredos da Plataforma
-  /\b(\.env|dotenv)\b/i,
+  // 3. Tokens, Chaves de API e Segredos da Plataforma SiteXpress
   /\b(vps_deploy_token|deploy_token|token\s*de\s*deploy|token\s*da\s*api)\b/i,
   /\b(jwt_secret|jwt\s*secret|secret\s*key)\b/i,
   /\b(claude_api_key|gemini_api_key|anthropic_key|api\s*key\s*da\s*sitexpress)\b/i,
   /\b(senha\s*master|master\s*password|chave\s*mestra)\b/i,
+  /\b(ler|mostrar|mostre|conteúdo|conteudo|pegar|exibir|baixar|extrair|qual\s*(é|e)|revelar)\b.*?\b(\.env|dotenv|arquivo\s*\.env)\b/i,
+  /\b(\.env|dotenv|arquivo\s*\.env)\b.*?\b(ler|mostrar|mostre|conteúdo|conteudo|pegar|exibir|baixar|extrair|qual\s*(é|e)|revelar)\b/i,
 
-  // 4. Banco de Dados Principal da SiteXpress
+  // 4. Banco de Dados Principal / Master da SiteXpress
   /\b(adminsitexpress|db_sitexpress|143\.208\.9\.218)\b/i,
-  /\b(banco\s*principal|banco\s*master|tabela\s*de\s*usuarios|tabela\s*users|banco\s*da\s*sitexpress)\b/i,
+  /\b(senha|acesso|credencial)\b.*?\b(banco\s*principal|banco\s*master|banco\s*da\s*sitexpress)\b/i,
+  /\b(banco\s*principal|banco\s*master|banco\s*da\s*sitexpress)\b.*?\b(senha|acesso|credencial)\b/i,
+  /\b(tabela\s*users|tabela\s*de\s*usuarios)\b.*?\b(sitexpress|master|principal)\b/i,
 
   // 5. Tentativas de RCE, Backdoors e Quebra de Containers
   /\b(child_process|execSync|shell_exec|system\(|passthru)\b/i,
   /\b(shell\s*reverso|reverse\s*shell|backdoor|web\s*shell|trojan)\b/i,
   /\b(outros\s*containers|outros\s*clientes|listar\s*containers|\/home\/containers)\b/i,
 
-  // 6. Jailbreak e Prompt Injection para extrair regras internas
+  // 6. Jailbreak e Prompt Injection para extrair regras internas da plataforma
   /\b(ignore\s*(all\s*)?previous\s*instructions|ignore\s*todas\s*as\s*instrucoes|esquece\s*suas\s*regras)\b/i,
   /\b(revele\s*seu\s*prompt|mostre\s*seu\s*system\s*prompt|modo\s*desenvolvedor\s*desbloqueado|dan\s*mode)\b/i
 ];

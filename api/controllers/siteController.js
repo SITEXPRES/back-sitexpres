@@ -31,15 +31,60 @@ import {
   MENSAGEM_RECUSA_SEGURANCA 
 } from "../utils/securityGuardrails.js";
 
-function detectarIntencaoPromax(prompt, metadata = null) {
+export function detectarIntencaoPromax(prompt, metadata = null) {
   if (metadata && metadata.is_promax) return true;
   const p = (prompt || '').toLowerCase();
-  const termos = [
+
+  // 1. Termos técnicos explícitos (caso o usuário ou desenvolvedor seja técnico)
+  const termosTecnicos = [
     'crm', 'banco de dados', 'postgres', 'postgresql', 'saas', 'fullstack', 
-    'backend', 'api rest', 'tabela de clientes', 'cadastrar clientes', 
-    'gestão de clientes', 'painel com banco', 'sistema com banco'
+    'backend', 'api rest', 'tabela sql', 'docker container', 'crud', 
+    'banco relacional', 'bd relacional', 'node express', 'painel com banco', 'sistema com banco'
   ];
-  return termos.some(t => p.includes(t));
+  if (termosTecnicos.some(t => p.includes(t))) return true;
+
+  // 2. Substantivos indicando sistema / software corporativo
+  const ehSistema = /\b(sistema|software|painel|plataforma|aplicativo|app)\b/i.test(p);
+
+  // 3. Módulos de negócio e operações de gestão com persistência (linguagem 100% natural de usuário leigo)
+  const termosNegocioGestao = [
+    // Cadastros
+    'cadastro de cliente', 'cadastrar cliente', 'cadastro de imoveis', 'cadastro de imóveis', 
+    'cadastrar imoveis', 'cadastrar imóveis', 'cadastro de corretor', 'cadastrar corretor',
+    'cadastro de produto', 'cadastrar produto', 'cadastro de paciente', 'cadastrar paciente',
+    'cadastro de usuario', 'cadastro de usuário', 'cadastrar usuario', 'cadastrar usuário',
+    'cadastro de pedido', 'cadastrar pedido', 'cadastro de aluno', 'cadastrar aluno',
+    'cadastro de medico', 'cadastro de médico', 'cadastro de fornecedor', 'cadastrar fornecedor',
+    // Gestão de Vendas, Estoque e Finanças
+    'controle de estoque', 'gestao de estoque', 'gestão de estoque', 'controlar estoque',
+    'controle de venda', 'gestao de venda', 'gestão de venda', 'controlar venda', 'metricas de venda', 'métricas de venda',
+    'controle financeiro', 'gestao financeira', 'gestão financeira', 'fluxo de caixa', 'contas a pagar', 'contas a receber',
+    'painel administrativo', 'painel de controle', 'painel de gestao', 'painel de gestão',
+    'dashboard administrativo', 'dashboard de venda', 'dashboard de vendas', 'dashboard de métricas',
+    // Operações e Serviços
+    'agendamento de consulta', 'agendar consulta', 'ordem de servico', 'ordem de serviço',
+    'ordens de servico', 'ordens de serviço', 'controle de chamado', 'controle de chamados',
+    'gestao de pedido', 'gestão de pedido', 'gerenciar pedido', 'gerenciamento de pedido',
+    'gerenciar cliente', 'gerenciamento de cliente', 'controle de cliente',
+    'funil de venda', 'funil de vendas', 'funil de lead', 'gestao de lead', 'gestão de lead'
+  ];
+
+  if (termosNegocioGestao.some(t => p.includes(t))) return true;
+
+  // 4. Se o usuário pediu explicitamente um sistema/painel/software para um nicho comercial/operacional
+  // Ex: "Crie um sistema para minha imobiliária", "Faça um software para minha oficina", "Painel de vendas da loja"
+  if (ehSistema) {
+    const nichosNegocio = /\b(imobili[aá]ria|vendas|loja|com[eé]rcio|oficina|cl[ií]nica|consult[oó]rio|escola|curso|academia|restaurante|pizzaria|hotel|pousada|estoque|pedidos|financeiro|or[cç]amentos|clientes|funcion[aá]rios|mensalidades)\b/i;
+    
+    // Se não for explicitamente "apenas um site institucional / vitrine"
+    const apenasSiteVitrine = /\b(apenas|somente|só)\s+(um\s+)?(site|landing\s*page|p[aá]gina|institucional|vitrine)\b/i.test(p);
+    
+    if (nichosNegocio.test(p) && !apenasSiteVitrine) {
+      return true;
+    }
+  }
+
+  return false;
 }
 // ⚠️ REMOVIDO: import { console, url } from "inspector" — esse import sobrescrevia o console global e suprimia os logs no terminal!
 

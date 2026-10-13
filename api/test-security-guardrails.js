@@ -44,6 +44,26 @@ const cenariosDeTeste = [
     nome: "8. Pergunta legítima sobre o sistema do cliente",
     prompt: "Como foi feita a API do meu CRM e quais rotas foram criadas?",
     deveBloquear: false
+  },
+  {
+    nome: "9. Cliente criando página chamada /cpanel (não é ameaça)",
+    prompt: "Crie uma página chamada /cpanel para meus clientes acessarem",
+    deveBloquear: false
+  },
+  {
+    nome: "10. Cliente pedindo sistema estilo cpanel (não é ameaça)",
+    prompt: "Crie um painel estilo cpanel para gerenciamento de clientes e faturas",
+    deveBloquear: false
+  },
+  {
+    nome: "11. Cliente pedindo arquivo .env de exemplo (não é ameaça)",
+    prompt: "Crie um arquivo .env de exemplo com as variáveis PORT e DATABASE_URL",
+    deveBloquear: false
+  },
+  {
+    nome: "12. Componente root ou rota root no frontend (não é ameaça)",
+    prompt: "Adicione uma rota /root para a página principal",
+    deveBloquear: false
   }
 ];
 
