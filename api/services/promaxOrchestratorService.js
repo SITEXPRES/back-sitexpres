@@ -157,6 +157,7 @@ export async function executarFluxoPromax({ prompt, id_projeto, userId, mockCode
 
   return {
     success: true,
+    tokens_usados: appData.tokens_usados || 25000,
     tempoTotalSegundos: durationSec,
     projectName: uniqueProjectName,
     url_dominio: proxyResult?.url || existingMetadata?.url_dominio || null,

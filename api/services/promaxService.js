@@ -52,6 +52,20 @@ export async function gerarAplicacaoPromax(userPrompt) {
 
   console.log(`[PROMAX_AI] 📥 Resposta recebida da IA (${rawContent.length} chars). Validando JSON...`);
 
+  let totalTokens = 25000;
+  try {
+    const finalMessage = await stream.finalMessage();
+    const u = finalMessage?.usage || {};
+    const inputTokens = (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0) + (u.cache_read_input_tokens || 0);
+    const outputTokens = u.output_tokens || 0;
+    if (inputTokens + outputTokens > 0) {
+      totalTokens = inputTokens + outputTokens;
+    }
+    console.log(`[PROMAX_AI] 📊 Tokens utilizados: input=${inputTokens} output=${outputTokens} total=${totalTokens}`);
+  } catch (uErr) {
+    console.warn("[PROMAX_AI] ⚠️ Aviso ao ler usage do stream:", uErr.message);
+  }
+
   try {
     const cleanedJson = cleanJsonOutput(rawContent);
     const appData = JSON.parse(cleanedJson);
@@ -60,7 +74,8 @@ export async function gerarAplicacaoPromax(userPrompt) {
       throw new Error("Estrutura do JSON inválida (faltam name_app ou files)");
     }
 
-    console.log(`[PROMAX_AI] ✅ Aplicação gerada com sucesso: ${appData.name_app} (${appData.files.length} arquivos)`);
+    appData.tokens_usados = totalTokens;
+    console.log(`[PROMAX_AI] ✅ Aplicação gerada com sucesso: ${appData.name_app} (${appData.files.length} arquivos | ${totalTokens} tokens)`);
     return appData;
   } catch (parseError) {
     console.error("[PROMAX_AI] ❌ Erro ao parsear JSON retornado pela IA:", parseError.message);

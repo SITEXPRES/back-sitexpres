@@ -540,6 +540,15 @@ Se for MODIFICAÇÃO, responda EXATAMENTE com [MODIFICACAO].`,
 
             jobs[jobId].progress = 95;
             logStep(jobId, `✅ [PROMAX] Maestro concluiu deploy em ${resultadoPromax.tempoTotalSegundos}s`);
+
+            // 💰 Desconto de créditos proporcional aos tokens utilizados
+            try {
+              const tokensUsados = resultadoPromax.tokens_usados || 25000;
+              logStep(jobId, `💰 Descontando créditos Promax: ${tokensUsados} tokens (${(tokensUsados / 10000).toFixed(2)} créditos) para userId=${userId}`);
+              await uso_creditos(userId, tokensUsados, id_projeto);
+            } catch (credErr) {
+              console.error("[PROMAX] ⚠️ Erro ao descontar créditos:", credErr.message);
+            }
           } else {
             const nomeModeloIa = baseHTML ? 'Claude Haiku' : 'Claude Sonnet 5.5';
             logStep(jobId, `🤖 Enviando prompt para a IA (${nomeModeloIa})... aguarde`);
