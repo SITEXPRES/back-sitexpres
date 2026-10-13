@@ -253,3 +253,124 @@ export async function subdominioExiste(subdominio, dominioPrincipal, usuarioDono
     throw err;
   }
 }
+
+/**
+ * Configura o Proxy Reverso no DirectAdmin apontando um subdomínio para uma porta na VPS Docker
+ * @param {Object} params
+ * @param {string} params.subdominio - ex: "meucrm"
+ * @param {number|string} params.portaVps - ex: 13000
+ * @param {string} [params.dominioPrincipal] - default: "sitexpres.com.br"
+ * @param {string} [params.ipVps] - default: "143.208.9.235"
+ */
+export async function configurarProxySubdominio({
+  subdominio,
+  portaVps,
+  dominioPrincipal = 'sitexpres.com.br',
+  ipVps = '143.208.9.235'
+}) {
+  console.log(`[PROXY_DA] 🌐 Iniciando configuração de Proxy Reverso para ${subdominio}.${dominioPrincipal} -> ${ipVps}:${portaVps}`);
+
+  // 1. Cria o subdomínio no DirectAdmin (se já existir, o DA apenas mantém)
+  try {
+    await criarSubdominioDirectAdmin(subdominio, dominioPrincipal);
+    console.log(`[PROXY_DA] ✅ Subdomínio ${subdominio} garantido no DirectAdmin`);
+  } catch (daErr) {
+    console.warn(`[PROXY_DA] ⚠️ Aviso ao criar subdomínio no DirectAdmin (pode já existir):`, daErr.message);
+  }
+
+  // 2. Monta o .htaccess com regras de Proxy Reverso (mod_rewrite / mod_proxy)
+  const htaccessContent = `# ========================================================
+# PROXY REVERSO SITEXPRESS PROMAX
+# Encaminha o tráfego do subdomínio para a aplicação Docker
+# ========================================================
+RewriteEngine On
+RewriteBase /
+
+# 1. Se o mod_proxy estiver ativo, faz proxy transparente mantendo a URL e SSL
+<IfModule mod_proxy.c>
+  ProxyPreserveHost On
+  ProxyPass / http://${ipVps}:${portaVps}/
+  ProxyPassReverse / http://${ipVps}:${portaVps}/
+</IfModule>
+
+# 2. Fallback via RewriteRule com flag [P] (Proxy)
+<IfModule mod_rewrite.c>
+  RewriteRule ^(.*)$ http://${ipVps}:${portaVps}/$1 [P,L]
+</IfModule>
+`;
+
+  // 3. Monta o index.html com Iframe Fullscreen de fallback caso mod_proxy não esteja liberado
+  const indexHtmlContent = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subdominio}.${dominioPrincipal}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #020617; }
+    iframe { border: none; width: 100%; height: 100%; display: block; }
+  </style>
+</head>
+<body>
+  <iframe src="http://${ipVps}:${portaVps}/" title="${subdominio}"></iframe>
+</body>
+</html>`;
+
+  // 4. Conecta via FTP e grava o .htaccess e o index.html na pasta do subdomínio
+  const client = new ftp.Client();
+  client.ftp.verbose = false;
+
+  const ftpHosts = ["ftp.sitexpres.com.br", "srv3br.com.br"];
+  let uploaded = false;
+  let lastError = null;
+
+  const targetDir = `/domains/${subdominio}.${dominioPrincipal}/public_html`;
+
+  for (const host of ftpHosts) {
+    try {
+      console.log(`[PROXY_DA] 🔌 Conectando via FTP em ${host}...`);
+      await client.access({
+        host,
+        user: process.env.user_directamin,
+        password: process.env.pass_directamin,
+        secure: false
+      });
+
+      console.log(`[PROXY_DA] 📁 Acessando diretório alvo: ${targetDir}`);
+      await client.ensureDir(targetDir);
+
+      // Envia .htaccess
+      const htaccessStream = Readable.from([htaccessContent]);
+      await client.uploadFrom(htaccessStream, `${targetDir}/.htaccess`);
+      console.log(`[PROXY_DA] ✅ .htaccess de Proxy Reverso gravado com sucesso!`);
+
+      // Envia index.html de fallback
+      const indexStream = Readable.from([indexHtmlContent]);
+      await client.uploadFrom(indexStream, `${targetDir}/index.html`);
+      console.log(`[PROXY_DA] ✅ index.html de fallback gravado com sucesso!`);
+
+      uploaded = true;
+      break;
+    } catch (ftpErr) {
+      console.warn(`[PROXY_DA] ⚠️ Falha ao enviar via FTP em ${host}:`, ftpErr.message);
+      lastError = ftpErr;
+    } finally {
+      client.close();
+    }
+  }
+
+  if (!uploaded) {
+    throw new Error(`Não foi possível enviar configuração de proxy via FTP para o DirectAdmin: ${lastError?.message}`);
+  }
+
+  const urlFinal = `https://${subdominio}.${dominioPrincipal}`;
+  console.log(`[PROXY_DA] 🎉 Proxy configurado com sucesso! Subdomínio ativo em: ${urlFinal}`);
+
+  return {
+    success: true,
+    subdominio: `${subdominio}.${dominioPrincipal}`,
+    url: urlFinal,
+    alvoVps: `http://${ipVps}:${portaVps}`
+  };
+}

@@ -29,6 +29,9 @@ router.post("/testedom", testecret_domin);
 router.get("/analytics/:id_projeto", authMiddleware, getSiteAnalytics);
 
 import { downloadSite } from '../controllers/downloadController.js';
+import { gerarPromaxController } from '../controllers/promaxController.js';
+
 router.get('/download/:id', downloadSite);
+router.post('/gerar_promax', authMiddleware, gerarPromaxController);
 
 export default router;

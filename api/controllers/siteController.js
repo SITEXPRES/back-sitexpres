@@ -23,6 +23,24 @@ import { uso_creditos, verificar_creditos_prompt } from "./creditosController.js
 import { consultaPlano } from "./planoController.js";
 import { gerar_site } from "./gerar_siteController_vite.js";
 import { desatrelarHtmlSitexpress, coletarArquivosProjeto } from "../utils/siteAssetHelper.js";
+import { executarFluxoPromax } from "../services/promaxOrchestratorService.js";
+import { 
+  detectarAmeacaSeguranca, 
+  sanitizarRespostaSeguranca, 
+  REGRAS_SEGURANCA_SYSTEM_PROMPT,
+  MENSAGEM_RECUSA_SEGURANCA 
+} from "../utils/securityGuardrails.js";
+
+function detectarIntencaoPromax(prompt, metadata = null) {
+  if (metadata && metadata.is_promax) return true;
+  const p = (prompt || '').toLowerCase();
+  const termos = [
+    'crm', 'banco de dados', 'postgres', 'postgresql', 'saas', 'fullstack', 
+    'backend', 'api rest', 'tabela de clientes', 'cadastrar clientes', 
+    'gestão de clientes', 'painel com banco', 'sistema com banco'
+  ];
+  return termos.some(t => p.includes(t));
+}
 // ⚠️ REMOVIDO: import { console, url } from "inspector" — esse import sobrescrevia o console global e suprimia os logs no terminal!
 
 const anthropic = new Anthropic({
@@ -221,6 +239,22 @@ export const newsite = async (req, res) => {
           );
           logStep(jobId, `✅ Consulta BD concluída (${Date.now() - t3}ms) | site existente: ${existing.rows.length > 0}`);
 
+          let projectMetadata = null;
+          try {
+            const siteMetaRes = await client.query(
+              `SELECT metadata, site_url FROM public.sites WHERE id_projeto = $1 ORDER BY id DESC LIMIT 1`,
+              [id_projeto]
+            );
+            if (siteMetaRes.rows.length > 0 && siteMetaRes.rows[0].metadata) {
+              projectMetadata = typeof siteMetaRes.rows[0].metadata === 'string'
+                ? JSON.parse(siteMetaRes.rows[0].metadata)
+                : siteMetaRes.rows[0].metadata;
+              logStep(jobId, `ℹ️  Metadata do projeto carregado (Promax: ${!!projectMetadata?.is_promax})`);
+            }
+          } catch (mErr) {
+            console.warn("Aviso ao carregar metadata:", mErr.message);
+          }
+
           const qtde_sites = await client.query(
             `SELECT * FROM public.sites where user_id = $1`,
             [userId]
@@ -280,13 +314,47 @@ export const newsite = async (req, res) => {
           let isQuestionOnly = false;
           let questionAnswer = "";
 
-          if (!primeiraVez) {
+          // 🛡️ GUARDA DE SEGURANÇA: Interceptação imediata de tentativas de obter credenciais de hospedagem/servidor
+          const checagemSeguranca = detectarAmeacaSeguranca(prompt);
+          if (checagemSeguranca.ameaca) {
+            logStep(jobId, '🛡️ [SEGURANÇA] Tentativa de acesso a dados confidenciais bloqueada!');
+            isQuestionOnly = true;
+            questionAnswer = checagemSeguranca.resposta || MENSAGEM_RECUSA_SEGURANCA;
+          } else if (!primeiraVez) {
             logStep(jobId, '🤖 Classificando intenção (modificação vs pergunta)...');
             try {
+               let promaxInfoContext = "";
+               if (projectMetadata && projectMetadata.is_promax) {
+                 promaxInfoContext = `
+\n[FICHA TÉCNICA DO SISTEMA PROMAX DO CLIENTE]
+- Subdomínio Oficial: ${projectMetadata.url_dominio || projectMetadata.subdominio || 'Não configurado'}
+- Acesso Direto VPS: ${projectMetadata.url_direta || 'http://143.208.9.235:' + projectMetadata.port}
+- Porta da Aplicação: ${projectMetadata.port || '3000'}
+- Banco de Dados PostgreSQL 15:
+  - Host Externo: ${projectMetadata.database?.host || '143.208.9.235'}
+  - Porta Externa: ${projectMetadata.database?.porta_externa || projectMetadata.database?.port_externa || '12010'}
+  - Nome do Banco: ${projectMetadata.database?.name || (projectMetadata.projectName ? projectMetadata.projectName + '_db' : 'crm_app_db')}
+  - Usuário: ${projectMetadata.database?.user || 'admin'}
+  - Senha: ${projectMetadata.database?.password || 'definida no deploy'}
+  - Conexão Interna Docker: ${projectMetadata.database?.internal_url || 'postgres://...'}
+- Containers Docker:
+  - Container Aplicação: ${projectMetadata.containers?.app || projectMetadata.container_app}
+  - Container Banco de Dados: ${projectMetadata.containers?.db || projectMetadata.container_db}
+- Stack Tecnológica: ${projectMetadata.tecnologia || 'Node.js 18 + Express + PostgreSQL 15 + Tailwind CSS'}
+- Arquivos do Projeto: ${Array.isArray(projectMetadata.files) ? projectMetadata.files.join(', ') : 'package.json, index.js, public/index.html'}
+- Resumo do Sistema: ${projectMetadata.descricao || 'Aplicação Fullstack com Express e PostgreSQL'}
+- Arquitetura da API: Backend Express em index.js conectado via pool pg ao container Postgres na rede interna sitexpress-net, servindo frontend estático e rotas REST /api/
+`;
+               }
+
                const intentResp = await anthropic.messages.create({
                  model: "claude-haiku-4-5-20251001",
-                 max_tokens: 300,
-                 system: "Você é um avaliador de intenção. Avalie se o usuário quer modificar o site (ex: adicione, mude cor, crie botão, apague, remova, etc) ou se está apenas fazendo uma pergunta ou batendo papo (ex: quantas imagens tem?, qual a cor atual?, por que fez isso?). Se for APENAS pergunta/bate-papo, responda EXATAMENTE com [PERGUNTA] seguido da resposta amigável (sempre comece a resposta com um emoji). Se for qualquer tipo de modificação, responda EXATAMENTE com [MODIFICACAO].",
+                 max_tokens: 650,
+                 system: `Você é o assistente técnico virtual da Sitexpres. Avalie se o usuário quer modificar o sistema/site (ex: adicione campo, mude cor, crie botão, apague, altere) ou se está apenas fazendo uma pergunta ou pedindo informações (ex: quais as credenciais do banco?, qual a senha?, como conectar?, como foi feita a api?, qual a porta?, quantas imagens tem?).${promaxInfoContext}
+${REGRAS_SEGURANCA_SYSTEM_PROMPT}
+Se for PERGUNTA ou DÚVIDA INFORMATIVA, responda EXATAMENTE com [PERGUNTA] seguido de uma resposta amigável, clara, prestativa e formatada em Markdown contendo os dados solicitados (sempre comece com um emoji e use tópicos ou tabelas limpas). Se o usuário perguntar sobre o banco de dados do seu próprio sistema, portas, rotas, como foi feita a API ou detalhes técnicos, utilize os dados da FICHA TÉCNICA.
+NUNCA invente nem forneça credenciais de hospedagem (DirectAdmin/FTP/cPanel), acessos SSH, senhas da VPS ou dados do sistema central.
+Se for MODIFICAÇÃO, responda EXATAMENTE com [MODIFICACAO].`,
                  messages: [
                    ...chatHistory, 
                    { 
@@ -298,8 +366,8 @@ export const newsite = async (req, res) => {
                const intentText = intentResp.content[0].text.trim();
                if (intentText.startsWith("[PERGUNTA]")) {
                  isQuestionOnly = true;
-                 questionAnswer = intentText.replace("[PERGUNTA]", "").trim();
-                 logStep(jobId, '✅ Intenção: PERGUNTA. Resposta gerada.');
+                 questionAnswer = sanitizarRespostaSeguranca(intentText.replace("[PERGUNTA]", "").trim());
+                 logStep(jobId, '✅ Intenção: PERGUNTA. Resposta técnica gerada com sucesso.');
                } else {
                  logStep(jobId, '✅ Intenção: MODIFICAÇÃO.');
                }
@@ -307,6 +375,7 @@ export const newsite = async (req, res) => {
                console.error("Erro na classificação de intenção:", err);
             }
           }
+
 
           finalPrompt = primeiraVez
             ? fullPrompt
@@ -319,21 +388,35 @@ export const newsite = async (req, res) => {
           if (isQuestionOnly) {
              logStep(jobId, '🔗 Reconectando ao BD para salvar apenas a mensagem (sem gerar código)...');
              client = await pool.connect();
-             const novoId = existing.rows[0].id;
-             try {
-               await client.query(
-                 `INSERT INTO site_prompts (user_id, id_projeto, prompt, id_site_gererate, status, assistant_message)
-                  VALUES ($1, $2, $3, $4, $5, $6)`,
-                 [userId, id_projeto, prompt, novoId, 'ativo', questionAnswer]
-               );
-             } catch (e) {
-               console.error("Erro ao inserir site_prompts para pergunta:", e);
+             const novoId = existing?.rows?.[0]?.id || null;
+             const sanitizedAnswer = sanitizarRespostaSeguranca(questionAnswer);
+             if (novoId) {
+               try {
+                 await client.query(
+                   `INSERT INTO site_prompts (user_id, id_projeto, prompt, id_site_gererate, status, assistant_message)
+                    VALUES ($1, $2, $3, $4, $5, $6)`,
+                   [userId, id_projeto, prompt, novoId, 'ativo', sanitizedAnswer]
+                 );
+               } catch (e) {
+                 console.error("Erro ao inserir site_prompts para pergunta:", e);
+               }
              }
              client.release();
              client = null;
              
              jobs[jobId].progress = 100;
-             jobs[jobId] = { status: "done", result: { html_content: existing.rows[0].html_content, assistant_message: questionAnswer }, error: null };
+             jobs[jobId] = { 
+               status: "done", 
+               result: { 
+                 html_content: existing?.rows?.[0]?.html_content || "<div></div>", 
+                 assistant_message: sanitizedAnswer,
+                 is_promax: !!projectMetadata?.is_promax,
+                 metadata: projectMetadata,
+                 url_dominio: projectMetadata?.url_dominio,
+                 url_direta: projectMetadata?.url_direta
+               }, 
+               error: null 
+             };
              logStep(jobId, `🎉 Job concluído (Apenas Resposta)`);
              return;
           }
@@ -342,6 +425,8 @@ export const newsite = async (req, res) => {
 
           // ─── FASE 2: chamada à IA (sem conexão BD aberta) ───────────────────
           let html, distPath, tmpDirPath, hasError;
+          let promaxMetadataToSave = null;
+          let assistantMessageOverride = null;
           const isTestMode = finalPrompt.includes("[teste]");
 
           if (isTestMode) {
@@ -351,6 +436,65 @@ export const newsite = async (req, res) => {
             tmpDirPath = null;
             hasError = false;
             jobs[jobId].progress = 100;
+          } else if (detectarIntencaoPromax(finalPrompt, projectMetadata)) {
+            logStep(jobId, '🚀 [PROMAX] Intenção identificada: Sistema Fullstack com PostgreSQL. Acionando Maestro...');
+            jobs[jobId].progress = 25;
+
+            const resultadoPromax = await executarFluxoPromax({
+              prompt: finalPrompt,
+              id_projeto,
+              userId,
+              existingMetadata: projectMetadata
+            });
+
+            jobs[jobId].progress = 85;
+            const finalUrl = resultadoPromax.url_dominio || resultadoPromax.url_direta;
+
+            html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #020617; }
+    iframe { width: 100%; height: 100%; border: none; }
+  </style>
+</head>
+<body>
+  <iframe src="${finalUrl}" title="CRM Promax"></iframe>
+</body>
+</html>`;
+
+            distPath = null;
+            tmpDirPath = null;
+            hasError = false;
+
+            promaxMetadataToSave = {
+              is_promax: true,
+              projectName: resultadoPromax.projectName,
+              url_dominio: resultadoPromax.url_dominio,
+              url_direta: resultadoPromax.url_direta,
+              port: resultadoPromax.port,
+              containers: {
+                app: resultadoPromax.container_app,
+                db: resultadoPromax.container_db
+              },
+              database: resultadoPromax.db,
+              tecnologia: resultadoPromax.tecnologia || 'Node.js 18 + Express + PostgreSQL 15 + Tailwind CSS',
+              descricao: resultadoPromax.descricao || '',
+              files: resultadoPromax.files || [],
+              created_at: new Date().toISOString()
+            };
+
+            assistantMessageOverride = `🎉 Uau! Seu sistema corporativo com banco de dados PostgreSQL foi gerado e colocado no ar com sucesso!
+
+🌐 **Acesse aqui:** [${finalUrl}](${finalUrl})
+🐘 **Banco de Dados:** PostgreSQL 15 configurado e conectado na VPS.
+
+*Dica: Você pode me perguntar a qualquer momento quais são as credenciais do banco ou como conectar nele!*`;
+
+            jobs[jobId].progress = 95;
+            logStep(jobId, `✅ [PROMAX] Maestro concluiu deploy em ${resultadoPromax.tempoTotalSegundos}s`);
           } else {
             const nomeModeloIa = baseHTML ? 'Claude Haiku' : 'Claude Sonnet 5.5';
             logStep(jobId, `🤖 Enviando prompt para a IA (${nomeModeloIa})... aguarde`);
@@ -384,7 +528,7 @@ export const newsite = async (req, res) => {
           } // fecha if(!isTestMode)
 
           // Gera subdomínio (apenas na criação, sem BD ainda)
-          if (primeiraVez) {
+          if (!promaxMetadataToSave && primeiraVez) {
             logStep(jobId, '🔤 Gerando nome do subdomínio via IA...');
             const tSub = Date.now();
             nomeSubdominio = await gerarNomeSubdominio(prompt);
@@ -394,9 +538,12 @@ export const newsite = async (req, res) => {
             const tDA = Date.now();
             try { await criarSubdominioDirectAdmin(nomeSubdominio, "sitexpres.com.br"); } catch (e) { console.error("Erro DA:", e.message); }
             logStep(jobId, `✅ Subdomínio criado no DirectAdmin (${Date.now() - tDA}ms)`);
+          } else if (promaxMetadataToSave) {
+            nomeSubdominio = promaxMetadataToSave.projectName;
           } else {
             logStep(jobId, `ℹ️  Subdomínio existente recuperado: ${nomeSubdominio}`);
           }
+
 
           // ─── FASE 3: nova conexão para salvar tudo no BD ────────────────────
           logStep(jobId, '🔗 Reconectando ao BD para salvar resultados...');
@@ -406,22 +553,28 @@ export const newsite = async (req, res) => {
           const tDB = Date.now();
 
           if (primeiraVez) {
-            const siteUrl = `https://${nomeSubdominio}.sitexpres.com.br`;
+            const siteUrl = promaxMetadataToSave?.url_dominio || `https://${nomeSubdominio}.sitexpres.com.br`;
+            const metaToSave = promaxMetadataToSave || { id_projeto, subdominio: nomeSubdominio, created_by: 'ai_generation' };
             await client.query(
               `INSERT INTO sites 
               (user_id, site_name, site_url, credits_used, status, metadata, id_projeto)
               VALUES ($1, $2, $3, $4, $5, $6, $7)`,
               [
                 userId,
-                `Site de ${nomeSubdominio}`,
+                promaxMetadataToSave ? `Sistema ${promaxMetadataToSave.projectName}` : `Site de ${nomeSubdominio}`,
                 siteUrl,
                 10,
                 'active',
-                JSON.stringify({ id_projeto, subdominio: nomeSubdominio, created_by: 'ai_generation' }),
+                JSON.stringify(metaToSave),
                 id_projeto
               ]
             );
             logStep(jobId, `✅ Site inserido na tabela 'sites'`);
+          } else if (promaxMetadataToSave) {
+            await client.query(
+              `UPDATE sites SET metadata = $1, site_url = $2 WHERE id_projeto = $3`,
+              [JSON.stringify(promaxMetadataToSave), promaxMetadataToSave.url_dominio || promaxMetadataToSave.url_direta, id_projeto]
+            );
           }
 
           await client.query(
@@ -433,6 +586,7 @@ export const newsite = async (req, res) => {
             [id_projeto]
           );
 
+          const previewUrlFinal = promaxMetadataToSave ? (promaxMetadataToSave.url_dominio || promaxMetadataToSave.url_direta) : `https://${nomeSubdominio}.sitexpres.com.br?v=${Date.now()}`;
           const previewHtml = `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -448,7 +602,7 @@ export const newsite = async (req, res) => {
   <script type="sitexpres/react" id="react-source"><!-- SITEXPRES_REACT_START -->
 ${html}
 <!-- SITEXPRES_REACT_END --></script>
-  <iframe src="https://${nomeSubdominio}.sitexpres.com.br?v=${Date.now()}" title="Preview"></iframe>
+  <iframe src="${previewUrlFinal}" title="Preview"></iframe>
 </body>
 </html>`;
 
@@ -464,27 +618,33 @@ ${html}
 
             // Gera a mensagem inteligente com Haiku
             let assistantMessage = "";
-            try {
-              if (primeiraVez) {
-                 assistantMessage = "🎉 Uau! Seu site foi gerado e publicado com sucesso!";
-              } else {
-                 const aiResp = await anthropic.messages.create({
-                   model: "claude-haiku-4-5-20251001",
-                   max_tokens: 250,
-                   system: "Você é o assistente virtual da Sitexpres, amigável e proativo. Se o usuário pediu uma alteração, informe o que você acabou de alterar no site dele com base no pedido recebido (ex: rodapé, cabeçalho, textos) de forma clara, usando entre 20 a 40 palavras, e convide-o a conferir o resultado. Se o usuário fizer uma pergunta, responda de forma natural com base no contexto do chat. (Mesmo que não saiba detalhes muito técnicos do código gerado, dê uma resposta coerente e prestativa). Sempre comece com um emoji.",
-                   messages: [
-                     ...chatHistory, 
-                     { 
-                       role: "user", 
-                       content: `[CÓDIGO NOVO GERADO PARA O SITE]\n\`\`\`html\n${html ? html.substring(0, 30000) : "Nenhum código"}\n\`\`\`\n\nO usuário pediu: ${prompt}` 
-                     }
-                   ]
-                 });
-                 assistantMessage = aiResp.content[0].text;
+            if (assistantMessageOverride) {
+              assistantMessage = assistantMessageOverride;
+            } else {
+              try {
+                if (primeiraVez) {
+                   assistantMessage = "🎉 Uau! Seu site foi gerado e publicado com sucesso!";
+                } else {
+                   const aiResp = await anthropic.messages.create({
+                     model: "claude-haiku-4-5-20251001",
+                     max_tokens: 250,
+                     system: "Você é o assistente virtual da Sitexpres, amigável e proativo. Se o usuário pediu uma alteração, informe o que você acabou de alterar no site dele com base no pedido recebido (ex: rodapé, cabeçalho, textos) de forma clara, usando entre 20 a 40 palavras, e convide-o a conferir o resultado. Se o usuário fizer uma pergunta, responda de forma natural com base no contexto do chat. (Mesmo que não saiba detalhes muito técnicos do código gerado, dê uma resposta coerente e prestativa). Sempre comece com um emoji.",
+                     messages: [
+                       ...chatHistory, 
+                       { 
+                         role: "user", 
+                         content: `[CÓDIGO NOVO GERADO PARA O SITE]\n\`\`\`html\n${html ? html.substring(0, 30000) : "Nenhum código"}\n\`\`\`\n\nO usuário pediu: ${prompt}` 
+                       }
+                     ]
+                   });
+                   assistantMessage = aiResp.content[0].text;
+                }
+              } catch (err) {
+                console.error("Erro ao gerar mensagem com Haiku", err);
               }
-            } catch (err) {
-              console.error("Erro ao gerar mensagem com Haiku", err);
             }
+
+            assistantMessage = sanitizarRespostaSeguranca(assistantMessage);
 
             try {
               await client.query(
@@ -507,6 +667,27 @@ ${html}
               }
             }
           logStep(jobId, `✅ HTML salvo no banco (${Date.now() - tDB}ms) | id gerado: ${novoId}`);
+
+          // Se for aplicação Promax, o deploy na VPS e a rota no DirectAdmin já foram executados pelo Maestro!
+          if (promaxMetadataToSave) {
+            logStep(jobId, `⚡ [PROMAX] Deploy e proxy já configurados pelo Maestro. Finalizando job com sucesso!`);
+            client.release();
+            client = null;
+            jobs[jobId].progress = 100;
+            jobs[jobId] = {
+              status: "done",
+              result: {
+                html_content: previewHtml,
+                assistant_message: assistantMessage,
+                is_promax: true,
+                url_dominio: promaxMetadataToSave.url_dominio,
+                url_direta: promaxMetadataToSave.url_direta,
+                metadata: promaxMetadataToSave
+              },
+              error: null
+            };
+            return;
+          }
 
           const existe_hospedagem = await client.query(
             `SELECT * FROM hospedagens where id_projeto = $1`,
@@ -975,6 +1156,33 @@ export const get_dominio = async (req, res) => {
   try {
     client = await pool.connect();
 
+    // 1. Verifica primeiro na tabela sites (onde fica o metadata completo do Promax)
+    const siteMetaRes = await client.query(
+      "SELECT site_url, metadata FROM public.sites WHERE id_projeto = $1 ORDER BY id DESC LIMIT 1",
+      [id_projeto]
+    );
+
+    if (siteMetaRes.rows.length > 0 && siteMetaRes.rows[0].site_url) {
+      const siteUrl = siteMetaRes.rows[0].site_url;
+      const metadata = typeof siteMetaRes.rows[0].metadata === 'string'
+        ? JSON.parse(siteMetaRes.rows[0].metadata)
+        : siteMetaRes.rows[0].metadata;
+
+      const isPromax = !!metadata?.is_promax;
+      let subdominio = metadata?.projectName || metadata?.subdominio;
+      if (!subdominio && siteUrl.includes('.sitexpres.com.br')) {
+        subdominio = siteUrl.replace(/^https?:\/\//, '').replace('.sitexpres.com.br', '').split('/')[0];
+      }
+
+      return res.json({
+        subdominio: subdominio || id_projeto,
+        url: siteUrl,
+        is_promax: isPromax,
+        metadata: isPromax ? metadata : undefined
+      });
+    }
+
+    // 2. Fallback para generated_sites
     const result = await client.query(
       "SELECT subdominio FROM generated_sites WHERE id_projeto = $1 LIMIT 1",
       [id_projeto]
@@ -986,16 +1194,16 @@ export const get_dominio = async (req, res) => {
 
     const { subdominio } = result.rows[0];
 
-    // Retorna também a URL completa, se quiser
     return res.json({
       subdominio,
       url: `https://${subdominio}.sitexpres.com.br`,
+      is_promax: false
     });
   } catch (error) {
     console.error("Erro ao buscar subdomínio:", error);
     return res.status(500).json({ error: "Erro interno ao buscar subdomínio." });
   } finally {
-    if (client) client.release(); // 🔥 importante para evitar vazamento de conexão
+    if (client) client.release();
   }
 };
 

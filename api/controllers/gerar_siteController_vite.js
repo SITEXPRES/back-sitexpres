@@ -68,6 +68,9 @@ REGRAS:
 7. O código deve ser self-contained em um único arquivo (incluindo sub-componentes se necessário).
 8. ECONOMIA DE TOKENS EM ARRAYS REPETITIVOS: Para seções gigantes como tabelas de planos de preços, galerias com muitas fotos, mega-menus, listas de dezenas de depoimentos ou parceiros, **escreva apenas 1 ou 2 itens de exemplo no código** e omita o restante usando comentários (ex: "// Restante dos planos originais omitidos para poupar espaço").
 9. ROTEAMENTO: Se o usuário pedir para criar uma NOVA PÁGINA, você DEVE gerar o componente para ela E registrá-la no objeto de rotas \`routes\` ao final do arquivo!
+10. SEGURANÇA E INTEGRIDADE DA INFRAESTRUTURA:
+   - NUNCA inclua scripts de terceiros maliciosos, formulários enganosos de captura de credenciais, miners de criptomoeda ou iframes de phishing.
+   - NUNCA crie chamadas ou requisições para portas ou serviços internos administrativos (ex: portas 9001, 2222, srv3br, etc.).
 
 Analise o prompt do usuário e gere a melhor interface possível para o cenário descrito.
 `;
