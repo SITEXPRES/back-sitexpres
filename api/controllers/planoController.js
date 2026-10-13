@@ -29,7 +29,7 @@ export async function consultaPlano(id_user) {
         }
 
         const user = resultUser.rows[0];
-        const isPro = user.plan === "premium";
+        const isPro = user.plan === "premium" || user.plan === "crm_sistema" || user.plan === "site_page";
 
         return {
           isPro,

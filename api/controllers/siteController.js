@@ -24,21 +24,36 @@ import { consultaPlano } from "./planoController.js";
 import { gerar_site } from "./gerar_siteController_vite.js";
 import { desatrelarHtmlSitexpress, coletarArquivosProjeto } from "../utils/siteAssetHelper.js";
 import { executarFluxoPromax } from "../services/promaxOrchestratorService.js";
-import { 
-  detectarAmeacaSeguranca, 
-  sanitizarRespostaSeguranca, 
+import {
+  detectarAmeacaSeguranca,
+  sanitizarRespostaSeguranca,
   REGRAS_SEGURANCA_SYSTEM_PROMPT,
-  MENSAGEM_RECUSA_SEGURANCA 
+  MENSAGEM_RECUSA_SEGURANCA
 } from "../utils/securityGuardrails.js";
 
-export function detectarIntencaoPromax(prompt, metadata = null) {
+export function detectarIntencaoPromax(prompt, metadata = null, tipoProjeto = null, planoUsuario = null) {
+  // 1. Se foi explicitamente solicitado como Site / Landing Page pelo frontend -> NUNCA Promax!
+  if (tipoProjeto === 'site' || tipoProjeto === 'site_page') return false;
+
+  // 2. Se o plano do usuário for exclusivo de Sites/Pages -> NUNCA Promax!
+  if (planoUsuario === 'site_page') return false;
+
+  // 3. Se for um projeto existente que já é um site normal (DirectAdmin) -> NUNCA migrar para Promax em prompts de edição!
+  if (metadata && metadata.is_promax === false) return false;
+  if (metadata && !metadata.is_promax && (metadata.subdominio || metadata.projectName)) return false;
+
+  // 4. Se foi explicitamente solicitado como Sistema / CRM pelo frontend -> SEMPRE Promax!
+  if (tipoProjeto === 'sistema' || tipoProjeto === 'crm' || tipoProjeto === 'crm_sistema') return true;
+
+  // 5. Se já for um projeto Promax existente -> continua no Promax
   if (metadata && metadata.is_promax) return true;
+
   const p = (prompt || '').toLowerCase();
 
   // 1. Termos técnicos explícitos (caso o usuário ou desenvolvedor seja técnico)
   const termosTecnicos = [
-    'crm', 'banco de dados', 'postgres', 'postgresql', 'saas', 'fullstack', 
-    'backend', 'api rest', 'tabela sql', 'docker container', 'crud', 
+    'crm', 'banco de dados', 'postgres', 'postgresql', 'saas', 'fullstack',
+    'backend', 'api rest', 'tabela sql', 'docker container', 'crud',
     'banco relacional', 'bd relacional', 'node express', 'painel com banco', 'sistema com banco'
   ];
   if (termosTecnicos.some(t => p.includes(t))) return true;
@@ -49,7 +64,7 @@ export function detectarIntencaoPromax(prompt, metadata = null) {
   // 3. Módulos de negócio e operações de gestão com persistência (linguagem 100% natural de usuário leigo)
   const termosNegocioGestao = [
     // Cadastros
-    'cadastro de cliente', 'cadastrar cliente', 'cadastro de imoveis', 'cadastro de imóveis', 
+    'cadastro de cliente', 'cadastrar cliente', 'cadastro de imoveis', 'cadastro de imóveis',
     'cadastrar imoveis', 'cadastrar imóveis', 'cadastro de corretor', 'cadastrar corretor',
     'cadastro de produto', 'cadastrar produto', 'cadastro de paciente', 'cadastrar paciente',
     'cadastro de usuario', 'cadastro de usuário', 'cadastrar usuario', 'cadastrar usuário',
@@ -75,10 +90,10 @@ export function detectarIntencaoPromax(prompt, metadata = null) {
   // Ex: "Crie um sistema para minha imobiliária", "Faça um software para minha oficina", "Painel de vendas da loja"
   if (ehSistema) {
     const nichosNegocio = /\b(imobili[aá]ria|vendas|loja|com[eé]rcio|oficina|cl[ií]nica|consult[oó]rio|escola|curso|academia|restaurante|pizzaria|hotel|pousada|estoque|pedidos|financeiro|or[cç]amentos|clientes|funcion[aá]rios|mensalidades)\b/i;
-    
+
     // Se não for explicitamente "apenas um site institucional / vitrine"
     const apenasSiteVitrine = /\b(apenas|somente|só)\s+(um\s+)?(site|landing\s*page|p[aá]gina|institucional|vitrine)\b/i.test(p);
-    
+
     if (nichosNegocio.test(p) && !apenasSiteVitrine) {
       return true;
     }
@@ -114,8 +129,6 @@ function extrairReactCode(conteudo) {
   return conteudo;
 }
 
-
-
 async function countTokensManual(systemPrompt) {
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages/count_tokens", {
@@ -141,8 +154,6 @@ async function countTokensManual(systemPrompt) {
   }
 }
 
-
-
 // Função principal combinada
 // Jobs temporários em memória
 export const jobs = {}; // { jobId: { status, result, error } }
@@ -157,16 +168,15 @@ function logStep(jobId, msg, data = null) {
   }
 }
 
-
 // Helper: Extrair URLs do prompt e fazer fetch
 async function extractUrlsAndFetchContent(prompt, logStep, jobId) {
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   const urls = prompt.match(urlRegex);
-  
+
   if (!urls || urls.length === 0) return prompt;
 
   let enrichedPrompt = prompt + '\n\n--- CONTEXTO ADICIONAL LIDO DAS URLs FORNECIDAS ---\n';
-  
+
   for (const url of urls) {
     if (logStep) logStep(jobId, `🌐 Lendo conteúdo da URL: ${url}`);
     try {
@@ -176,19 +186,19 @@ async function extractUrlsAndFetchContent(prompt, logStep, jobId) {
       });
       const html = response.data;
       const $ = cheerio.load(html);
-      
+
       // Remover scripts, styles, etc.
       $('script, style, noscript, iframe, img, svg, video, audio').remove();
-      
+
       let textContent = $('body').text();
       // Limpar espaços vazios
       textContent = textContent.replace(/\s+/g, ' ').trim();
-      
+
       // Limitar a quantidade de texto para não estourar os tokens
       if (textContent.length > 20000) {
         textContent = textContent.substring(0, 20000) + '... [Conteúdo Truncado]';
       }
-      
+
       enrichedPrompt += `\nConteúdo do site ${url}:\n${textContent}\n`;
       if (logStep) logStep(jobId, `✅ URL lida com sucesso (${textContent.length} caracteres extraídos).`);
     } catch (e) {
@@ -202,9 +212,9 @@ async function extractUrlsAndFetchContent(prompt, logStep, jobId) {
 
 export const newsite = async (req, res) => {
   try {
-    const { prompt, id_projeto, userId } = req.body;
+    const { prompt, id_projeto, userId, tipo_projeto } = req.body;
 
-    logStep(null, `📥 Nova requisição newsite | userId=${userId} | id_projeto=${id_projeto}`);
+    logStep(null, `📥 Nova requisição newsite | userId=${userId} | id_projeto=${id_projeto} | tipo_projeto=${tipo_projeto || 'auto'}`);
 
     if (!prompt || !prompt.trim()) {
       return res.status(400).json({ success: false, message: "Prompt não enviado" });
@@ -246,6 +256,14 @@ export const newsite = async (req, res) => {
       const isPro = plano.isPro;
       const typedo_plano = plano.plan;
       logStep(null, `✅ Plano consultado (${Date.now() - t2}ms) | plano: ${typedo_plano}`);
+
+      // Validação de tipo de plano vs tipo de projeto
+      if (typedo_plano === 'site_page' && (tipo_projeto === 'sistema' || tipo_projeto === 'crm' || tipo_projeto === 'crm_sistema')) {
+        return res.status(403).json({
+          success: false,
+          message: "Seu plano atual é exclusivo para Sites e Landing Pages. Para gerar Sistemas e CRMs com banco de dados, faça upgrade para o plano CRM & Sistemas."
+        });
+      }
 
       // Imagens/Logos enviados pelo usuário (suporte a múltiplos)
       const uploadedFiles = req.files && req.files.length > 0 ? req.files : [];
@@ -318,7 +336,7 @@ export const newsite = async (req, res) => {
           }
 
           primeiraVez = existing.rows.length === 0;
-          baseHTML    = primeiraVez ? "" : (existing.rows[0].js_content || extrairReactCode(existing.rows[0].html_content));
+          baseHTML = primeiraVez ? "" : (existing.rows[0].js_content || extrairReactCode(existing.rows[0].html_content));
           if (!primeiraVez) {
             nomeSubdominio = existing.rows[0].name.replace("Site de ", "").toLowerCase();
           }
@@ -343,7 +361,7 @@ export const newsite = async (req, res) => {
               );
               if (pastPrompts.rows.length > 0) {
                 historyText = "\n\n[HISTÓRICO DA CONVERSA]:\n" + pastPrompts.rows.map(p => `Usuário: ${p.prompt}\nAssistente: ${p.assistant_message || ""}`).join("\n\n") + "\n\n";
-                
+
                 pastPrompts.rows.forEach(p => {
                   chatHistory.push({ role: "user", content: p.prompt });
                   if (p.assistant_message) {
@@ -368,9 +386,9 @@ export const newsite = async (req, res) => {
           } else if (!primeiraVez) {
             logStep(jobId, '🤖 Classificando intenção (modificação vs pergunta)...');
             try {
-               let promaxInfoContext = "";
-               if (projectMetadata && projectMetadata.is_promax) {
-                 promaxInfoContext = `
+              let promaxInfoContext = "";
+              if (projectMetadata && projectMetadata.is_promax) {
+                promaxInfoContext = `
 \n[FICHA TÉCNICA DO SISTEMA PROMAX DO CLIENTE]
 - Subdomínio Oficial: ${projectMetadata.url_dominio || projectMetadata.subdominio || 'Não configurado'}
 - Acesso Direto VPS: ${projectMetadata.url_direta || 'http://143.208.9.235:' + projectMetadata.port}
@@ -390,34 +408,34 @@ export const newsite = async (req, res) => {
 - Resumo do Sistema: ${projectMetadata.descricao || 'Aplicação Fullstack com Express e PostgreSQL'}
 - Arquitetura da API: Backend Express em index.js conectado via pool pg ao container Postgres na rede interna sitexpress-net, servindo frontend estático e rotas REST /api/
 `;
-               }
+              }
 
-               const intentResp = await anthropic.messages.create({
-                 model: "claude-haiku-4-5-20251001",
-                 max_tokens: 650,
-                 system: `Você é o assistente técnico virtual da Sitexpres. Avalie se o usuário quer modificar o sistema/site (ex: adicione campo, mude cor, crie botão, apague, altere) ou se está apenas fazendo uma pergunta ou pedindo informações (ex: quais as credenciais do banco?, qual a senha?, como conectar?, como foi feita a api?, qual a porta?, quantas imagens tem?).${promaxInfoContext}
+              const intentResp = await anthropic.messages.create({
+                model: "claude-haiku-4-5-20251001",
+                max_tokens: 650,
+                system: `Você é o assistente técnico virtual da Sitexpres. Avalie se o usuário quer modificar o sistema/site (ex: adicione campo, mude cor, crie botão, apague, altere) ou se está apenas fazendo uma pergunta ou pedindo informações (ex: quais as credenciais do banco?, qual a senha?, como conectar?, como foi feita a api?, qual a porta?, quantas imagens tem?).${promaxInfoContext}
 ${REGRAS_SEGURANCA_SYSTEM_PROMPT}
 Se for PERGUNTA ou DÚVIDA INFORMATIVA, responda EXATAMENTE com [PERGUNTA] seguido de uma resposta amigável, clara, prestativa e formatada em Markdown contendo os dados solicitados (sempre comece com um emoji e use tópicos ou tabelas limpas). Se o usuário perguntar sobre o banco de dados do seu próprio sistema, portas, rotas, como foi feita a API ou detalhes técnicos, utilize os dados da FICHA TÉCNICA.
 NUNCA invente nem forneça credenciais de hospedagem (DirectAdmin/FTP/cPanel), acessos SSH, senhas da VPS ou dados do sistema central.
 Se for MODIFICAÇÃO, responda EXATAMENTE com [MODIFICACAO].`,
-                 messages: [
-                   ...chatHistory, 
-                   { 
-                     role: "user", 
-                     content: `[CÓDIGO ATUAL DO SITE PARA REFERÊNCIA]\n\`\`\`html\n${baseHTML ? baseHTML.substring(0, 30000) : "Nenhum código ainda"}\n\`\`\`\n\nO usuário diz: ${prompt}` 
-                   }
-                 ]
-               });
-               const intentText = intentResp.content[0].text.trim();
-               if (intentText.startsWith("[PERGUNTA]")) {
-                 isQuestionOnly = true;
-                 questionAnswer = sanitizarRespostaSeguranca(intentText.replace("[PERGUNTA]", "").trim());
-                 logStep(jobId, '✅ Intenção: PERGUNTA. Resposta técnica gerada com sucesso.');
-               } else {
-                 logStep(jobId, '✅ Intenção: MODIFICAÇÃO.');
-               }
+                messages: [
+                  ...chatHistory,
+                  {
+                    role: "user",
+                    content: `[CÓDIGO ATUAL DO SITE PARA REFERÊNCIA]\n\`\`\`html\n${baseHTML ? baseHTML.substring(0, 30000) : "Nenhum código ainda"}\n\`\`\`\n\nO usuário diz: ${prompt}`
+                  }
+                ]
+              });
+              const intentText = intentResp.content[0].text.trim();
+              if (intentText.startsWith("[PERGUNTA]")) {
+                isQuestionOnly = true;
+                questionAnswer = sanitizarRespostaSeguranca(intentText.replace("[PERGUNTA]", "").trim());
+                logStep(jobId, '✅ Intenção: PERGUNTA. Resposta técnica gerada com sucesso.');
+              } else {
+                logStep(jobId, '✅ Intenção: MODIFICAÇÃO.');
+              }
             } catch (err) {
-               console.error("Erro na classificação de intenção:", err);
+              console.error("Erro na classificação de intenção:", err);
             }
           }
 
@@ -431,39 +449,39 @@ Se for MODIFICAÇÃO, responda EXATAMENTE com [MODIFICACAO].`,
           client = null;
 
           if (isQuestionOnly) {
-             logStep(jobId, '🔗 Reconectando ao BD para salvar apenas a mensagem (sem gerar código)...');
-             client = await pool.connect();
-             const novoId = existing?.rows?.[0]?.id || null;
-             const sanitizedAnswer = sanitizarRespostaSeguranca(questionAnswer);
-             if (novoId) {
-               try {
-                 await client.query(
-                   `INSERT INTO site_prompts (user_id, id_projeto, prompt, id_site_gererate, status, assistant_message)
+            logStep(jobId, '🔗 Reconectando ao BD para salvar apenas a mensagem (sem gerar código)...');
+            client = await pool.connect();
+            const novoId = existing?.rows?.[0]?.id || null;
+            const sanitizedAnswer = sanitizarRespostaSeguranca(questionAnswer);
+            if (novoId) {
+              try {
+                await client.query(
+                  `INSERT INTO site_prompts (user_id, id_projeto, prompt, id_site_gererate, status, assistant_message)
                     VALUES ($1, $2, $3, $4, $5, $6)`,
-                   [userId, id_projeto, prompt, novoId, 'ativo', sanitizedAnswer]
-                 );
-               } catch (e) {
-                 console.error("Erro ao inserir site_prompts para pergunta:", e);
-               }
-             }
-             client.release();
-             client = null;
-             
-             jobs[jobId].progress = 100;
-             jobs[jobId] = { 
-               status: "done", 
-               result: { 
-                 html_content: existing?.rows?.[0]?.html_content || "<div></div>", 
-                 assistant_message: sanitizedAnswer,
-                 is_promax: !!projectMetadata?.is_promax,
-                 metadata: projectMetadata,
-                 url_dominio: projectMetadata?.url_dominio,
-                 url_direta: projectMetadata?.url_direta
-               }, 
-               error: null 
-             };
-             logStep(jobId, `🎉 Job concluído (Apenas Resposta)`);
-             return;
+                  [userId, id_projeto, prompt, novoId, 'ativo', sanitizedAnswer]
+                );
+              } catch (e) {
+                console.error("Erro ao inserir site_prompts para pergunta:", e);
+              }
+            }
+            client.release();
+            client = null;
+
+            jobs[jobId].progress = 100;
+            jobs[jobId] = {
+              status: "done",
+              result: {
+                html_content: existing?.rows?.[0]?.html_content || "<div></div>",
+                assistant_message: sanitizedAnswer,
+                is_promax: !!projectMetadata?.is_promax,
+                metadata: projectMetadata,
+                url_dominio: projectMetadata?.url_dominio,
+                url_direta: projectMetadata?.url_direta
+              },
+              error: null
+            };
+            logStep(jobId, `🎉 Job concluído (Apenas Resposta)`);
+            return;
           }
 
           logStep(jobId, '🔓 Conexão com BD liberada — iniciando chamada à IA...');
@@ -481,7 +499,7 @@ Se for MODIFICAÇÃO, responda EXATAMENTE com [MODIFICACAO].`,
             tmpDirPath = null;
             hasError = false;
             jobs[jobId].progress = 100;
-          } else if (detectarIntencaoPromax(finalPrompt, projectMetadata)) {
+          } else if (detectarIntencaoPromax(prompt, projectMetadata, tipo_projeto, typedo_plano)) {
             logStep(jobId, '🚀 [PROMAX] Intenção identificada: Sistema Fullstack com PostgreSQL. Acionando Maestro...');
             jobs[jobId].progress = 25;
 
@@ -506,7 +524,7 @@ Se for MODIFICAÇÃO, responda EXATAMENTE com [MODIFICACAO].`,
   </style>
 </head>
 <body>
-  <iframe src="${finalUrl}" title="CRM Promax"></iframe>
+  <iframe src="${finalUrl}" title="CRM Sitexpres"></iframe>
 </body>
 </html>`;
 
@@ -552,32 +570,32 @@ Se for MODIFICAÇÃO, responda EXATAMENTE com [MODIFICACAO].`,
           } else {
             const nomeModeloIa = baseHTML ? 'Claude Haiku' : 'Claude Sonnet 5.5';
             logStep(jobId, `🤖 Enviando prompt para a IA (${nomeModeloIa})... aguarde`);
-          const tIA = Date.now();
-          const geracaoResult = await gerar_site(
-            finalPrompt,
-            "REACT",
-            req,
-            id_projeto,
-            baseHTML,
-            userId,
-            primeiraVez,
-            (percent) => {
-              jobs[jobId].progress = percent;
+            const tIA = Date.now();
+            const geracaoResult = await gerar_site(
+              finalPrompt,
+              "REACT",
+              req,
+              id_projeto,
+              baseHTML,
+              userId,
+              primeiraVez,
+              (percent) => {
+                jobs[jobId].progress = percent;
+              }
+            );
+            if (typeof geracaoResult === 'string') {
+              // Modo HTML Puro
+              html = desatrelarHtmlSitexpress(geracaoResult);
+              distPath = null;
+              tmpDirPath = null;
+              hasError = false;
+            } else {
+              // Modo React Vite
+              html = desatrelarHtmlSitexpress(geracaoResult.reactCode);
+              distPath = geracaoResult.distPath;
+              tmpDirPath = geracaoResult.tmpDirPath;
+              hasError = geracaoResult.hasError;
             }
-          );
-          if (typeof geracaoResult === 'string') {
-            // Modo HTML Puro
-            html = desatrelarHtmlSitexpress(geracaoResult);
-            distPath = null;
-            tmpDirPath = null;
-            hasError = false;
-          } else {
-            // Modo React Vite
-            html = desatrelarHtmlSitexpress(geracaoResult.reactCode);
-            distPath = geracaoResult.distPath;
-            tmpDirPath = geracaoResult.tmpDirPath;
-            hasError = geracaoResult.hasError;
-          }
             logStep(jobId, `✅ Geração e build concluídos (${((Date.now() - tIA) / 1000).toFixed(1)}s)`);
           } // fecha if(!isTestMode)
 
@@ -608,7 +626,13 @@ Se for MODIFICAÇÃO, responda EXATAMENTE com [MODIFICACAO].`,
 
           if (primeiraVez) {
             const siteUrl = promaxMetadataToSave?.url_dominio || `https://${nomeSubdominio}.sitexpres.com.br`;
-            const metaToSave = promaxMetadataToSave || { id_projeto, subdominio: nomeSubdominio, created_by: 'ai_generation' };
+            const metaToSave = promaxMetadataToSave || {
+              id_projeto,
+              subdominio: nomeSubdominio,
+              is_promax: false,
+              tipo_projeto: 'site',
+              created_by: 'ai_generation'
+            };
             await client.query(
               `INSERT INTO sites 
               (user_id, site_name, site_url, credits_used, status, metadata, id_projeto)
@@ -670,56 +694,56 @@ ${html}
 
           const novoId = insertSite.rows[0].id;
 
-            // Gera a mensagem inteligente com Haiku
-            let assistantMessage = "";
-            if (assistantMessageOverride) {
-              assistantMessage = assistantMessageOverride;
-            } else {
-              try {
-                if (primeiraVez) {
-                   assistantMessage = "🎉 Uau! Seu site foi gerado e publicado com sucesso!";
-                } else {
-                   const aiResp = await anthropic.messages.create({
-                     model: "claude-haiku-4-5-20251001",
-                     max_tokens: 250,
-                     system: "Você é o assistente virtual da Sitexpres, amigável e proativo. Se o usuário pediu uma alteração, informe o que você acabou de alterar no site dele com base no pedido recebido (ex: rodapé, cabeçalho, textos) de forma clara, usando entre 20 a 40 palavras, e convide-o a conferir o resultado. Se o usuário fizer uma pergunta, responda de forma natural com base no contexto do chat. (Mesmo que não saiba detalhes muito técnicos do código gerado, dê uma resposta coerente e prestativa). Sempre comece com um emoji.",
-                     messages: [
-                       ...chatHistory, 
-                       { 
-                         role: "user", 
-                         content: `[CÓDIGO NOVO GERADO PARA O SITE]\n\`\`\`html\n${html ? html.substring(0, 30000) : "Nenhum código"}\n\`\`\`\n\nO usuário pediu: ${prompt}` 
-                       }
-                     ]
-                   });
-                   assistantMessage = aiResp.content[0].text;
-                }
-              } catch (err) {
-                console.error("Erro ao gerar mensagem com Haiku", err);
-              }
-            }
-
-            assistantMessage = sanitizarRespostaSeguranca(assistantMessage);
-
+          // Gera a mensagem inteligente com Haiku
+          let assistantMessage = "";
+          if (assistantMessageOverride) {
+            assistantMessage = assistantMessageOverride;
+          } else {
             try {
-              await client.query(
-                `INSERT INTO site_prompts (user_id, id_projeto, prompt, id_site_gererate, status, assistant_message)
-                 VALUES ($1, $2, $3, $4, $5, $6)`,
-                [userId, id_projeto, prompt, novoId, 'ativo', assistantMessage]
-              );
-            } catch (promptErr) {
-              if (promptErr.code === '42703' || (promptErr.message && promptErr.message.includes('assistant_message'))) {
-                console.warn(`[${new Date().toISOString()}] ⚠️ Coluna assistant_message ainda não existe em site_prompts. Inserindo sem ela e criando coluna...`);
-                await client.query(
-                  `INSERT INTO site_prompts (user_id, id_projeto, prompt, id_site_gererate, status)
-                   VALUES ($1, $2, $3, $4, $5)`,
-                  [userId, id_projeto, prompt, novoId, 'ativo']
-                );
-                // Executa migration assíncrona para adicionar a coluna para as próximas chamadas
-                pool.query(`ALTER TABLE public.site_prompts ADD COLUMN IF NOT EXISTS assistant_message TEXT;`).catch(() => {});
+              if (primeiraVez) {
+                assistantMessage = "🎉 Uau! Seu site foi gerado e publicado com sucesso!";
               } else {
-                throw promptErr;
+                const aiResp = await anthropic.messages.create({
+                  model: "claude-haiku-4-5-20251001",
+                  max_tokens: 250,
+                  system: "Você é o assistente virtual da Sitexpres, amigável e proativo. Se o usuário pediu uma alteração, informe o que você acabou de alterar no site dele com base no pedido recebido (ex: rodapé, cabeçalho, textos) de forma clara, usando entre 20 a 40 palavras, e convide-o a conferir o resultado. Se o usuário fizer uma pergunta, responda de forma natural com base no contexto do chat. (Mesmo que não saiba detalhes muito técnicos do código gerado, dê uma resposta coerente e prestativa). Sempre comece com um emoji.",
+                  messages: [
+                    ...chatHistory,
+                    {
+                      role: "user",
+                      content: `[CÓDIGO NOVO GERADO PARA O SITE]\n\`\`\`html\n${html ? html.substring(0, 30000) : "Nenhum código"}\n\`\`\`\n\nO usuário pediu: ${prompt}`
+                    }
+                  ]
+                });
+                assistantMessage = aiResp.content[0].text;
               }
+            } catch (err) {
+              console.error("Erro ao gerar mensagem com Haiku", err);
             }
+          }
+
+          assistantMessage = sanitizarRespostaSeguranca(assistantMessage);
+
+          try {
+            await client.query(
+              `INSERT INTO site_prompts (user_id, id_projeto, prompt, id_site_gererate, status, assistant_message)
+                 VALUES ($1, $2, $3, $4, $5, $6)`,
+              [userId, id_projeto, prompt, novoId, 'ativo', assistantMessage]
+            );
+          } catch (promptErr) {
+            if (promptErr.code === '42703' || (promptErr.message && promptErr.message.includes('assistant_message'))) {
+              console.warn(`[${new Date().toISOString()}] ⚠️ Coluna assistant_message ainda não existe em site_prompts. Inserindo sem ela e criando coluna...`);
+              await client.query(
+                `INSERT INTO site_prompts (user_id, id_projeto, prompt, id_site_gererate, status)
+                   VALUES ($1, $2, $3, $4, $5)`,
+                [userId, id_projeto, prompt, novoId, 'ativo']
+              );
+              // Executa migration assíncrona para adicionar a coluna para as próximas chamadas
+              pool.query(`ALTER TABLE public.site_prompts ADD COLUMN IF NOT EXISTS assistant_message TEXT;`).catch(() => { });
+            } else {
+              throw promptErr;
+            }
+          }
           logStep(jobId, `✅ HTML salvo no banco (${Date.now() - tDB}ms) | id gerado: ${novoId}`);
 
           // Se for aplicação Promax, o deploy na VPS e a rota no DirectAdmin já foram executados pelo Maestro!
@@ -776,8 +800,8 @@ ${html}
 
           if (existe_hospedagem.rows.length > 0) {
             try {
-              const username          = existe_hospedagem.rows[0].username;
-              const password          = existe_hospedagem.rows[0].senha;
+              const username = existe_hospedagem.rows[0].username;
+              const password = existe_hospedagem.rows[0].senha;
               const dominio_hospedagem = existe_hospedagem.rows[0].dominio;
               try {
                 if (distPath) {
@@ -832,12 +856,12 @@ ${html}
               console.error("Erro FTP DirectAdmin:", errFTP);
             }
           }
-          
+
           try {
             const zipsDir = path.join(process.cwd(), 'uploads', 'zips');
             await fs.mkdir(zipsDir, { recursive: true });
             const zipPath = path.join(zipsDir, `${id_projeto}.zip`);
-            
+
             await new Promise((resolve, reject) => {
               const output = fsSync.createWriteStream(zipPath);
               let archive;
@@ -857,7 +881,7 @@ ${html}
               output.on('close', resolve);
               archive.on('error', reject);
               archive.pipe(output);
-              
+
               if (distPath) {
                 archive.directory(distPath, false);
               } else {
@@ -881,7 +905,7 @@ ${html}
 
           // Limpa a pasta temporária do build
           if (tmpDirPath) { await fs.rm(tmpDirPath, { recursive: true, force: true }).catch(e => console.error('Erro ao deletar tmp dir:', e)); }
-          
+
 
           // Update no github caso integrado
           logStep(jobId, '🐙 Verificando integração com GitHub...');
@@ -906,7 +930,7 @@ ${html}
           jobs[jobId] = { status: "error", result: null, error: error.message };
         } finally {
           if (client) {
-            try { client.release(); } catch (ignored) {}
+            try { client.release(); } catch (ignored) { }
           }
         }
       })();
@@ -1351,8 +1375,8 @@ export const restauracao_versao = async (req, res) => {
         [id_projeto]
       );
       if (dados_gen.rows.length > 0) {
-        subdominio = dados_gen.rows[0].subdominio 
-          ? dados_gen.rows[0].subdominio + '.sitexpres.com.br' 
+        subdominio = dados_gen.rows[0].subdominio
+          ? dados_gen.rows[0].subdominio + '.sitexpres.com.br'
           : dados_gen.rows[0].name.replace("Site de ", "").toLowerCase() + '.sitexpres.com.br';
       }
     }
@@ -1387,7 +1411,7 @@ export const restauracao_versao = async (req, res) => {
     }
     const tmpDirName = `restauracao_${id_projeto}_${Date.now()}`;
     const tmpDirPath = path.join(tmpBase, tmpDirName);
-    
+
     let distPath = null;
 
     try {
@@ -1411,15 +1435,15 @@ export const restauracao_versao = async (req, res) => {
         if (!fsSync.existsSync(vitePkg)) {
           await execPromise('npm install --include=dev --no-audit', { cwd: tmpDirPath });
         }
-        await execPromise('chmod -R +x node_modules/.bin || true', { cwd: tmpDirPath }).catch(() => {});
-        
+        await execPromise('chmod -R +x node_modules/.bin || true', { cwd: tmpDirPath }).catch(() => { });
+
         try {
           await execPromise('npx --no-install vite build', { cwd: tmpDirPath });
         } catch {
           await execPromise('npm run build', { cwd: tmpDirPath });
         }
         distPath = path.join(tmpDirPath, "dist");
-        
+
         // Copiar arquivos extras (imagens) para a pasta dist
         if (distPath && arquivosExtras.length > 0) {
           const imagesDist = path.join(distPath, 'images');
@@ -1466,7 +1490,7 @@ export const restauracao_versao = async (req, res) => {
       }
     } finally {
       if (tmpDirPath && fsSync.existsSync(tmpDirPath)) {
-         await fs.rm(tmpDirPath, { recursive: true, force: true }).catch(e => console.error(e));
+        await fs.rm(tmpDirPath, { recursive: true, force: true }).catch(e => console.error(e));
       }
     }
 

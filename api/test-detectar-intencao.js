@@ -82,13 +82,38 @@ const testes = [
     nome: "15. Site de imobiliária vitrine (apenas site)",
     prompt: "Crie apenas um site vitrine para imobiliária com fotos das casas e contato",
     esperaPromax: false
+  },
+  // --- TESTES DE ISOLAMENTO E PREVENÇÃO DE MISTURA ---
+  {
+    nome: "16. Usuário no plano site_page pede sistema (deve barrar e ir para site)",
+    prompt: "Crie um sistema para imobiliária com cadastro de clientes",
+    plano: "site_page",
+    esperaPromax: false
+  },
+  {
+    nome: "17. Tela escolheu explicitamente tipo 'site' (deve barrar e ir para site)",
+    prompt: "Crie um sistema CRM para imobiliária com postgresql",
+    tipo: "site",
+    esperaPromax: false
+  },
+  {
+    nome: "18. Projeto existente de site tradicional recebe prompt de favicon/cloudx (NUNCA vira Promax)",
+    prompt: "Altere o Favicon para o mesmo do site https://cloudx.com.br/ em todas as paginas",
+    metadata: { is_promax: false, subdominio: "sugestodesubdom" },
+    esperaPromax: false
+  },
+  {
+    nome: "19. Tela escolheu explicitamente tipo 'sistema' (deve ir para Promax)",
+    prompt: "Crie meu sistema de imobiliária",
+    tipo: "sistema",
+    esperaPromax: true
   }
 ];
 
 let acertos = 0;
 
 for (const t of testes) {
-  const resultado = detectarIntencaoPromax(t.prompt);
+  const resultado = detectarIntencaoPromax(t.prompt, t.metadata || null, t.tipo || null, t.plano || null);
   const ok = resultado === t.esperaPromax;
   
   console.log(`📌 [${t.esperaPromax ? "PROMAX" : "VITE"}] ${t.nome}`);
