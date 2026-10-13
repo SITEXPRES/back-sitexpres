@@ -31,7 +31,7 @@ function cleanJsonOutput(text) {
  * @returns {Promise<Object>} - Objeto contendo name_app, tecnologia, files, etc.
  */
 export async function gerarAplicacaoPromax(userPrompt, existingContext = null) {
-  const model = "claude-sonnet-5-5";
+  const model = process.env.PROMAX_CLAUDE_MODEL || "claude-sonnet-5-5";
   console.log(`[PROMAX_AI] 🧠 Solicitando geração de aplicação para Claude (${model})...`);
   console.log(`[PROMAX_AI] 📝 Prompt do usuário: "${userPrompt}"`);
   if (existingContext) {
