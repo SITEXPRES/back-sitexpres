@@ -32,7 +32,7 @@ import {
 } from "../utils/securityGuardrails.js";
 
 export function detectarIntencaoPromax(prompt, metadata = null, tipoProjeto = null, planoUsuario = null) {
-  // 1. Se foi explicitamente solicitado como Site / Landing Page pelo frontend -> NUNCA Promax!
+  // 1. Se foi explicitamente solicitado como Site / Landing Page pelo frontend (e não for auto) -> NUNCA Promax!
   if (tipoProjeto === 'site' || tipoProjeto === 'site_page') return false;
 
   // 2. Se o plano do usuário for exclusivo de Sites/Pages -> NUNCA Promax!
