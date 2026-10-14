@@ -107,6 +107,18 @@ const testes = [
     prompt: "Crie meu sistema de imobiliária",
     tipo: "sistema",
     esperaPromax: true
+  },
+  {
+    nome: "20. Usuário no plano starter (R$ 29,90) pede CRM com banco (deve barrar Promax)",
+    prompt: "Crie um CRM com banco de dados postgres para minha empresa",
+    plano: "starter",
+    esperaPromax: false
+  },
+  {
+    nome: "21. Usuário no plano free pede CRM com banco (deve barrar Promax)",
+    prompt: "Crie um CRM com banco de dados postgres para minha empresa",
+    plano: "free",
+    esperaPromax: false
   }
 ];
 

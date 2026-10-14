@@ -378,11 +378,15 @@ export const consultarPix = async (req, res) => {
                 [transacao.user_id]
             );
 
-            //Colocando usuário como premium
+            // Determina plano: R$ 29,90 / 100 créditos = 'site_page' (Starter - exclusivo para Sites & Landing Pages)
+            // R$ 79,90+ / 1.000+ créditos = 'premium' (Pro / CRM & Sistemas)
+            const valorPago = parseFloat(transacao.monetary_value || 0);
+            const planoAtribuido = (valorPago <= 35.00 || transacao.credits <= 150) ? 'site_page' : 'premium';
+
             await pool.query(
                 `INSERT INTO public.user_subscriptions (user_id, plan, is_active) 
-         VALUES ($1, 'premium', true)`,
-                [transacao.user_id]
+                 VALUES ($1, $2, true)`,
+                [transacao.user_id, planoAtribuido]
             );
 
             // ENVIA NOTA FISCAL

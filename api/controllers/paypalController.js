@@ -907,10 +907,15 @@ export async function paymentSuccess(req, res) {
                 [user_id]
             );
 
+            // Determina plano: R$ 29,90 / 100 créditos = 'site_page' (Starter - exclusivo para Sites & Landing Pages)
+            // R$ 79,90+ / 1.000+ créditos = 'premium' (Pro / CRM & Sistemas)
+            const valorPago = parseFloat(monetary_value || 0);
+            const planoAtribuido = (valorPago <= 35.00 || (typeof qtd_creditos !== 'undefined' && qtd_creditos <= 150)) ? 'site_page' : 'premium';
+
             await pool.query(
                 `INSERT INTO public.user_subscriptions (user_id, plan, is_active) 
-                 VALUES ($1, 'premium', true)`,
-                [user_id]
+                 VALUES ($1, $2, true)`,
+                [user_id, planoAtribuido]
             );
 
             // 3. REGISTRAR PRÓXIMO CICLO (Fatura Pendente)

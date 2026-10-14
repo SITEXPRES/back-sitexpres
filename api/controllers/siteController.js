@@ -35,8 +35,8 @@ export function detectarIntencaoPromax(prompt, metadata = null, tipoProjeto = nu
   // 1. Se foi explicitamente solicitado como Site / Landing Page pelo frontend (e não for auto) -> NUNCA Promax!
   if (tipoProjeto === 'site' || tipoProjeto === 'site_page') return false;
 
-  // 2. Se o plano do usuário for exclusivo de Sites/Pages -> NUNCA Promax!
-  if (planoUsuario === 'site_page') return false;
+  // 2. Se o plano do usuário for exclusivo de Sites/Pages ou Free -> NUNCA Promax!
+  if (['site_page', 'starter', 'site', 'free'].includes(planoUsuario)) return false;
 
   // 3. Se for um projeto existente que já é um site normal (DirectAdmin) -> NUNCA migrar para Promax em prompts de edição!
   if (metadata && metadata.is_promax === false) return false;
@@ -257,12 +257,26 @@ export const newsite = async (req, res) => {
       const typedo_plano = plano.plan;
       logStep(null, `✅ Plano consultado (${Date.now() - t2}ms) | plano: ${typedo_plano}`);
 
-      // Validação de tipo de plano vs tipo de projeto
-      if (typedo_plano === 'site_page' && (tipo_projeto === 'sistema' || tipo_projeto === 'crm' || tipo_projeto === 'crm_sistema')) {
-        return res.status(403).json({
-          success: false,
-          message: "Seu plano atual é exclusivo para Sites e Landing Pages. Para gerar Sistemas e CRMs com banco de dados, faça upgrade para o plano CRM & Sistemas."
-        });
+      // Validação de tipo de plano vs tipo de projeto (Planos 29,90 / Free NÃO podem criar Sistemas ou CRMs)
+      const isPlanoApenasSites = ['site_page', 'starter', 'site', 'free'].includes(typedo_plano);
+
+      if (isPlanoApenasSites) {
+        // Bloqueio 1: Se escolheu explicitamente sistema / crm na tela
+        if (tipo_projeto === 'sistema' || tipo_projeto === 'crm' || tipo_projeto === 'crm_sistema') {
+          return res.status(403).json({
+            success: false,
+            message: "Seu plano atual (R$ 29,90) é exclusivo para Sites e Landing Pages. Para gerar Sistemas e CRMs com banco de dados PostgreSQL, faça upgrade para o plano Pro / CRM."
+          });
+        }
+
+        // Bloqueio 2: Se deixou em 'auto' mas o prompt pede claramente um CRM / Sistema com banco de dados
+        const querCRM = detectarIntencaoPromax(prompt, null, 'auto', 'premium');
+        if (querCRM) {
+          return res.status(403).json({
+            success: false,
+            message: "Identificamos que você solicitou um Sistema/CRM com banco de dados. Seu plano atual (R$ 29,90) é exclusivo para Sites e Landing Pages. Faça upgrade para o plano Pro / CRM para criar Sistemas com PostgreSQL!"
+          });
+        }
       }
 
       // Imagens/Logos enviados pelo usuário (suporte a múltiplos)
