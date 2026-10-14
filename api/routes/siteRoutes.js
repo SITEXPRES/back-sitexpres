@@ -1,5 +1,5 @@
 import express from "express";
-import { getSites, newsite, jobStatus, check_id_projeto, testecret_domin, list_don, get_dominio, getPromts, restauracao_versao, deletar_site, getSiteAnalytics } from "../controllers/siteController.js";
+import { getSites, newsite, jobStatus, check_id_projeto, testecret_domin, list_don, get_dominio, getPromts, restauracao_versao, deletar_site, getSiteAnalytics, verifySiteReady } from "../controllers/siteController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
 import { upload } from "../middlewares/upload.js";
 const router = express.Router();
@@ -17,6 +17,7 @@ router.post("/gerar_new_site", (req, res, next) => {
   });
 }, newsite);
 router.get("/job-status/:jobId", authMiddleware, jobStatus);  //gerando site assincrono
+router.get("/verify-url", verifySiteReady); // Verificador se site/CRM está online sem placeholder
 router.get("/", authMiddleware, getSites);
 router.get("/teste", (req, res) => res.send("rota site ok"));
 router.get("/get_dominio/:id_projeto", authMiddleware, get_dominio);

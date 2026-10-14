@@ -716,7 +716,7 @@ Suas alterações foram aplicadas diretamente no container da sua aplicação (p
     .spinner-ring { width: 44px; height: 44px; border: 3px solid rgba(56, 189, 248, 0.15); border-top-color: #38bdf8; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 14px; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .title { font-size: 15px; font-weight: 600; color: #f1f5f9; margin-bottom: 5px; }
-    .subtitle { font-size: 12px; color: #94a3b8; max-width: 290px; text-align: center; line-height: 1.4; }
+    .subtitle { font-size: 12px; color: #94a3b8; max-width: 320px; text-align: center; line-height: 1.4; }
     #react-source { display: none; }
   </style>
 </head>
@@ -726,15 +726,18 @@ ${html}
 <!-- SITEXPRES_REACT_END --></script>
   <div id="loader">
     <div class="spinner-ring"></div>
-    <div class="title">Conectando ao servidor...</div>
-    <div class="subtitle">Inicializando o site recém-publicado. Ele aparecerá na tela em instantes!</div>
+    <div class="title" id="loader-title">Carregando visualização...</div>
+    <div class="subtitle" id="loader-sub">Sincronizando com o servidor. O projeto aparecerá em instantes!</div>
   </div>
-  <iframe id="preview-frame" src="${previewUrlFinal}" title="Preview"></iframe>
+  <iframe id="preview-frame" src="" data-src="${previewUrlFinal}" title="Preview"></iframe>
   <script>
     (function() {
       const frame = document.getElementById('preview-frame');
       const loader = document.getElementById('loader');
+      const titleEl = document.getElementById('loader-title');
+      const subEl = document.getElementById('loader-sub');
       const targetUrl = "${previewUrlFinal}";
+      const isPromax = ${!!promaxMetadataToSave};
       let isLoaded = false;
 
       function revealSite() {
@@ -744,29 +747,51 @@ ${html}
         loader.classList.add('hidden');
       }
 
-      frame.addEventListener('load', () => {
-        setTimeout(revealSite, 300);
-      });
-
       let attempts = 0;
-      const maxAttempts = 15;
-      function pollServer() {
-        if (isLoaded || attempts >= maxAttempts) return;
+      const maxAttempts = 30;
+
+      async function verificarEExibir() {
+        if (isLoaded) return;
         attempts++;
-        fetch(targetUrl, { mode: 'no-cors', cache: 'no-cache' })
-          .then(() => {
-            if (!isLoaded) {
-              frame.src = targetUrl;
-              setTimeout(revealSite, 400);
+
+        try {
+          const verifyApi = 'https://back.sitexpres.com.br/api/sites/verify-url?url=' + encodeURIComponent(targetUrl) + '&tipo=' + (isPromax ? 'promax' : 'site');
+          const res = await fetch(verifyApi, { cache: 'no-store' });
+          const data = await res.json();
+
+          if (data && data.ready) {
+            if (titleEl) titleEl.innerText = "Site pronto! Renderizando...";
+            if (subEl) subEl.innerText = "Sincronização concluída com sucesso.";
+            frame.src = targetUrl;
+            frame.addEventListener('load', () => setTimeout(revealSite, 300));
+            setTimeout(revealSite, 2500);
+            return;
+          }
+        } catch (e) {
+          try {
+            const probeUrl = targetUrl + (targetUrl.includes('?') ? '&' : '?') + '_p=' + Date.now();
+            const direct = await fetch(probeUrl, { cache: 'no-store' });
+            if (direct.ok) {
+              const text = (await direct.text()).toLowerCase();
+              if (!text.includes('functioning normally') && (text.includes('<html') || text.includes('<!doctype') || text.includes('root') || text.includes('<body') || isPromax)) {
+                frame.src = targetUrl;
+                frame.addEventListener('load', () => setTimeout(revealSite, 300));
+                setTimeout(revealSite, 2500);
+                return;
+              }
             }
-          })
-          .catch(() => {
-            setTimeout(pollServer, 2000);
-          });
+          } catch (directErr) { }
+        }
+
+        if (attempts < maxAttempts) {
+          setTimeout(verificarEExibir, 1000);
+        } else {
+          frame.src = targetUrl;
+          setTimeout(revealSite, 1000);
+        }
       }
 
-      setTimeout(pollServer, 1500);
-      setTimeout(revealSite, 10000);
+      verificarEExibir();
     })();
   </script>
 </body>
@@ -840,7 +865,14 @@ ${html}
 
           // Se for aplicação Promax, o deploy na VPS e a rota no DirectAdmin já foram executados pelo Maestro!
           if (promaxMetadataToSave) {
-            logStep(jobId, `⚡ [PROMAX] Deploy e proxy já configurados pelo Maestro. Finalizando job com sucesso!`);
+            logStep(jobId, `⚡ [PROMAX] Deploy e proxy configurados pelo Maestro. Verificando disponibilidade do CRM...`);
+            const promaxTargetUrl = promaxMetadataToSave.url_dominio || promaxMetadataToSave.url_direta;
+            await aguardarSiteOnline(promaxTargetUrl, {
+              tipo: 'promax',
+              maxTentativas: 15,
+              intervaloMs: 1000,
+              log: (msg) => logStep(jobId, msg)
+            });
             client.release();
             client = null;
             jobs[jobId].progress = 100;
@@ -1010,6 +1042,16 @@ ${html}
           } else {
             logStep(jobId, 'ℹ️  GitHub não integrado — ignorando atualização');
           }
+
+          // Verificação ativa: aguarda servidor web propagar os novos arquivos e não exibir mais o placeholder
+          const siteTargetUrl = `https://${nomeSubdominio}.sitexpres.com.br`;
+          logStep(jobId, `🔍 [VERIFICADOR] Checando se o site já está online e livre do placeholder...`);
+          await aguardarSiteOnline(siteTargetUrl, {
+            tipo: 'site',
+            maxTentativas: 15,
+            intervaloMs: 1000,
+            log: (msg) => logStep(jobId, msg)
+          });
 
           const totalMs = Date.now() - jobStartTime;
           logStep(jobId, `🎉 Job concluído com SUCESSO em ${(totalMs / 1000).toFixed(1)}s`);
@@ -1702,5 +1744,147 @@ export const deletar_site = async (req, res) => {
     });
   }
 };
+
+/**
+ * Aguarda ativamente até que o servidor web (LiteSpeed/DirectAdmin ou Proxy VPS)
+ * esteja servindo o HTML real ou CRM do cliente, e NÃO a página de placeholder
+ * "Web server is functioning normally" ou respostas temporárias 502/503.
+ */
+export async function aguardarSiteOnline(url, { tipo = 'site', maxTentativas = 15, intervaloMs = 1000, log = console.log } = {}) {
+  if (!url) return { pronto: false };
+  log(`⏳ [VERIFICADOR] Checando se ${url} já está respondendo com o conteúdo final...`);
+
+  for (let tentativa = 1; tentativa <= maxTentativas; tentativa++) {
+    try {
+      const probeUrl = `${url}${url.includes('?') ? '&' : '?'}_probe=${Date.now()}`;
+      const response = await axios.get(probeUrl, {
+        timeout: 3000,
+        validateStatus: () => true,
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'User-Agent': 'SitexpresVerifier/1.0'
+        }
+      });
+
+      const status = response.status;
+      const dataStr = typeof response.data === 'string' ? response.data : JSON.stringify(response.data || '');
+      const lower = dataStr.toLowerCase();
+
+      // Checa placeholders de DirectAdmin, LiteSpeed e Apache
+      const isPlaceholder =
+        lower.includes('web server is functioning normally') ||
+        lower.includes('apache is functioning normally') ||
+        lower.includes('functioning normally') ||
+        (lower.includes('litespeed web server') && lower.includes('default page'));
+
+      const isErrorStatus = status >= 500 || status === 404;
+
+      if (!isErrorStatus && !isPlaceholder && status === 200) {
+        if (tipo === 'site') {
+          const temHtmlReal = lower.includes('<html') || lower.includes('<!doctype') || lower.includes('root') || lower.includes('<body') || lower.includes('<div');
+          if (temHtmlReal) {
+            log(`✅ [VERIFICADOR] Site verificado e ativo no servidor web (${tentativa}s)!`);
+            return { pronto: true, tentativa };
+          }
+        } else {
+          // CRM / Promax
+          log(`✅ [VERIFICADOR] CRM verificado e ativo no servidor web (${tentativa}s)!`);
+          return { pronto: true, tentativa };
+        }
+      }
+
+      log(`⏳ [VERIFICADOR] Servidor ainda sincronizando (${tentativa}/${maxTentativas}): HTTP ${status}${isPlaceholder ? ' [placeholder DirectAdmin detectado]' : ''}`);
+    } catch (err) {
+      log(`⏳ [VERIFICADOR] Aguardando resposta do host (${tentativa}/${maxTentativas}): ${err.message}`);
+    }
+
+    await new Promise(r => setTimeout(r, intervaloMs));
+  }
+
+  log(`⚠️ [VERIFICADOR] Tempo limite de espera atingido (${maxTentativas}s). Liberando exibição.`);
+  return { pronto: false };
+}
+
+/**
+ * Endpoint de verificação pública para o iframe de preview ou dashboard saber
+ * se o site já propagou e se está livre do placeholder "Web server is functioning normally".
+ */
+export const verifySiteReady = async (req, res) => {
+  try {
+    const targetUrl = req.query.url;
+    const tipo = req.query.tipo || 'site';
+
+    if (!targetUrl) {
+      return res.status(400).json({ success: false, ready: false, message: 'URL não informada' });
+    }
+
+    try {
+      const parsed = new URL(targetUrl);
+      const host = parsed.hostname;
+      const isAllowedHost =
+        host.endsWith('.sitexpres.com.br') ||
+        host === 'sitexpres.com.br' ||
+        host === '143.208.9.235' ||
+        host === '143.208.8.36' ||
+        host === 'localhost';
+
+      if (!isAllowedHost) {
+        return res.status(403).json({ success: false, ready: false, message: 'Host não autorizado' });
+      }
+    } catch (e) {
+      return res.status(400).json({ success: false, ready: false, message: 'URL inválida' });
+    }
+
+    const probeUrl = `${targetUrl}${targetUrl.includes('?') ? '&' : '?'}_probe=${Date.now()}`;
+    const response = await axios.get(probeUrl, {
+      timeout: 3000,
+      validateStatus: () => true,
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'User-Agent': 'SitexpresVerifier/1.0'
+      }
+    });
+
+    const status = response.status;
+    const dataStr = typeof response.data === 'string' ? response.data : JSON.stringify(response.data || '');
+    const lower = dataStr.toLowerCase();
+
+    const isPlaceholder =
+      lower.includes('web server is functioning normally') ||
+      lower.includes('apache is functioning normally') ||
+      lower.includes('functioning normally') ||
+      (lower.includes('litespeed web server') && lower.includes('default page'));
+
+    const isErrorStatus = status >= 500 || status === 404;
+
+    if (!isErrorStatus && !isPlaceholder && status === 200) {
+      if (tipo === 'site') {
+        const temHtmlReal = lower.includes('<html') || lower.includes('<!doctype') || lower.includes('root') || lower.includes('<body') || lower.includes('<div');
+        if (temHtmlReal) {
+          return res.json({ success: true, ready: true, status: 200 });
+        }
+      } else {
+        return res.json({ success: true, ready: true, status: 200 });
+      }
+    }
+
+    return res.json({
+      success: true,
+      ready: false,
+      status: status,
+      isPlaceholder,
+      message: isPlaceholder ? 'Placeholder DirectAdmin detectado' : 'Aguardando inicialização'
+    });
+  } catch (err) {
+    return res.json({
+      success: true,
+      ready: false,
+      error: err.message
+    });
+  }
+};
+
 
 
