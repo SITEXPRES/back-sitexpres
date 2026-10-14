@@ -1,5 +1,5 @@
 import express from "express";
-import { getApiCheck, getInfo_dom } from "../controllers/adminController.js";
+import { getApiCheck, getInfo_dom, getPricingPlans } from "../controllers/adminController.js";
 import { 
     getAllWithdrawals, 
     getPendingCount, 
@@ -12,6 +12,7 @@ router.get("/teste", (req, res) => res.send("rota admin ok"));
 
 router.get('/check/api', getApiCheck);
 router.get('/info_dominio', getInfo_dom);
+router.get('/pricing/plans', getPricingPlans);
 
 // 💰 Rotas de Gestão de Afiliados (Saques)
 router.get('/affiliate/withdrawals', getAllWithdrawals);

@@ -73,3 +73,61 @@ export async function getInfo_dom(req, res) {
         });
     }
 }
+
+export async function getPricingPlans(req, res) {
+    try {
+        const result = await pool.query(
+            `SELECT setting_key, setting_value 
+             FROM public.admin_settings 
+             WHERE setting_key IN (
+                 'plan_starter_credits',
+                 'plan_starter_price',
+                 'plan_pro_credits',
+                 'plan_pro_price',
+                 'spot_price',
+                 'monthly_credits',
+                 'monthly_total'
+             )`
+        );
+
+        const settings = {};
+        result.rows.forEach(row => {
+            let val = row.setting_value;
+            if (typeof val === 'string') {
+                try {
+                    val = JSON.parse(val);
+                } catch (e) {}
+            }
+            settings[row.setting_key] = val;
+        });
+
+        const starterCredits = parseInt(settings.plan_starter_credits) || 100;
+        const starterPrice = parseFloat(settings.plan_starter_price) || 29.90;
+        const proCredits = parseInt(settings.plan_pro_credits) || 1000;
+        const proPrice = parseFloat(settings.plan_pro_price) || 79.90;
+        const spotPrice = parseFloat(settings.spot_price) || 1.00;
+
+        return res.json({
+            success: true,
+            starter: {
+                credits: starterCredits,
+                price: starterPrice,
+                priceFormatted: `R$ ${starterPrice.toFixed(2).replace('.', ',')}`,
+                unitPrice: starterCredits > 0 ? (starterPrice / starterCredits).toFixed(2).replace('.', ',') : '0,30'
+            },
+            pro: {
+                credits: proCredits,
+                price: proPrice,
+                priceFormatted: `R$ ${proPrice.toFixed(2).replace('.', ',')}`,
+                unitPrice: proCredits > 0 ? (proPrice / proCredits).toFixed(2).replace('.', ',') : '0,08'
+            },
+            spot: {
+                unitPrice: spotPrice,
+                unitPriceFormatted: `R$ ${spotPrice.toFixed(2).replace('.', ',')}`
+            }
+        });
+    } catch (error) {
+        console.error('Erro ao buscar planos de preços:', error);
+        return res.status(500).json({ error: 'Erro ao buscar planos de preços' });
+    }
+}
