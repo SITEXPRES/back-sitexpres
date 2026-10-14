@@ -32,12 +32,85 @@ function limparRetorno(codigo) {
   return codigo.trim();
 }
 
+/**
+ * Analisa o código atual do projeto e o prompt bruto do cliente usando Claude Haiku (rápido e econômico).
+ * Identifica páginas, seções e padrões visuais existentes (classes CSS, tamanhos de imagens como max-h-[400px], etc.)
+ * e traduz o pedido do cliente em uma especificação técnica precisa antes de enviar ao modelo de edição.
+ */
+async function enriquecerPromptEdicaoComHaiku(promptOriginal, baseHTML) {
+  if (!baseHTML || baseHTML.trim().length === 0 || !promptOriginal || promptOriginal.trim().length === 0) {
+    return promptOriginal;
+  }
+
+  const pLower = promptOriginal.trim().toLowerCase();
+  if (['sim', 'ok', 'beleza', 'pode ser', 'concordo', 'continuar'].includes(pLower)) {
+    return promptOriginal;
+  }
+
+  try {
+    const t0 = Date.now();
+    console.log(`[${new Date().toISOString()}] [ENRIQUECER_PROMPT] 🧠 Analisando contexto do projeto com Claude Haiku...`);
+
+    const response = await anthropic.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 1500,
+      temperature: 0.1,
+      system: `Você é um Arquiteto Frontend Sênior e Especialista em Engenharia de Prompt do SiteXpress.
+Sua missão é analisar o código React (App.jsx) atual do site e o pedido (prompt) do cliente para traduzi-lo em uma especificação técnica PRECISA e detalhada para o modelo de edição.
+
+DIRETRIZES DE ANÁLISE:
+1. PÁGINAS E NAVEGAÇÃO:
+   - Se o cliente citar uma rota ou página (ex: "/cpanel", "sobre", "contato", "painel"), identifique o componente ou bloco exato correspondente no código.
+   - Oriente a edição a ocorrer estritamente nessa página/rota sem afetar as demais.
+
+2. PADRÕES DE IMAGENS E MÍDIAS (MUITO CRÍTICO):
+   - Se o usuário pedir para adicionar, trocar ou ajustar imagens (ou se houver instruções de imagens anexadas):
+     a) Inspecione as imagens vizinhas ou existentes no mesmo componente/seção no código atual.
+     b) Extraia as classes CSS de tamanho e proporção exatas (ex: max-h-[400px], h-48 md:h-64, aspect-video, object-cover, w-full, rounded-xl).
+     c) Se o usuário disser "mantenha o padrão de tamanho", "mesmo tamanho" ou não especificar dimensões, DECLARE EXPLICITAMENTE as classes CSS Tailwind que devem ser aplicadas nas novas tags <img> (ex: "aplique obrigatoriamente: 'w-full max-h-[400px] object-cover rounded-xl' para manter a mesma altura das outras imagens").
+     d) Certifique-se de que caminhos de imagens locais usem o padrão absoluto da aplicação (ex: "/images/arquivo.png").
+
+3. DESIGN SYSTEM E COMPONENTES:
+   - Identifique cores de destaque, gradientes e classes de botões ou cards do contexto para que o novo elemento se integre perfeitamente.
+
+4. PRESERVAÇÃO DA INTENÇÃO:
+   - Mantenha 100% da intenção do usuário, apenas tornando-a técnica, detalhada e à prova de distorção de layout.
+
+FORMATO DE RESPOSTA:
+Retorne APENAS o prompt enriquecido final em texto corrido e direto, sem introdução, sem saudações e sem blocos markdown.`,
+      messages: [
+        {
+          role: "user",
+          content: `CÓDIGO ATUAL DO COMPONENTE:\n${baseHTML.slice(0, 45000)}\n\nPEDIDO ORIGINAL DO CLIENTE:\n${promptOriginal}`
+        }
+      ]
+    });
+
+    const enrichedText = response.content?.[0]?.text?.trim();
+    if (enrichedText && enrichedText.length > 10) {
+      console.log(`[${new Date().toISOString()}] [ENRIQUECER_PROMPT] ✅ Prompt enriquecido com sucesso (${Date.now() - t0}ms):\n"${enrichedText.slice(0, 250)}..."`);
+      return enrichedText;
+    }
+  } catch (err) {
+    console.warn(`[${new Date().toISOString()}] [ENRIQUECER_PROMPT] ⚠️ Falha ao enriquecer prompt com Haiku (usando original):`, err.message);
+  }
+
+  return promptOriginal;
+}
+
 export async function gerar_site(prompt, parte, req, id_projeto, baseHTML = "", userId, primeiraVez, onProgress = null) {
   const inicioGeracao = Date.now();
   const modoLabel = primeiraVez ? 'CRIAÇÃO' : 'EDIÇÃO';
   console.log(`[${new Date().toISOString()}] [GERAR_SITE_VITE] 🚀 Iniciando geração de React Vite | modo=${modoLabel} | id_projeto=${id_projeto} | userId=${userId}`);
 
   const isEditing = baseHTML && baseHTML.trim().length > 0;
+
+  // 🧠 Pré-processamento e enriquecimento do prompt de edição com Claude Haiku
+  let promptProcessado = prompt;
+  if (isEditing) {
+    if (onProgress) onProgress(2);
+    promptProcessado = await enriquecerPromptEdicaoComHaiku(prompt, baseHTML);
+  }
 
   const systemPromptCriacao = `
 Você é um Engenheiro UX SÊNIOR especializado em criar interfaces PREMIUM comparáveis ao Lovable, Webflow e Framer.
@@ -92,7 +165,7 @@ CÓDIGO HTML ATUAL:
 ${baseHTML}
 
 PROMPT DO USUÁRIO (O QUE DEVE SER ALTERADO/MIGRADO):
-${prompt}
+${promptProcessado}
 ` : `
 Você é um Engenheiro UX SÊNIOR especialista em EDITAR componentes React premium existentes.
 Você receberá o código fonte atual do componente (App.jsx). 
@@ -103,11 +176,20 @@ Faça APENAS as modificações solicitadas pelo usuário, mantendo todo o resto 
 ⚠️ ECONOMIA DE TOKENS: Em arrays e componentes repetitivos (ex: lista de dezenas de planos, faq, depoimentos, galerias gigantes), se a alteração NÃO for no meio deles, retorne o código com apenas 1 item de exemplo e diga \`// restante dos depoimentos originais omitidos para poupar espaço\`.
 ⚠️ CRIAR PÁGINA: Se o prompt pedir para adicionar nova página, crie o componente da página e REGISTRE OBRIGATORIAMENTE no objeto de rotas \`const routes\` no final do arquivo.
 
+⚠️ PADRÃO DE TAMANHO DE IMAGENS E MÍDIAS (MUITO CRÍTICO):
+- Ao inserir ou substituir tags <img>, NUNCA deixe a imagem sem restrição de altura que estique ou quebre o layout (ex: esticar para 700px quando os outros cards ou a página é de ~400px).
+- SEMPRE respeite e copie o padrão de classes CSS das imagens vizinhas/existentes no mesmo componente (ex: max-h-[400px], h-48 md:h-64, object-cover, aspect-video, w-full, rounded-xl). Se o usuário pedir para "manter o padrão de tamanho", inspecione as outras imagens do componente e copie EXATAMENTE as mesmas classes de altura, largura e proporção.
+- NUNCA use caminhos relativos (./images/) para imagens em subpáginas; use o caminho absoluto com barra (ex: "/images/arquivo.png").
+
+⚠️ PÁGINAS E ROTAS ESPECÍFICAS (ex: /cpanel, /dashboard):
+- Se o usuário mencionar uma página ou rota específica (ex: /cpanel), localize o componente responsável por essa rota no App.jsx e aplique a modificação ESTRITAMENTE dentro dele.
+- Se a página solicitada ainda não existir, crie o componente da nova página e registre-a obrigatoriamente no objeto de rotas const routes.
+
 CÓDIGO ATUAL:
 ${baseHTML}
 
 PROMPT DO USUÁRIO:
-${prompt}
+${promptProcessado}
 `;
 
   // Modo econômico: a IA devolve só blocos SEARCH/REPLACE (o código vai UMA vez, com cache)
@@ -142,6 +224,8 @@ REGRAS CRÍTICAS:
 - NUNCA retorne o código inteiro do componente, APENAS os blocos alterados.
 - Se não for necessário mudar uma linha, não mude.
 - ÍCONES: NUNCA importe ícones de redes sociais do 'lucide-react' (Facebook, Instagram, Linkedin, Youtube, Twitter).
+- PADRÃO DE IMAGENS: Ao alterar ou adicionar <img>, NUNCA deixe com altura descontrolada ou esticada. Mantenha rigorosamente as classes de restrição de altura do layout (ex: max-h-[400px], h-48, object-cover, rounded-xl). Use sempre caminhos absolutos /images/...
+- ROTAS/PÁGINAS: Se o usuário pedir alteração em uma página específica (ex: /cpanel), altere apenas o bloco daquela página.
 
 CÓDIGO ATUAL (base para o SEARCH):
 ${baseHTML}
@@ -219,7 +303,7 @@ export default function App() {
       let editadoPorBlocos = false;
       if (isEditing && !isLegacyHTML) {
         try {
-          const resp = await streamClaude(systemPromptBlocos, prompt, 16000, 'edição por blocos (Haiku)', MODELO_EDICAO);
+          const resp = await streamClaude(systemPromptBlocos, promptProcessado, 16000, 'edição por blocos (Haiku)', MODELO_EDICAO);
           const blocks = parseEditBlocks(resp);
           if (blocks.length > 0) {
             const r = applyEditBlocks(baseHTML, blocks);
@@ -242,7 +326,7 @@ export default function App() {
       if (!editadoPorBlocos) {
         reactCode = await streamClaude(
           systemPrompt,
-          isEditing ? prompt : "Crie o componente React conforme solicitado: " + prompt,
+          isEditing ? promptProcessado : "Crie o componente React conforme solicitado: " + promptProcessado,
           maxTokens,
           isEditing ? 'edição completa' : 'criação'
         );

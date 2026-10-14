@@ -346,7 +346,7 @@ export const newsite = async (req, res) => {
           const promptWithUrls = await extractUrlsAndFetchContent(prompt, logStep, jobId);
 
           const fullPrompt = uploadedFiles.length > 0
-            ? `${promptWithUrls}\n[INSTRUÇÃO DE IMAGENS/LOGOS: O usuário enviou ${uploadedFiles.length} imagem(ns). Utilize os caminhos relativos abaixo nas tags <img> correspondentes. O nome original do arquivo indica o propósito de cada imagem (ex: "logo.png" → use como logo, "footer.jpg" → use no footer, "banner.jpg" → use como banner):\n${uploadedFiles.map((f, i) => `- Arquivo "${f.originalname}" → caminho: "./images/${f.filename}" (ex: <img src="./images/${f.filename}" alt="${f.originalname.replace(/\.[^.]+$/, '')}">)`).join('\n')}\nNUNCA utilize links absolutos apontando para back.sitexpres.com.br nem links externos para esses arquivos!]`
+            ? `${promptWithUrls}\n[INSTRUÇÃO DE IMAGENS/LOGOS: O usuário enviou ${uploadedFiles.length} imagem(ns). Utilize os caminhos absolutos abaixo nas tags <img> correspondentes (ex: "/images/${uploadedFiles[0].filename}"). O nome original do arquivo indica o propósito de cada imagem (ex: "logo.png" → use como logo, "footer.jpg" → use no footer, "banner.jpg" → use como banner):\n${uploadedFiles.map((f, i) => `- Arquivo "${f.originalname}" → caminho: "/images/${f.filename}" (ex: <img src="/images/${f.filename}" alt="${f.originalname.replace(/\.[^.]+$/, '')}">)`).join('\n')}\nNUNCA utilize caminhos relativos (./images/) pois quebram em subpáginas nem links externos!]`
             : promptWithUrls;
 
           let historyText = "";
@@ -707,8 +707,16 @@ Suas alterações foram aplicadas diretamente no container da sua aplicação (p
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #ffffff; }
-    iframe { width: 100%; height: 100%; border: none; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #090d16; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+    iframe { width: 100%; height: 100%; border: none; display: block; opacity: 0; transition: opacity 0.4s ease; }
+    iframe.loaded { opacity: 1; }
+    #loader { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #090d16; color: #f8fafc; z-index: 10; transition: opacity 0.4s ease, visibility 0.4s; }
+    #loader.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+    .spinner-ring { width: 44px; height: 44px; border: 3px solid rgba(56, 189, 248, 0.15); border-top-color: #38bdf8; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 14px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .title { font-size: 15px; font-weight: 600; color: #f1f5f9; margin-bottom: 5px; }
+    .subtitle { font-size: 12px; color: #94a3b8; max-width: 290px; text-align: center; line-height: 1.4; }
     #react-source { display: none; }
   </style>
 </head>
@@ -716,7 +724,51 @@ Suas alterações foram aplicadas diretamente no container da sua aplicação (p
   <script type="sitexpres/react" id="react-source"><!-- SITEXPRES_REACT_START -->
 ${html}
 <!-- SITEXPRES_REACT_END --></script>
-  <iframe src="${previewUrlFinal}" title="Preview"></iframe>
+  <div id="loader">
+    <div class="spinner-ring"></div>
+    <div class="title">Conectando ao servidor...</div>
+    <div class="subtitle">Inicializando o site recém-publicado. Ele aparecerá na tela em instantes!</div>
+  </div>
+  <iframe id="preview-frame" src="${previewUrlFinal}" title="Preview"></iframe>
+  <script>
+    (function() {
+      const frame = document.getElementById('preview-frame');
+      const loader = document.getElementById('loader');
+      const targetUrl = "${previewUrlFinal}";
+      let isLoaded = false;
+
+      function revealSite() {
+        if (isLoaded) return;
+        isLoaded = true;
+        frame.classList.add('loaded');
+        loader.classList.add('hidden');
+      }
+
+      frame.addEventListener('load', () => {
+        setTimeout(revealSite, 300);
+      });
+
+      let attempts = 0;
+      const maxAttempts = 15;
+      function pollServer() {
+        if (isLoaded || attempts >= maxAttempts) return;
+        attempts++;
+        fetch(targetUrl, { mode: 'no-cors', cache: 'no-cache' })
+          .then(() => {
+            if (!isLoaded) {
+              frame.src = targetUrl;
+              setTimeout(revealSite, 400);
+            }
+          })
+          .catch(() => {
+            setTimeout(pollServer, 2000);
+          });
+      }
+
+      setTimeout(pollServer, 1500);
+      setTimeout(revealSite, 10000);
+    })();
+  </script>
 </body>
 </html>`;
 
