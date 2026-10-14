@@ -7,6 +7,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 dotenv.config();
+import * as cheerio from "cheerio";
 import { uso_creditos } from "./creditosController.js";
 import { parseEditBlocks, applyEditBlocks } from "../services/editBlocks.js";
 import { exec } from "child_process";
@@ -30,6 +31,136 @@ function limparRetorno(codigo) {
   // Remove "javascript" solto no início caso a IA retorne sem backticks
   codigo = codigo.replace(/^javascript\s*\n?/i, "");
   return codigo.trim();
+}
+
+/**
+ * Validador e auto-corretor de integridade de rotas.
+ * Evita ReferenceError fatal em runtime (ex: RevendaCpanelPageLegacy vs RevendaCpanelPage).
+ */
+function validarIntegridadeRotas(codigo) {
+  if (!codigo || typeof codigo !== "string") return codigo;
+
+  const routesMatch = codigo.match(/const\s+routes\s*=\s*\{([\s\S]*?)\};/);
+  if (!routesMatch) return codigo;
+
+  const routesBody = routesMatch[1];
+  const routeEntries = [...routesBody.matchAll(/['"]([^'"]+)['"]\s*:\s*([A-Za-z0-9_]+)/g)];
+
+  let codigoCorrigido = codigo;
+
+  for (const [, routePath, componentName] of routeEntries) {
+    if (!componentName) continue;
+
+    // Verifica se componentName está declarado como function ou const/let/var
+    const isDeclared = new RegExp(`(?:function|const|let|var)\\s+${componentName}\\b`).test(codigoCorrigido);
+
+    if (!isDeclared) {
+      console.warn(`[VALIDAR_ROTAS] ⚠️ Componente '${componentName}' na rota '${routePath}' não está explicitamente declarado! Buscando variações...`);
+
+      // Procura se a IA declarou com sufixo (ex: RevendaCpanelPageLegacy, RevendaCpanelPageOld)
+      const variationRegex = new RegExp(`function\\s+(${componentName}[A-Za-z0-9_]+)\\s*\\(`, "g");
+      const variationMatch = variationRegex.exec(codigoCorrigido);
+
+      if (variationMatch) {
+        const foundName = variationMatch[1];
+        console.log(`[VALIDAR_ROTAS] 🔧 Auto-corrigindo declaração de '${foundName}' para '${componentName}'!`);
+        codigoCorrigido = codigoCorrigido.replace(
+          new RegExp(`function\\s+${foundName}\\s*\\(`, "g"),
+          `function ${componentName}(`
+        );
+      } else {
+        console.warn(`[VALIDAR_ROTAS] 🚨 Criando alias/fallback seguro para '${componentName}' para evitar tela branca!`);
+        codigoCorrigido = `\nconst ${componentName} = () => <div className="min-h-[60vh] flex items-center justify-center text-white/70">Página em carregamento...</div>;\n` + codigoCorrigido;
+      }
+    }
+  }
+
+  return codigoCorrigido;
+}
+
+/**
+ * Se o prompt do usuário contiver links externos (ex: https://cloudx.com.br/...),
+ * faz scraping em tempo real para obter os dados reais (títulos, planos, preços, recursos)
+ * e injeta como contexto para que a IA não alucine.
+ */
+async function enriquecerComUrlsExternas(promptTexto) {
+  if (!promptTexto || typeof promptTexto !== "string") return promptTexto;
+
+  const urlRegex = /https?:\/\/[^\s"'>)]+/gi;
+  const urls = [...new Set(promptTexto.match(urlRegex) || [])];
+
+  const urlsValidas = urls.filter((u) => {
+    const uLow = u.toLowerCase();
+    return !uLow.includes("sitexpres") &&
+           !uLow.includes("localhost") &&
+           !uLow.includes("github") &&
+           !uLow.includes("unsplash") &&
+           !uLow.includes("picsum");
+  });
+
+  if (urlsValidas.length === 0) return promptTexto;
+
+  console.log(`[SCRAPER_PROMPT] 🌐 Encontrada(s) ${urlsValidas.length} URL(s) externa(s) no prompt: ${urlsValidas.join(", ")}`);
+
+  let contextoUrls = "\n\n=========================================================\n" +
+                     "🌐 CONTEÚDO EXTRAÍDO EM TEMPO REAL DAS URLS CITADAS NO PEDIDO:\n" +
+                     "=========================================================\n";
+
+  for (const url of urlsValidas.slice(0, 2)) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 7000);
+
+      const resp = await fetch(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        signal: controller.signal
+      });
+      clearTimeout(timeout);
+
+      if (!resp.ok) continue;
+
+      const html = await resp.text();
+      const $ = cheerio.load(html);
+
+      $("script, style, noscript, svg, iframe, nav, footer, header").remove();
+
+      const pageTitle = $("title").text().trim();
+      const metaDesc = $('meta[name="description"]').attr("content") || "";
+
+      const signupLinks = [];
+      $('a[href*="assinatura"], a[href*="painel"], a[href*="cart"]').each((_, el) => {
+        const href = $(el).attr("href");
+        const text = $(el).text().trim();
+        if (href && (href.startsWith("http://") || href.startsWith("https://"))) {
+          signupLinks.push(`${text ? text + ": " : ""}${href}`);
+        }
+      });
+
+      let mainText = $("body").text().replace(/\s+/g, " ").trim();
+      if (mainText.length > 3500) {
+        mainText = mainText.slice(0, 3500) + "... [conteúdo truncado para economia de tokens]";
+      }
+
+      contextoUrls += `\n--- DADOS REAIS DE: ${url} ---\n`;
+      if (pageTitle) contextoUrls += `Título da Página: ${pageTitle}\n`;
+      if (metaDesc) contextoUrls += `Descrição: ${metaDesc}\n`;
+      if (signupLinks.length > 0) {
+        contextoUrls += `Links de contratação oficiais encontrados:\n${[...new Set(signupLinks)].slice(0, 6).join("\n")}\n`;
+      }
+      contextoUrls += `Conteúdo textual principal:\n${mainText}\n-------------------------\n`;
+
+      console.log(`[SCRAPER_PROMPT] ✅ Conteúdo extraído com sucesso de ${url} (${mainText.length} chars)`);
+    } catch (err) {
+      console.warn(`[SCRAPER_PROMPT] ⚠️ Falha ao raspar URL ${url}:`, err.message);
+    }
+  }
+
+  contextoUrls += "\nINSTRUÇÃO CRÍTICA: UTILIZE ESTRITAMENTE AS INFORMAÇÕES REAIS ACIMA (planos, nomes, preços e recursos) para preencher a página solicitada pelo usuário!\n";
+
+  return promptTexto + contextoUrls;
 }
 
 /**
@@ -73,7 +204,14 @@ DIRETRIZES DE ANÁLISE:
 3. DESIGN SYSTEM E COMPONENTES:
    - Identifique cores de destaque, gradientes e classes de botões ou cards do contexto para que o novo elemento se integre perfeitamente.
 
-4. PRESERVAÇÃO DA INTENÇÃO:
+4. CLONAGEM / DUPLICAÇÃO DE PÁGINAS EXISTENTES (CRÍTICO):
+   - Se o cliente pedir para "clonar", "duplicar" ou "criar página X baseada na página Y" (ex: "clonar /hospedagem-directadmin/ criando /revenda-hospedagem-cpanel/"):
+     a) Localize o componente da página de origem no código atual (ex: DirectAdminHostingPage ou CpanelHostingPage).
+     b) Declare explicitamente que a nova página DEVE COPIAR RIGOROSAMENTE A ESTRUTURA VISUAL E O FLUXO desse componente (mesmo Hero de 2 colunas com card lateral flutuante, mesma barra horizontal de 4 benefícios, mesma seção de planos com toggle Mensal/Anual, mesma galeria e mesma grade interativa de tecnologias).
+     c) Mantenha os cards de planos PROPORCIONAIS e CONCISOS (4 specs destacadas no topo com check verde + divisor + 5 a 6 itens comuns com check ciano). NUNCA crie listas gigantescas que desalinhem os cards.
+     d) Alerte que o nome da função do componente DEVE ser EXATAMENTE igual ao nome registrado no objeto const routes (sem sufixos como Legacy, Old ou Temp).
+
+5. PRESERVAÇÃO DA INTENÇÃO:
    - Mantenha 100% da intenção do usuário, apenas tornando-a técnica, detalhada e à prova de distorção de layout.
 
 FORMATO DE RESPOSTA:
@@ -105,11 +243,14 @@ export async function gerar_site(prompt, parte, req, id_projeto, baseHTML = "", 
 
   const isEditing = baseHTML && baseHTML.trim().length > 0;
 
-  // 🧠 Pré-processamento e enriquecimento do prompt de edição com Claude Haiku
+  // 🌐 Se o prompt contiver links externos, raspa as páginas em tempo real para alimentar a IA com dados reais
   let promptProcessado = prompt;
+  promptProcessado = await enriquecerComUrlsExternas(promptProcessado);
+
+  // 🧠 Pré-processamento e enriquecimento do prompt de edição com Claude Haiku
   if (isEditing) {
     if (onProgress) onProgress(2);
-    promptProcessado = await enriquecerPromptEdicaoComHaiku(prompt, baseHTML);
+    promptProcessado = await enriquecerPromptEdicaoComHaiku(promptProcessado, baseHTML);
   }
 
   const systemPromptCriacao = `
@@ -185,6 +326,13 @@ Faça APENAS as modificações solicitadas pelo usuário, mantendo todo o resto 
 - Se o usuário mencionar uma página ou rota específica (ex: /cpanel), localize o componente responsável por essa rota no App.jsx e aplique a modificação ESTRITAMENTE dentro dele.
 - Se a página solicitada ainda não existir, crie o componente da nova página e registre-a obrigatoriamente no objeto de rotas const routes.
 
+⚠️ CLONAGEM / DUPLICAÇÃO DE PÁGINAS (MUITO CRÍTICO):
+- Se o usuário pedir para clonar uma página existente (ex: "clone da página /hospedagem-directadmin/ criando /revenda-hospedagem-cpanel/"):
+  1. Localize o componente da página original e replique EXATAMENTE sua arquitetura visual e layout (Hero 2 colunas com card lateral flutuante, barra de 4 benefícios horizontais, tabela de planos proporcional com toggle Mensal/Anual, galeria e grade de tecnologias).
+  2. Mantenha os cards de planos CONCISOS e na mesma proporção das outras páginas (máximo 4 especificações destacadas no topo com check verde + linha divisória + 5 a 6 itens comuns com check ciano). NUNCA crie listas gigantescas de dezenas de itens que quebrem a proporção da página.
+  3. NÃO crie seções desconectadas ou avulsas (como fotos de servidores soltas ou depoimentos duplicados) que não existem na página de origem.
+  4. NOMEAÇÃO E ROTAS: O nome da função do componente DEVE ser EXATAMENTE IGUAL ao nome usado no objeto const routes (NUNCA adicione sufixos como Legacy, Old, Temp).
+
 CÓDIGO ATUAL:
 ${baseHTML}
 
@@ -226,6 +374,7 @@ REGRAS CRÍTICAS:
 - ÍCONES: NUNCA importe ícones de redes sociais do 'lucide-react' (Facebook, Instagram, Linkedin, Youtube, Twitter).
 - PADRÃO DE IMAGENS: Ao alterar ou adicionar <img>, NUNCA deixe com altura descontrolada ou esticada. Mantenha rigorosamente as classes de restrição de altura do layout (ex: max-h-[400px], h-48, object-cover, rounded-xl). Use sempre caminhos absolutos /images/...
 - ROTAS/PÁGINAS: Se o usuário pedir alteração em uma página específica (ex: /cpanel), altere apenas o bloco daquela página.
+- CLONAGEM DE PÁGINAS: Ao clonar ou duplicar uma página existente, copie fielmente a estrutura das seções (Hero 2 colunas, barra de benefícios, planos com toggle mensal/anual) e mantenha a proporção dos cards com dados curtos (máximo 4 specs + divisor + 5-6 comuns). O nome do componente DEVE bater exatamente com o objeto const routes.
 
 CÓDIGO ATUAL (base para o SEARCH):
 ${baseHTML}
@@ -334,6 +483,7 @@ export default function App() {
     }
 
     reactCode = limparRetorno(reactCode);
+    reactCode = validarIntegridadeRotas(reactCode);
 
     // ===========================================
     // PROCESSO DE BUILD DO VITE
