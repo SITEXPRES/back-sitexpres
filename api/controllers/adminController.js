@@ -22,7 +22,8 @@ export async function getApiCheck(req, res) {
         }
         
         // Pega o valor e converte para boolean
-        const maintenanceMode = result.rows[0].setting_value === "true";
+        const raw = String(result.rows[0].setting_value || '').replace(/"/g, '').trim().toLowerCase();
+        const maintenanceMode = raw === "true" || raw === "1";
         
         return res.json({ 
             maintenance_mode: maintenanceMode 
