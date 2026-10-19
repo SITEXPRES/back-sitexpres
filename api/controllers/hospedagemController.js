@@ -6,7 +6,14 @@ import FormData from 'form-data';
 import Client from 'ftp';
 import fs from 'fs';
 import path from 'path';
-import { deletarSubdominioDirectAdmin } from './integracao_directadmin.js';
+import https from 'https';
+import { exec } from 'child_process';
+import util from 'util';
+const execPromise = util.promisify(exec);
+import { fileURLToPath } from 'url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+import { deletarSubdominioDirectAdmin, enviarDiretorioSubdominio } from './integracao_directadmin.js';
 import { desatrelarHtmlSitexpress, coletarArquivosProjeto } from '../utils/siteAssetHelper.js';
 
 // Configurações do DirectAdmin
@@ -115,6 +122,172 @@ const gerarUsernameUnico = async (nomeBase) => {
     return username;
 };
 
+
+/**
+ * Compila o código React/Vite para a pasta dist para ser enviado à hospedagem
+ */
+async function compilarViteParaHospedagem(reactCode, id_projeto) {
+    const templatePath = path.resolve(__dirname, '../templates/vite-base');
+    const tmpBase = path.resolve(__dirname, '../tmp');
+    if (!fs.existsSync(tmpBase)) {
+        fs.mkdirSync(tmpBase, { recursive: true });
+    }
+
+    const tmpDirPath = path.join(tmpBase, `hospedagem_${id_projeto}_${Date.now()}`);
+    await fs.promises.cp(templatePath, tmpDirPath, { recursive: true });
+
+    const appPath = path.join(tmpDirPath, 'src', 'App.jsx');
+    const sanitizedCode = reactCode.replace(/(["'])\.\/images\//g, '$1/images/');
+    await fs.promises.writeFile(appPath, sanitizedCode, 'utf8');
+
+    try {
+        await execPromise('npx --no-install vite build', { cwd: tmpDirPath });
+    } catch {
+        await execPromise('npm run build', { cwd: tmpDirPath });
+    }
+
+    const distPath = path.join(tmpDirPath, 'dist');
+    return { distPath, tmpDirPath };
+}
+
+/**
+ * Habilita SSL, configura o link simbólico private_html e solicita Let's Encrypt no DirectAdmin
+ */
+async function configurarSslDirectAdmin(username, senha, dominio, email) {
+    const host = `https://${process.env.host_directadmin || 'srv3br.com.br'}:2222`;
+    try {
+        // 1. Ativa SSL e symlink private_html -> public_html
+        await axios.post(
+            `${host}/CMD_API_DOMAIN`,
+            new URLSearchParams({
+                action: 'modify',
+                domain: dominio,
+                ssl: 'ON',
+                force_ssl: 'yes',
+                ubandwidth: 'unlimited',
+                uquota: 'unlimited'
+            }).toString(),
+            {
+                auth: { username, password: senha },
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                httpsAgent: new https.Agent({ rejectUnauthorized: false }),
+                timeout: 30000
+            }
+        );
+
+        await axios.post(
+            `${host}/CMD_API_DOMAIN`,
+            new URLSearchParams({
+                action: 'private_html',
+                domain: dominio,
+                val: 'symlink'
+            }).toString(),
+            {
+                auth: { username, password: senha },
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                httpsAgent: new https.Agent({ rejectUnauthorized: false }),
+                timeout: 30000
+            }
+        );
+
+        // 2. Solicita certificado Let's Encrypt gratuito
+        await axios.post(
+            `${host}/CMD_API_SSL`,
+            new URLSearchParams({
+                domain: dominio,
+                action: 'save',
+                type: 'create',
+                request: 'letsencrypt',
+                name: dominio,
+                email: email || 'admin@sitexpres.com',
+                keysize: '2048',
+                le_select0: dominio,
+                le_select1: `www.${dominio}`
+            }).toString(),
+            {
+                auth: { username, password: senha },
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                httpsAgent: new https.Agent({ rejectUnauthorized: false }),
+                timeout: 60000
+            }
+        );
+        console.log(`[HOSPEDAGEM] ✅ SSL Let's Encrypt configurado com sucesso para ${dominio}`);
+    } catch (sslErr) {
+        console.warn(`[HOSPEDAGEM] ⚠️ Aviso ao configurar SSL automático para ${dominio}:`, sslErr.message);
+    }
+}
+
+/**
+ * Publica o site real na nova hospedagem (Vite React ou HTML Puro) e configura SSL
+ */
+async function publicarProjetoHospedagem(username, senha, dominio, id_projeto, client, email = '') {
+    const existing = await client.query(
+        `SELECT html_content, js_content FROM generated_sites 
+         WHERE id_projeto = $1 
+         ORDER BY created_at DESC LIMIT 1`,
+        [id_projeto]
+    );
+
+    if (existing.rows.length === 0) {
+        return { success: false, message: 'Nenhum site encontrado para upload' };
+    }
+
+    const jsContent = existing.rows[0].js_content;
+    const isVite = jsContent && jsContent.length > 100 && !jsContent.trim().toLowerCase().startsWith('<!doctype') && !jsContent.trim().toLowerCase().startsWith('<html');
+
+    let uploadSuccess = false;
+
+    if (isVite) {
+        let buildInfo = null;
+        try {
+            console.log(`[HOSPEDAGEM] ⚙️ Compilando projeto Vite para ${dominio}...`);
+            buildInfo = await compilarViteParaHospedagem(jsContent, id_projeto);
+
+            const arquivosExtras = await coletarArquivosProjeto(id_projeto, jsContent, null, client);
+            if (arquivosExtras.length > 0) {
+                const imagesDist = path.join(buildInfo.distPath, 'images');
+                await fs.promises.mkdir(imagesDist, { recursive: true });
+                for (const arq of arquivosExtras) {
+                    if (arq.localPath && fs.existsSync(arq.localPath)) {
+                        await fs.promises.copyFile(arq.localPath, path.join(imagesDist, arq.remoteName));
+                    }
+                }
+            }
+
+            console.log(`[HOSPEDAGEM] 📤 Enviando build Vite para ${dominio} via FTP...`);
+            try {
+                await enviarDiretorioSubdominio("srv3br.com.br", username, senha, dominio, buildInfo.distPath);
+            } catch {
+                await enviarDiretorioSubdominio("ftp.sitexpres.com.br", username, senha, dominio, buildInfo.distPath);
+            }
+            uploadSuccess = true;
+        } catch (errBuild) {
+            console.error(`[HOSPEDAGEM] ❌ Erro ao compilar/enviar build Vite:`, errBuild);
+        } finally {
+            if (buildInfo?.tmpDirPath) {
+                await fs.promises.rm(buildInfo.tmpDirPath, { recursive: true, force: true }).catch(() => {});
+            }
+        }
+    }
+
+    if (!uploadSuccess && existing.rows[0].html_content) {
+        const pureHtml = desatrelarHtmlSitexpress(existing.rows[0].html_content);
+        const arquivosExtras = await coletarArquivosProjeto(id_projeto, pureHtml, null, client);
+        const resUpload = await uploadIndexHtml(username, senha, dominio, pureHtml, arquivosExtras);
+        uploadSuccess = resUpload.success;
+    }
+
+    // Configura SSL e symlink no DirectAdmin
+    await configurarSslDirectAdmin(username, senha, dominio, email);
+
+    // Atualiza site_url na tabela sites para apontar para o domínio próprio
+    await client.query(
+        `UPDATE sites SET site_url = $1 WHERE id_projeto = $2`,
+        [`https://${dominio}`, id_projeto]
+    );
+
+    return { success: uploadSuccess };
+}
 
 /**
  * Cria uma nova conta de hospedagem no DirectAdmin
@@ -238,78 +411,13 @@ export const creat_hospedagem = async (req, res) => {
         if (sucesso) {
             console.log('✅ Conta criada com sucesso, iniciando upload do site...');
 
-            // Upload do index.html para public_html
+            // Publicar o site real (Vite React ou HTML) e configurar SSL
             let uploadStatus = { success: false, message: '' };
-
-
-            //Consultar html no Banco
-            let htmlContent = "";
-
-            const existing = await client.query(
-                `SELECT html_content FROM generated_sites 
-                WHERE id_projeto = $1 
-                ORDER BY created_at DESC LIMIT 1`,
-                [id_projeto]
-            );
-
-            if (existing.rows.length > 0 && existing.rows[0]?.html_content) {
-                htmlContent = desatrelarHtmlSitexpress(existing.rows[0].html_content);
-                console.log('✅ HTML encontrado no banco de dados');
-            }
-
-            if (htmlContent) {
-                try {
-                    const arquivosExtras = await coletarArquivosProjeto(id_projeto, htmlContent, null, client);
-                    uploadStatus = await uploadIndexHtml(username, senha, dominio, htmlContent, arquivosExtras);
-                    console.log('📤 Status do upload:', uploadStatus);
-
-                    //Removendo Subdominio
-
-                    const dados_site = await client.query(
-                        `SELECT id_projeto, site_url FROM public.sites WHERE id_projeto = $1`,
-                        [id_projeto]
-                    );
-
-                    // Verificar se encontrou o site
-                    if (dados_site.rows.length === 0) {
-                        console.log('⚠️ Site não encontrado para remover subdomínio');
-                    } else {
-                        const siteUrl = dados_site.rows[0].site_url;
-
-                        // Extrair apenas o subdomínio (parte antes do domínio principal)
-                        const urlLimpa = siteUrl
-                            .replace('https://', '')
-                            .replace('http://', '')
-                            .replace(/\/$/, '')
-                            .trim();
-
-                        // Separar subdomínio do domínio principal
-                        // apostasesp.sitexpres.com.br → subdominio: apostasesp, dominio: sitexpres.com.br
-                        const partes = urlLimpa.split('.');
-                        const subdomain = partes[0]; // apostasesp
-                        const dominioPrincipal = partes.slice(1).join('.'); // sitexpres.com.br
-
-                        console.log('🗑️ Removendo subdomínio:', subdomain);
-                        console.log('📌 Domínio principal:', dominioPrincipal);
-
-                        try {
-                            const resultado = await deletarSubdominioDirectAdmin(
-                                subdomain);
-
-                            console.log('✅ Subdomínio removido com sucesso:', resultado);
-                        } catch (error) {
-                            console.error('❌ Erro ao remover subdomínio:', error.message);
-                            // Não quebra o fluxo, apenas loga o erro
-                        }
-                    }
-
-                } catch (uploadError) {
-                    console.error('❌ Erro no upload do arquivo:', uploadError);
-                    uploadStatus = {
-                        success: false,
-                        message: uploadError.message
-                    };
-                }
+            try {
+                uploadStatus = await publicarProjetoHospedagem(username, senha, dominio, id_projeto, client, email);
+            } catch (upErr) {
+                console.error('❌ Erro no upload/publicação do site na hospedagem:', upErr);
+                uploadStatus = { success: false, message: upErr.message };
             }
 
             // Salvar informações no banco de dados PostgreSQL
@@ -537,37 +645,14 @@ export const createHospedagem_funcao = async ({
         }
 
         // ======================
-        // Buscar HTML no banco
-        // ======================
-        let htmlContent = '';
-
-        const existing = await client.query(
-            `SELECT html_content 
-             FROM generated_sites 
-             WHERE id_projeto = $1 
-             ORDER BY created_at DESC 
-             LIMIT 1`,
-            [id_projeto]
-        );
-
-        if (existing.rows.length > 0 && existing.rows[0]?.html_content) {
-            htmlContent = desatrelarHtmlSitexpress(existing.rows[0].html_content);
-        }
-
-        // ======================
-        // Upload do site
+        // Publicar o site real (Vite React ou HTML) e configurar SSL
         // ======================
         let uploadStatus = { success: false };
-
-        if (htmlContent) {
-            const arquivosExtras = await coletarArquivosProjeto(id_projeto, htmlContent, null, client);
-            uploadStatus = await uploadIndexHtml(
-                username,
-                senha,
-                dominio,
-                htmlContent,
-                arquivosExtras
-            );
+        try {
+            uploadStatus = await publicarProjetoHospedagem(username, senha, dominio, id_projeto, client, email);
+        } catch (upErr) {
+            console.error('❌ Erro no upload/publicação do site na hospedagem (função):', upErr);
+            uploadStatus = { success: false, message: upErr.message };
         }
 
         // ======================
