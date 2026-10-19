@@ -13,6 +13,8 @@ import { parseEditBlocks, applyEditBlocks } from "../services/editBlocks.js";
 import { exec } from "child_process";
 import util from "util";
 const execPromise = util.promisify(exec);
+import { isFinancialError, gerarHtmlErroCliente, CODIGO_ERRO_FINANCEIRO, MENSAGEM_CLIENTE_FINANCEIRO } from "../utils/errorHandler.js";
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -421,25 +423,48 @@ export default function App() {
       // Chamada com streaming; o system vai com cache_control (releituras ~90% mais baratas)
       const streamClaude = async (systemText, userContent, maxTok, label, modelo = MODELO) => {
         console.log(`[${new Date().toISOString()}] [GERAR_SITE_VITE] 🧠 Chamando Claude API (${label}) | modelo: ${modelo} | max_tokens: ${maxTok}`);
-        const stream = await anthropic.messages.stream({
-          model: modelo,
-          max_tokens: maxTok,
-          system: [{ type: "text", text: systemText, cache_control: { type: "ephemeral" } }],
-          messages: [{ role: "user", content: userContent }]
-        });
+        let stream;
+        try {
+          stream = await anthropic.messages.stream({
+            model: modelo,
+            max_tokens: maxTok,
+            system: [{ type: "text", text: systemText, cache_control: { type: "ephemeral" } }],
+            messages: [{ role: "user", content: userContent }]
+          });
+        } catch (apiErr) {
+          if (isFinancialError(apiErr)) {
+            console.error(`[${new Date().toISOString()}] [GERAR_SITE_VITE] ⚠️ ERRO FINANCEIRO ANTHROPIC (${label}):`, apiErr.message);
+            const finErr = new Error(MENSAGEM_CLIENTE_FINANCEIRO);
+            finErr.isFinancial = true;
+            throw finErr;
+          }
+          throw apiErr;
+        }
+
         if (onProgress) onProgress(5);
         let out = '';
         let lastReportedPercent = 0;
-        for await (const event of stream) {
-          if (event.type === "content_block_delta" && event.delta?.text) {
-            out += event.delta.text;
-            const percent = Math.min(Math.round((out.length / expectedChars) * 75) + 5, 80);
-            if (onProgress && percent !== lastReportedPercent) {
-              onProgress(percent);
-              lastReportedPercent = percent;
+        try {
+          for await (const event of stream) {
+            if (event.type === "content_block_delta" && event.delta?.text) {
+              out += event.delta.text;
+              const percent = Math.min(Math.round((out.length / expectedChars) * 75) + 5, 80);
+              if (onProgress && percent !== lastReportedPercent) {
+                onProgress(percent);
+                lastReportedPercent = percent;
+              }
             }
           }
+        } catch (streamErr) {
+          if (isFinancialError(streamErr)) {
+            console.error(`[${new Date().toISOString()}] [GERAR_SITE_VITE] ⚠️ ERRO FINANCEIRO DURANTE STREAM (${label}):`, streamErr.message);
+            const finErr = new Error(MENSAGEM_CLIENTE_FINANCEIRO);
+            finErr.isFinancial = true;
+            throw finErr;
+          }
+          throw streamErr;
         }
+
         const finalMessage = await stream.finalMessage();
         const u = finalMessage.usage || {};
         const inputTokens = (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0);
@@ -598,13 +623,13 @@ export default function App() {
         console.error(`[${new Date().toISOString()}] [GERAR_SITE_VITE] ❌ Erro no build:`, buildErr);
       }
 
-      // Criar um dist de erro para mostrar no preview
+      // Criar um dist de erro para mostrar no preview (sem vazar stack trace técnico ao cliente)
       const distErrorPath = path.join(tmpDirPath, "dist");
       await fs.mkdir(distErrorPath, { recursive: true });
-      const errorHtml = `<!DOCTYPE html><html><head><title>Erro no Build</title><script src="https://cdn.tailwindcss.com"></script></head><body class="bg-red-50 p-10"><div class="max-w-3xl mx-auto bg-white p-8 rounded shadow text-red-600"><h1 class="text-2xl font-bold mb-4">Erro ao compilar o projeto</h1><pre class="bg-gray-100 p-4 rounded overflow-auto">${buildErr.message}</pre></div></body></html>`;
+      const errorHtml = gerarHtmlErroCliente(CODIGO_ERRO_FINANCEIRO);
       await fs.writeFile(path.join(distErrorPath, "index.html"), errorHtml);
 
-      return { reactCode, distPath: distErrorPath, tmpDirPath, hasError: true, buildError: buildErr.message };
+      return { reactCode, distPath: distErrorPath, tmpDirPath, hasError: true, buildError: buildErr.message, isFinancial: true };
     }
 
     const distPath = path.join(tmpDirPath, "dist");

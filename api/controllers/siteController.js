@@ -23,6 +23,8 @@ import { uso_creditos, verificar_creditos_prompt } from "./creditosController.js
 import { consultaPlano } from "./planoController.js";
 import { gerar_site } from "./gerar_siteController_vite.js";
 import { desatrelarHtmlSitexpress, coletarArquivosProjeto } from "../utils/siteAssetHelper.js";
+import { isFinancialError, CODIGO_ERRO_FINANCEIRO, MENSAGEM_CLIENTE_FINANCEIRO } from "../utils/errorHandler.js";
+
 import { executarFluxoPromax } from "../services/promaxOrchestratorService.js";
 import {
   detectarAmeacaSeguranca,
@@ -829,6 +831,8 @@ ${html}
           let assistantMessage = "";
           if (assistantMessageOverride) {
             assistantMessage = assistantMessageOverride;
+          } else if (hasError || (typeof geracaoResult === 'object' && geracaoResult?.hasError)) {
+            assistantMessage = MENSAGEM_CLIENTE_FINANCEIRO;
           } else {
             try {
               if (primeiraVez) {
@@ -850,6 +854,11 @@ ${html}
               }
             } catch (err) {
               console.error("Erro ao gerar mensagem com Haiku", err);
+              if (isFinancialError(err)) {
+                assistantMessage = MENSAGEM_CLIENTE_FINANCEIRO;
+              } else {
+                assistantMessage = "Suas alterações foram enviadas com sucesso! Confira o resultado no preview.";
+              }
             }
           }
 
@@ -1075,7 +1084,11 @@ ${html}
           const totalMs = Date.now() - jobStartTime;
           console.error(`[${new Date().toISOString()}] [JOB:${jobId}] ❌ ERRO após ${(totalMs / 1000).toFixed(1)}s:`, error.message);
           console.error(error);
-          jobs[jobId] = { status: "error", result: null, error: error.message };
+          const isFin = isFinancialError(error);
+          const userFacingError = isFin
+            ? MENSAGEM_CLIENTE_FINANCEIRO
+            : "Instabilidade temporária no processamento. Por favor, tente novamente em instantes.";
+          jobs[jobId] = { status: "error", result: null, error: userFacingError };
         } finally {
           if (client) {
             try { client.release(); } catch (ignored) { }

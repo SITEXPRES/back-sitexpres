@@ -1,9 +1,5 @@
 api/node_modules/*
+node_modules/
 api/.env
-
-/node_modules
-api/.env
-api/.env
-api/.env
-api/.env
-api/.env
+api/tmp/
+tmp/
