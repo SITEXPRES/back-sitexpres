@@ -23,7 +23,7 @@ import { uso_creditos, verificar_creditos_prompt } from "./creditosController.js
 import { consultaPlano } from "./planoController.js";
 import { gerar_site } from "./gerar_siteController_vite.js";
 import { desatrelarHtmlSitexpress, coletarArquivosProjeto } from "../utils/siteAssetHelper.js";
-import { isFinancialError, CODIGO_ERRO_FINANCEIRO, MENSAGEM_CLIENTE_FINANCEIRO } from "../utils/errorHandler.js";
+import { isFinancialError, CODIGO_ERRO_FINANCEIRO, MENSAGEM_CLIENTE_FINANCEIRO, MENSAGEM_CLIENTE_FALHA_EDICAO } from "../utils/errorHandler.js";
 
 import { executarFluxoPromax } from "../services/promaxOrchestratorService.js";
 import {
@@ -673,6 +673,47 @@ Suas alterações foram aplicadas diretamente no container da sua aplicação (p
           logStep(jobId, '🔗 Reconectando ao BD para salvar resultados...');
           client = await pool.connect();
 
+          // 🛡️ GUARDA DE ROLLBACK & PROTEÇÃO AO CLIENTE:
+          // Se a IA ou o build falharam durante a edição de um site já existente, NUNCA inativa a versão anterior
+          // e NUNCA envia nada para o FTP/DirectAdmin. O site oficial do cliente no ar e o preview continuam 100% intactos!
+          if (hasError && !primeiraVez) {
+            logStep(jobId, `🛡️ [FAIL-SAFE ATIVADO] Falha na edição. Preservando 100% da versão funcional anterior do cliente!`);
+
+            const isFin = (geracaoResult?.isFinancial || (typeof geracaoResult === 'object' && geracaoResult?.isFinancial));
+            const assistantMessageFalha = isFin
+              ? MENSAGEM_CLIENTE_FINANCEIRO
+              : MENSAGEM_CLIENTE_FALHA_EDICAO;
+
+            try {
+              const activeSiteId = existing.rows[0]?.id || null;
+              await client.query(
+                `INSERT INTO site_prompts (user_id, id_projeto, prompt, id_site_gererate, status, assistant_message)
+                 VALUES ($1, $2, $3, $4, $5, $6)`,
+                [userId, id_projeto, prompt, activeSiteId, 'falha', assistantMessageFalha]
+              );
+            } catch (errP) {
+              console.error("Erro ao salvar prompt de falha:", errP);
+            }
+
+            if (tmpDirPath) {
+              await fs.rm(tmpDirPath, { recursive: true, force: true }).catch(() => {});
+            }
+
+            client.release();
+            client = null;
+
+            jobs[jobId].progress = 100;
+            jobs[jobId] = {
+              status: "done",
+              result: {
+                ...existing.rows[0],
+                assistant_message: assistantMessageFalha
+              },
+              error: null
+            };
+            return;
+          }
+
           logStep(jobId, '💾 Salvando HTML no banco de dados...');
           const tDB = Date.now();
 
@@ -945,7 +986,9 @@ ${html}
             }
           }
 
-          if (existe_hospedagem.rows.length > 0) {
+          if (hasError) {
+            logStep(jobId, `🛡️ [FTP CANCELADO] Geração com erro. Upload FTP bloqueado para impedir corrupção do site.`);
+          } else if (existe_hospedagem.rows.length > 0) {
             try {
               const username = existe_hospedagem.rows[0].username;
               const password = existe_hospedagem.rows[0].senha;
@@ -1087,8 +1130,20 @@ ${html}
           const isFin = isFinancialError(error);
           const userFacingError = isFin
             ? MENSAGEM_CLIENTE_FINANCEIRO
-            : "Instabilidade temporária no processamento. Por favor, tente novamente em instantes.";
-          jobs[jobId] = { status: "error", result: null, error: userFacingError };
+            : MENSAGEM_CLIENTE_FALHA_EDICAO;
+
+          if (!primeiraVez && existing?.rows?.[0]) {
+            jobs[jobId] = {
+              status: "done",
+              result: {
+                ...existing.rows[0],
+                assistant_message: userFacingError
+              },
+              error: null
+            };
+          } else {
+            jobs[jobId] = { status: "error", result: null, error: userFacingError };
+          }
         } finally {
           if (client) {
             try { client.release(); } catch (ignored) { }

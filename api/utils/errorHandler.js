@@ -6,6 +6,8 @@
 export const CODIGO_ERRO_FINANCEIRO = "#1-fin";
 export const MENSAGEM_CLIENTE_FINANCEIRO =
   "Serviço temporariamente indisponível no momento. Por favor, tente novamente em alguns instantes. (#1-fin)";
+export const MENSAGEM_CLIENTE_FALHA_EDICAO =
+  "⚠️ Não foi possível aplicar esta modificação no momento. Para a sua segurança, o seu site atual continuou 100% no ar e protegido! Por favor, tente novamente em alguns instantes ou divida o pedido em etapas menores.";
 
 export function isFinancialError(err) {
   if (!err) return false;

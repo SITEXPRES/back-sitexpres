@@ -46,6 +46,34 @@ function applyUltraFuzzy(original, search, replaceText) {
 }
 
 /**
+ * Tentativa 3: Se o bloco tiver 3 ou mais linhas e houver alguma variação interna,
+ * busca as linhas de âncora inicial e final para delimitar a substituição com precisão.
+ */
+function applyAnchorFuzzy(original, search, replaceText) {
+  const lines = search.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  if (lines.length < 3) return null;
+
+  const firstLine = lines[0];
+  const lastLine = lines[lines.length - 1];
+
+  // Garante que a primeira linha é significativa (não é apenas uma chave ou colchete isolado)
+  if (firstLine.length < 5) return null;
+
+  const firstIdx = original.indexOf(firstLine);
+  if (firstIdx === -1) return null;
+
+  // Busca a última linha a partir da primeira ocorrência, respeitando uma janela plausível
+  const searchScope = original.slice(firstIdx, firstIdx + Math.max(search.length * 3, 3000));
+  const lastLineInScope = searchScope.lastIndexOf(lastLine);
+  if (lastLineInScope !== -1) {
+    const endOriginalIdx = firstIdx + lastLineInScope + lastLine.length;
+    return original.slice(0, firstIdx) + replaceText + original.slice(endOriginalIdx);
+  }
+
+  return null;
+}
+
+/**
  * Aplica os blocos no código. Retorna { code, applied, failed }.
  * Se qualquer bloco falhar, o chamador deve cair para reescrita completa.
  */
@@ -70,9 +98,18 @@ export function applyEditBlocks(original, blocks) {
     if (res) { 
       code = res; 
       applied++; 
-    } else {
-      failed++;
+      continue;
     }
+
+    // Tentativa 3: "Anchor Fuzzy" - Salva se a IA variar alguma linha intermediária
+    const resAnchor = applyAnchorFuzzy(code, search, replace);
+    if (resAnchor) {
+      code = resAnchor;
+      applied++;
+      continue;
+    }
+
+    failed++;
   }
   return { code, applied, failed };
 }

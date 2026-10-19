@@ -81,6 +81,91 @@ function validarIntegridadeRotas(codigo) {
 }
 
 /**
+ * Validador de integridade sintática e completude de código React gerado.
+ * Impede que códigos truncados pelo limite de tokens da IA (chaves desbalanceadas,
+ * strings abertas, export cortado) cheguem ao build e corrompam o site do cliente.
+ */
+function isCodeComplete(codigo) {
+  if (!codigo || typeof codigo !== "string") return false;
+  const trimmed = codigo.trim();
+  if (trimmed.length < 150) return false;
+
+  // 1. Deve conter export default function App ou export default App
+  if (!/(?:export\s+default\s+function\s+App|function\s+App\b[\s\S]*export\s+default\s+App)/.test(trimmed)) {
+    console.warn("[INTEGRIDADE] 🚨 Código não possui export default function App!");
+    return false;
+  }
+
+  // 2. Deve terminar com fechamento de bloco ou função (ex: '}', '};')
+  if (!/\}[\s;]*$/.test(trimmed)) {
+    console.warn("[INTEGRIDADE] 🚨 Código não termina com caractere de fechamento '}'!");
+    return false;
+  }
+
+  // 3. Verifica balanceamento de chaves e se há strings cortadas no fim
+  let braces = 0;
+  let inString = false;
+  let quoteChar = "";
+  let inComment = false;
+
+  for (let i = 0; i < trimmed.length; i++) {
+    const char = trimmed[i];
+    const next = trimmed[i + 1];
+
+    if (inComment) {
+      if (inComment === "line" && char === "\n") inComment = false;
+      else if (inComment === "block" && char === "*" && next === "/") {
+        inComment = false;
+        i++;
+      }
+      continue;
+    }
+
+    if (inString) {
+      if (char === "\\") {
+        i++; // escapa próximo caractere
+        continue;
+      }
+      if (char === quoteChar) {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === "/" && next === "/") {
+      inComment = "line";
+      i++;
+      continue;
+    }
+    if (char === "/" && next === "*") {
+      inComment = "block";
+      i++;
+      continue;
+    }
+    if (char === '"' || char === "'" || char === "`") {
+      inString = true;
+      quoteChar = char;
+      continue;
+    }
+
+    if (char === "{") braces++;
+    else if (char === "}") braces--;
+  }
+
+  if (inString) {
+    console.warn(`[INTEGRIDADE] 🚨 String não fechada (quote '${quoteChar}') no final do arquivo! Código truncado.`);
+    return false;
+  }
+
+  if (braces !== 0) {
+    console.warn(`[INTEGRIDADE] 🚨 Chaves desbalanceadas (saldo: ${braces}). Código truncado.`);
+    return false;
+  }
+
+  return true;
+}
+
+/**
  * Se o prompt do usuário contiver links externos (ex: https://cloudx.com.br/...),
  * faz scraping em tempo real para obter os dados reais (títulos, planos, preços, recursos)
  * e injeta como contexto para que a IA não alucine.
@@ -355,7 +440,7 @@ Faça APENAS as modificações pedidas pelo usuário, mantendo todo o resto inta
 [Escreva aqui o novo código que irá substituir o trecho acima]
 >>>>>>> REPLACE
 
-EXEMPLO DE USO:
+EXEMPLO DE USO GERAL:
 <<<<<<< SEARCH
     <footer className="text-gray-500">
       <p>Copyright 2024</p>
@@ -367,10 +452,30 @@ EXEMPLO DE USO:
     </footer>
 >>>>>>> REPLACE
 
+EXEMPLO PARA CRIAR OU CLONAR UMA NOVA PÁGINA (ex: clonar uma página existente ou criar uma nova rota):
+Para adicionar ou clonar uma página, NÃO reescreva o arquivo nem o componente original!
+Basta fazer UM bloco localizando "const routes =" e inserindo a nova função de componente logo antes dele e registrando a nova rota dentro dele:
+<<<<<<< SEARCH
+const routes = {
+  '/': HomePage,
+=======
+function NovaPaginaComponente() {
+  return (
+    <div className="min-h-screen bg-[#07090e] text-white">
+      {/* Componente da nova página completo aqui */}
+    </div>
+  );
+}
+
+const routes = {
+  '/': HomePage,
+  '/nova-pagina': NovaPaginaComponente,
+>>>>>>> REPLACE
+
 REGRAS CRÍTICAS:
 - Pode usar vários blocos, na ordem em que aparecem no arquivo.
-- O bloco SEARCH deve existir EXATAMENTE igual no código original (copie e cole).
-- NUNCA use "..." (reticências) para omitir código.
+- O bloco SEARCH deve existir EXATAMENTE igual no código original (copie e cole). Mantenha o bloco SEARCH curto (3 a 6 linhas) apenas para servir de âncora inequívoca.
+- NUNCA use "..." (reticências) para omitir código dentro de um bloco REPLACE.
 - NUNCA retorne o código inteiro do componente, APENAS os blocos alterados.
 - Se não for necessário mudar uma linha, não mude.
 - ÍCONES: NUNCA importe ícones de redes sociais do 'lucide-react' (Facebook, Instagram, Linkedin, Youtube, Twitter).
@@ -498,17 +603,64 @@ export default function App() {
       }
 
       if (!editadoPorBlocos) {
-        reactCode = await streamClaude(
-          systemPrompt,
-          isEditing ? promptProcessado : "Crie o componente React conforme solicitado: " + promptProcessado,
-          maxTokens,
-          isEditing ? 'edição completa' : 'criação'
-        );
+        const isArquivoGrande = baseHTML && baseHTML.length > 40000;
+        if (isArquivoGrande && isEditing) {
+          console.log(`[${new Date().toISOString()}] [GERAR_SITE_VITE] ⚠️ Arquivo grande (${baseHTML.length} chars). Tentando 2ª passagem cirúrgica por blocos para evitar truncamento...`);
+          try {
+            const retryPrompt = `ATENÇÃO: A tentativa anterior falhou. O arquivo possui mais de ${Math.round(baseHTML.length / 1000)}k caracteres e NÃO PODE ser reescrito por inteiro sem estourar o limite de tokens da IA!
+Você DEVE OBRIGATORIAMENTE retornar blocos <<<<<<< SEARCH ... ======= ... >>>>>>> REPLACE.
+Copie EXATAMENTE 3 a 5 linhas do código original no SEARCH como âncora.
+Se estiver criando ou clonando página, procure por "const routes =" e insira a nova função de página antes dele e registre a rota.
+Pedido do usuário: ${promptProcessado}`;
+
+            const retryResp = await streamClaude(systemPromptBlocos, retryPrompt, 16000, 'edição cirúrgica retry', MODELO_EDICAO);
+            const retryBlocks = parseEditBlocks(retryResp);
+            if (retryBlocks.length > 0) {
+              const r2 = applyEditBlocks(baseHTML, retryBlocks);
+              if (r2.applied > 0 && r2.failed === 0) {
+                reactCode = r2.code;
+                editadoPorBlocos = true;
+                console.log(`[${new Date().toISOString()}] [GERAR_SITE_VITE] ✅ 2ª passagem cirúrgica aplicada com sucesso! (${r2.applied} blocos)`);
+              }
+            }
+          } catch (retryPassErr) {
+            console.error(`[${new Date().toISOString()}] [GERAR_SITE_VITE] Erro na 2ª passagem cirúrgica:`, retryPassErr.message);
+          }
+        }
+
+        if (!editadoPorBlocos) {
+          if (isEditing && baseHTML.length > 60000) {
+            console.error(`[${new Date().toISOString()}] [GERAR_SITE_VITE] 🛑 Abortando reescrita completa em arquivo gigante (${baseHTML.length} chars) para prevenir tela branca/corte de código!`);
+            const errGigante = new Error("Arquivo muito extenso para reescrita completa direta.");
+            errGigante.isCodeTruncationRisk = true;
+            throw errGigante;
+          }
+
+          reactCode = await streamClaude(
+            systemPrompt,
+            isEditing ? promptProcessado : "Crie o componente React conforme solicitado: " + promptProcessado,
+            maxTokens,
+            isEditing ? 'edição completa' : 'criação'
+          );
+        }
       }
     }
 
     reactCode = limparRetorno(reactCode);
     reactCode = validarIntegridadeRotas(reactCode);
+
+    // Validação de integridade e não-truncamento antes do build
+    if (!isCodeComplete(reactCode)) {
+      console.error(`[${new Date().toISOString()}] [GERAR_SITE_VITE] 🚨 Código React incompleto ou truncado detectado! Abortando build para proteção.`);
+      return {
+        reactCode: baseHTML || reactCode,
+        distPath: null,
+        tmpDirPath: null,
+        hasError: true,
+        buildError: "Código truncado ou incompleto detectado pela validação de integridade.",
+        isTruncated: true
+      };
+    }
 
     // ===========================================
     // PROCESSO DE BUILD DO VITE
@@ -639,6 +791,16 @@ export default function App() {
 
   } catch (error) {
     console.error(`[${new Date().toISOString()}] [GERAR_SITE_VITE] ❌ ERRO GERAL:`, error);
-    throw error;
+    if (error.isFinancial) {
+      throw error;
+    }
+    return {
+      reactCode: baseHTML,
+      distPath: null,
+      tmpDirPath: null,
+      hasError: true,
+      buildError: error.message,
+      isTruncationRisk: error.isCodeTruncationRisk || false
+    };
   }
 }
