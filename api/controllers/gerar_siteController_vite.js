@@ -674,6 +674,21 @@ Pedido do usuário: ${promptProcessado}`;
       fsSync.mkdirSync(tmpBase, { recursive: true });
     }
 
+    // Garante que o template base possui dependências instaladas (executa apenas na 1ª vez)
+    const templateVite = path.join(templatePath, "node_modules", "vite");
+    if (!fsSync.existsSync(templateVite)) {
+      console.log(`[${new Date().toISOString()}] [GERAR_SITE_VITE] 📦 Instalando dependências no template base...`);
+      const lockInTemplate = path.join(templatePath, "package-lock.json");
+      if (fsSync.existsSync(lockInTemplate)) {
+        await fs.unlink(lockInTemplate).catch(() => {});
+      }
+      try {
+        await execPromise('npm install --no-package-lock --include=dev --no-audit', { cwd: templatePath });
+      } catch (tmplErr) {
+        console.warn(`[GERAR_SITE_VITE] ⚠️ Aviso ao instalar dependências no template base:`, tmplErr.message);
+      }
+    }
+
     const tmpDirName = `projeto_${id_projeto}_${Date.now()}`;
     const tmpDirPath = path.join(tmpBase, tmpDirName);
 
@@ -710,7 +725,11 @@ Pedido do usuário: ${promptProcessado}`;
       const vitePkg = path.join(tmpDirPath, "node_modules", "vite");
       if (!fsSync.existsSync(vitePkg)) {
         console.log(`[${new Date().toISOString()}] [GERAR_SITE_VITE] 📦 Instalando dependências (Vite)...`);
-        await execPromise('npm install --include=dev --no-audit', { cwd: tmpDirPath });
+        const lockPath = path.join(tmpDirPath, "package-lock.json");
+        if (fsSync.existsSync(lockPath)) {
+          await fs.unlink(lockPath).catch(() => {});
+        }
+        await execPromise('npm install --no-package-lock --include=dev --no-audit', { cwd: tmpDirPath });
       }
       // Garante permissões em .bin
       await execPromise('chmod -R +x node_modules/.bin || true', { cwd: tmpDirPath }).catch(() => {});

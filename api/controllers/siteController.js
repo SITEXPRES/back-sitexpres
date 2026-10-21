@@ -1649,7 +1649,11 @@ export const restauracao_versao = async (req, res) => {
 
         const vitePkg = path.join(tmpDirPath, "node_modules", "vite");
         if (!fsSync.existsSync(vitePkg)) {
-          await execPromise('npm install --include=dev --no-audit', { cwd: tmpDirPath });
+          const lockPath = path.join(tmpDirPath, "package-lock.json");
+          if (fsSync.existsSync(lockPath)) {
+            await fs.unlink(lockPath).catch(() => {});
+          }
+          await execPromise('npm install --no-package-lock --include=dev --no-audit', { cwd: tmpDirPath });
         }
         await execPromise('chmod -R +x node_modules/.bin || true', { cwd: tmpDirPath }).catch(() => { });
 
