@@ -300,7 +300,7 @@ export const newsite = async (req, res) => {
         const jobStartTime = Date.now();
 
         // Variáveis que precisam sobreviver entre as fases
-        let primeiraVez, baseHTML, nomeSubdominio, finalPrompt;
+        let primeiraVez, baseHTML, nomeSubdominio, finalPrompt, existing;
 
         try {
           // ─── FASE 1: consultas rápidas ao BD ────────────────────────────────
@@ -310,7 +310,7 @@ export const newsite = async (req, res) => {
 
           logStep(jobId, '🔍 Verificando se site já existe...');
           const t3 = Date.now();
-          const existing = await client.query(
+          existing = await client.query(
             `SELECT id, name, html_content, js_content FROM generated_sites 
            WHERE id_projeto = $1 and status = 'ativo'
            ORDER BY created_at DESC LIMIT 1`,
@@ -509,7 +509,7 @@ ${REGRAS_SEGURANCA_SYSTEM_PROMPT}
           logStep(jobId, '🔓 Conexão com BD liberada — iniciando chamada à IA...');
 
           // ─── FASE 2: chamada à IA (sem conexão BD aberta) ───────────────────
-          let html, distPath, tmpDirPath, hasError;
+          let html, distPath, tmpDirPath, hasError, geracaoResult;
           let promaxMetadataToSave = null;
           let promaxRawFilesToSave = null;
           let assistantMessageOverride = null;
@@ -623,7 +623,7 @@ Suas alterações foram aplicadas diretamente no container da sua aplicação (p
             const nomeModeloIa = baseHTML ? 'Claude Haiku' : 'Claude Sonnet 5.5';
             logStep(jobId, `🤖 Enviando prompt para a IA (${nomeModeloIa})... aguarde`);
             const tIA = Date.now();
-            const geracaoResult = await gerar_site(
+            geracaoResult = await gerar_site(
               finalPrompt,
               "REACT",
               req,
@@ -685,7 +685,7 @@ Suas alterações foram aplicadas diretamente no container da sua aplicação (p
               : MENSAGEM_CLIENTE_FALHA_EDICAO;
 
             try {
-              const activeSiteId = existing.rows[0]?.id || null;
+              const activeSiteId = existing?.rows?.[0]?.id || null;
               await client.query(
                 `INSERT INTO site_prompts (user_id, id_projeto, prompt, id_site_gererate, status, assistant_message)
                  VALUES ($1, $2, $3, $4, $5, $6)`,
@@ -706,7 +706,7 @@ Suas alterações foram aplicadas diretamente no container da sua aplicação (p
             jobs[jobId] = {
               status: "done",
               result: {
-                ...existing.rows[0],
+                ...(existing?.rows?.[0] || {}),
                 assistant_message: assistantMessageFalha
               },
               error: null
@@ -863,7 +863,7 @@ ${html}
            (user_id, name, prompt, html_content, id_projeto, image_path, subdominio, status, js_content)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
            RETURNING id, name, prompt, html_content, created_at`,
-            [userId, `Site de ${nomeSubdominio}`, prompt, previewHtml, id_projeto, relativeImageURL || (existing.rows[0]?.image_path ? desatrelarHtmlSitexpress(existing.rows[0].image_path) : null), nomeSubdominio, 'ativo', jsContentToSave]
+            [userId, `Site de ${nomeSubdominio}`, prompt, previewHtml, id_projeto, relativeImageURL || (existing?.rows?.[0]?.image_path ? desatrelarHtmlSitexpress(existing.rows[0].image_path) : null), nomeSubdominio, 'ativo', jsContentToSave]
           );
 
           const novoId = insertSite.rows[0].id;
@@ -1136,7 +1136,7 @@ ${html}
             jobs[jobId] = {
               status: "done",
               result: {
-                ...existing.rows[0],
+                ...(existing?.rows?.[0] || {}),
                 assistant_message: userFacingError
               },
               error: null
