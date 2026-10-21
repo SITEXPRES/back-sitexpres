@@ -15,6 +15,24 @@ import util from "util";
 const execPromise = util.promisify(exec);
 import { isFinancialError, gerarHtmlErroCliente, CODIGO_ERRO_FINANCEIRO, MENSAGEM_CLIENTE_FINANCEIRO } from "../utils/errorHandler.js";
 
+/**
+ * Executa npm install contornando o bug de 'edgesOut' do Arborist
+ * usando --legacy-peer-deps e fallback com --force.
+ */
+async function safeNpmInstall(cwd) {
+  const lockPath = path.join(cwd, "package-lock.json");
+  if (fsSync.existsSync(lockPath)) {
+    await fs.unlink(lockPath).catch(() => {});
+  }
+  try {
+    await execPromise('npm install --legacy-peer-deps --no-package-lock --include=dev --no-audit', { cwd });
+  } catch (err1) {
+    console.warn(`[GERAR_SITE_VITE] ⚠️ npm install com --legacy-peer-deps falhou (${err1.message?.slice(0, 150)}). Tentando com --force...`);
+    await execPromise('npm cache clean --force', { cwd }).catch(() => {});
+    await execPromise('npm install --force --legacy-peer-deps --include=dev --no-audit', { cwd });
+  }
+}
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -678,12 +696,10 @@ Pedido do usuário: ${promptProcessado}`;
     const templateVite = path.join(templatePath, "node_modules", "vite");
     if (!fsSync.existsSync(templateVite)) {
       console.log(`[${new Date().toISOString()}] [GERAR_SITE_VITE] 📦 Instalando dependências no template base...`);
-      const lockInTemplate = path.join(templatePath, "package-lock.json");
-      if (fsSync.existsSync(lockInTemplate)) {
-        await fs.unlink(lockInTemplate).catch(() => {});
-      }
       try {
-        await execPromise('npm install --no-package-lock --include=dev --no-audit', { cwd: templatePath });
+        await safeNpmInstall(templatePath);
+        await execPromise('chmod -R +x node_modules/.bin || true', { cwd: templatePath }).catch(() => {});
+        console.log(`[${new Date().toISOString()}] [GERAR_SITE_VITE] ✅ Template base pronto com dependências instaladas!`);
       } catch (tmplErr) {
         console.warn(`[GERAR_SITE_VITE] ⚠️ Aviso ao instalar dependências no template base:`, tmplErr.message);
       }
@@ -725,11 +741,7 @@ Pedido do usuário: ${promptProcessado}`;
       const vitePkg = path.join(tmpDirPath, "node_modules", "vite");
       if (!fsSync.existsSync(vitePkg)) {
         console.log(`[${new Date().toISOString()}] [GERAR_SITE_VITE] 📦 Instalando dependências (Vite)...`);
-        const lockPath = path.join(tmpDirPath, "package-lock.json");
-        if (fsSync.existsSync(lockPath)) {
-          await fs.unlink(lockPath).catch(() => {});
-        }
-        await execPromise('npm install --no-package-lock --include=dev --no-audit', { cwd: tmpDirPath });
+        await safeNpmInstall(tmpDirPath);
       }
       // Garante permissões em .bin
       await execPromise('chmod -R +x node_modules/.bin || true', { cwd: tmpDirPath }).catch(() => {});

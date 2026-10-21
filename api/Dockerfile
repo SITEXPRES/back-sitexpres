@@ -12,7 +12,7 @@ RUN npm install
 COPY . .
 
 # Pré-instala as dependências do vite-base para os builds dos sites serem instantâneos
-RUN cd templates/vite-base && rm -rf node_modules package-lock.json && npm install --no-package-lock --include=dev && chmod -R +x node_modules/.bin || true
+RUN cd templates/vite-base && rm -rf node_modules package-lock.json && npm install --legacy-peer-deps --no-package-lock --include=dev && chmod -R +x node_modules/.bin || true
 RUN mkdir -p /app/tmp && chmod 777 /app/tmp
 
 # Certifica que dotenv vai ler o .env

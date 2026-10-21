@@ -1653,7 +1653,11 @@ export const restauracao_versao = async (req, res) => {
           if (fsSync.existsSync(lockPath)) {
             await fs.unlink(lockPath).catch(() => {});
           }
-          await execPromise('npm install --no-package-lock --include=dev --no-audit', { cwd: tmpDirPath });
+          try {
+            await execPromise('npm install --legacy-peer-deps --no-package-lock --include=dev --no-audit', { cwd: tmpDirPath });
+          } catch (e1) {
+            await execPromise('npm install --force --legacy-peer-deps --include=dev --no-audit', { cwd: tmpDirPath });
+          }
         }
         await execPromise('chmod -R +x node_modules/.bin || true', { cwd: tmpDirPath }).catch(() => { });
 
