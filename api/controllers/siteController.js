@@ -399,6 +399,10 @@ export const newsite = async (req, res) => {
             logStep(jobId, '🛡️ [SEGURANÇA] Tentativa de acesso a dados confidenciais bloqueada!');
             isQuestionOnly = true;
             questionAnswer = checagemSeguranca.resposta || MENSAGEM_RECUSA_SEGURANCA;
+          } else if (uploadedFiles.length > 0) {
+            // 📎 Se o usuário enviou imagens/arquivos, trata-se OBRIGATORIAMENTE de uma MODIFICAÇÃO no site ou CRM
+            logStep(jobId, `📁 Anexos recebidos (${uploadedFiles.length} arquivo(s)) — intenção definida automaticamente como MODIFICAÇÃO (sem recusa por falta de arquivo).`);
+            isQuestionOnly = false;
           } else if (!primeiraVez) {
             logStep(jobId, '🤖 Classificando intenção (modificação vs pergunta)...');
             try {
@@ -433,12 +437,12 @@ export const newsite = async (req, res) => {
 
 1. Se for PERGUNTA, DÚVIDA INFORMATIVA ou RESPOSTA CONVERSACIONAL / CONFIRMAÇÃO (ex: "Sim", "Não", "Ok", "Beleza", "Entendido", "Pode ser", "Combinado", "Vou mandar", "Obrigado", "Bom dia", ou qualquer resposta concordando/conversando sem conter instruções concretas de código):
    - Responda EXATAMENTE com [PERGUNTA] seguido de uma resposta amigável, natural e prestativa no contexto do chat (sempre comece com um emoji).
-   - Exemplo: se você acabou de pedir para o usuário enviar uma imagem/arquivo e ele respondeu "Sim", "Ok" ou "Beleza", responda: "🎨 Ótimo! Pode anexar a imagem clicando no ícone de anexo 📎 aqui no chat. Assim que você enviar, aplico a alteração diretamente no seu site!"
-   - NUNCA responda [MODIFICACAO] se o usuário apenas disse "Sim", "Ok" ou agradeceu sem descrever uma nova alteração de código ou sem anexar o arquivo solicitado!
+   - Exemplo: se você acabou de pedir para o usuário enviar uma imagem/arquivo e ele apenas disse "Sim", "Ok" ou "Beleza" sem enviar instruções de alteração, responda: "🎨 Ótimo! Pode anexar a imagem clicando no ícone de anexo 📎 aqui no chat. Assim que você enviar, aplico a alteração diretamente no seu site!"
+   - NUNCA responda [MODIFICACAO] se o usuário apenas disse "Sim", "Ok" ou agradeceu sem descrever uma nova alteração de código!
    - Se o usuário perguntar sobre banco de dados, portas, rotas ou dados técnicos, utilize os dados da FICHA TÉCNICA.${promaxInfoContext}
 ${REGRAS_SEGURANCA_SYSTEM_PROMPT}
 
-2. Se for uma MODIFICAÇÃO REAL no site/sistema (ex: "mude a cor", "adicione botão", "troque o texto X por Y", "remova o rodapé", "coloque a logo em anexo"):
+2. Se for uma MODIFICAÇÃO REAL no site/sistema (ex: "mude a cor", "adicione botão", "troque o texto X por Y", "remova o rodapé", "insira a foto", "coloque a imagem abaixo da localização"):
    - Responda EXATAMENTE com [MODIFICACAO].`,
                 messages: [
                   ...chatHistory,
@@ -548,7 +552,8 @@ ${REGRAS_SEGURANCA_SYSTEM_PROMPT}
               id_projeto,
               userId,
               existingMetadata: projectMetadata,
-              existingFiles: existingFiles
+              existingFiles: existingFiles,
+              uploadedFiles: uploadedFiles
             });
 
             jobs[jobId].progress = 85;
@@ -593,14 +598,16 @@ ${REGRAS_SEGURANCA_SYSTEM_PROMPT}
             };
 
             if (!primeiraVez && projectMetadata?.is_promax) {
+              const anexosMsg = uploadedFiles.length > 0 ? ` e a(s) imagem(ns) anexa(s) (${uploadedFiles.map(f => f.originalname).join(', ')})` : '';
               assistantMessageOverride = `⚡ **Sistema Atualizado com Sucesso!**
 
-Suas alterações foram aplicadas diretamente no container da sua aplicação (porta ${resultadoPromax.port}), mantendo todos os dados do seu banco de dados PostgreSQL intactos.
+Suas alterações${anexosMsg} foram aplicadas diretamente no container da sua aplicação (porta ${resultadoPromax.port}), mantendo todos os dados do seu banco de dados PostgreSQL intactos.
 
 🌐 **Acesse aqui:** [${finalUrl}](${finalUrl})
 🐘 **Banco de Dados:** Conectado ao PostgreSQL (${resultadoPromax.db.name}) existente.`;
             } else {
-              assistantMessageOverride = `🎉 Uau! Seu sistema corporativo com banco de dados PostgreSQL foi gerado e colocado no ar com sucesso!
+              const anexosMsg = uploadedFiles.length > 0 ? ` com a(s) imagem(ns) anexa(s)` : '';
+              assistantMessageOverride = `🎉 Uau! Seu sistema corporativo${anexosMsg} com banco de dados PostgreSQL foi gerado e colocado no ar com sucesso!
 
 🌐 **Acesse aqui:** [${finalUrl}](${finalUrl})
 🐘 **Banco de Dados:** PostgreSQL 15 configurado e conectado na VPS.
@@ -877,17 +884,22 @@ ${html}
           } else {
             try {
               if (primeiraVez) {
-                assistantMessage = "🎉 Uau! Seu site foi gerado e publicado com sucesso!";
+                assistantMessage = uploadedFiles.length > 0
+                  ? "🎉 Uau! Seu site foi gerado e publicado com sucesso com suas imagens incorporadas!"
+                  : "🎉 Uau! Seu site foi gerado e publicado com sucesso!";
               } else {
+                const attachmentsNote = uploadedFiles.length > 0
+                  ? `\n[ARQUIVOS/IMAGENS RECEBIDOS E APLICADOS NO CÓDIGO: ${uploadedFiles.map(f => `"${f.originalname}" (caminho: /images/${f.filename})`).join(', ')}]`
+                  : "";
                 const aiResp = await anthropic.messages.create({
                   model: "claude-haiku-4-5-20251001",
                   max_tokens: 250,
-                  system: `Você é o assistente virtual da Sitexpres, amigável e proativo. Informe de forma clara e objetiva o que você acabou de alterar no site dele com base ESTRITAMENTE no pedido atual do usuário ("${prompt}"), usando entre 20 a 40 palavras, e convide-o a conferir o resultado. NUNCA mencione alterações antigas (como favicon, logo, rodapé) a menos que o usuário tenha pedido especificamente isso no pedido atual! Sempre comece com um emoji.`,
+                  system: `Você é o assistente virtual da Sitexpres, amigável e proativo. Informe de forma clara e objetiva o que você acabou de alterar no site dele com base ESTRITAMENTE no pedido atual do usuário ("${prompt}"), usando entre 20 a 40 palavras, e convide-o a conferir o resultado.${uploadedFiles.length > 0 ? ' ATENÇÃO CRÍTICA: O usuário enviou imagem(ns)/arquivo(s) que foram processados e aplicados com sucesso! Confirme expressamente a inclusão/atualização da(s) imagem(ns) no site. NUNCA diga que não recebeu, que não visualizou ou peça para enviar novamente!' : ''} NUNCA mencione alterações antigas (como favicon, logo, rodapé) a menos que o usuário tenha pedido especificamente isso no pedido atual! Sempre comece com um emoji.`,
                   messages: [
                     ...chatHistory,
                     {
                       role: "user",
-                      content: `[CÓDIGO NOVO GERADO PARA O SITE]\n\`\`\`html\n${html ? html.substring(0, 30000) : "Nenhum código"}\n\`\`\`\n\nO usuário pediu: ${prompt}`
+                      content: `[CÓDIGO NOVO GERADO PARA O SITE]\n\`\`\`html\n${html ? html.substring(0, 30000) : "Nenhum código"}\n\`\`\`\n\nO usuário pediu: ${prompt}${attachmentsNote}`
                     }
                   ]
                 });

@@ -69,9 +69,9 @@ export async function coletarArquivosProjeto(id_projeto, htmlContent, currentFil
     }
   }
 
-  // 2. Extrair arquivos referenciados em ./images/ ou images/ no HTML
+  // 2. Extrair arquivos referenciados em /images/, ./images/ ou images/ no HTML
   if (htmlContent && typeof htmlContent === "string") {
-    const regexImg = /(?:src|href|url\()=?["']?(?:\.\/)?images\/([a-zA-Z0-9_.-]+)["'\)]?/gi;
+    const regexImg = /(?:src|href|url\()=?["']?(?:\.|\/)?\/?images\/([a-zA-Z0-9_.-]+)["'\)]?/gi;
     let match;
     while ((match = regexImg.exec(htmlContent)) !== null) {
       const filename = match[1];

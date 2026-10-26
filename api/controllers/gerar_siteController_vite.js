@@ -14,6 +14,7 @@ import { exec } from "child_process";
 import util from "util";
 const execPromise = util.promisify(exec);
 import { isFinancialError, gerarHtmlErroCliente, CODIGO_ERRO_FINANCEIRO, MENSAGEM_CLIENTE_FINANCEIRO } from "../utils/errorHandler.js";
+import { aplicarOtimizacoesDist } from "../services/seoGenerator.js";
 
 /**
  * Executa npm install contornando o bug de 'edgesOut' do Arborist
@@ -390,6 +391,11 @@ REGRAS:
 10. SEGURANÇA E INTEGRIDADE DA INFRAESTRUTURA:
    - NUNCA inclua scripts de terceiros maliciosos, formulários enganosos de captura de credenciais, miners de criptomoeda ou iframes de phishing.
    - NUNCA crie chamadas ou requisições para portas ou serviços internos administrativos (ex: portas 9001, 2222, srv3br, etc.).
+11. 🚀 SEO TÉCNICO E GEO (CRÍTICO PARA GOOGLE, BING E IAs):
+   - HIERARQUIA SEMÂNTICA: Use exatamente um único <h1> descritivo por página. Subseções devem usar <h2> e cards/planos <h3>.
+   - LINKS RASTREÁVEIS: SEMPRE use tags <a href="/rota"> com hrefs reais para navegação entre páginas e serviços. NUNCA utilize apenas botões (<button>) ou <div> com onClick para trocar de página, pois os crawlers de IA (ChatGPT Search, Perplexity) e do Google não conseguem indexar links sem href.
+   - ACESSIBILIDADE E ALT TEXT: Todas as tags <img> DEVEM ter atributos alt descritivos. Links e botões que contêm apenas ícones DEVEM ter aria-label explicativo.
+   - TEXTOS E CONTEÚDO COMERCIAL: Deixe sempre visíveis no código os textos descritivos das ofertas, preços, recursos e benefícios, sem esconder conteúdos vitais de busca.
 
 Analise o prompt do usuário e gere a melhor interface possível para o cenário descrito.
 `;
@@ -437,6 +443,12 @@ Faça APENAS as modificações solicitadas pelo usuário, mantendo todo o resto 
   2. Mantenha os cards de planos CONCISOS e na mesma proporção das outras páginas (máximo 4 especificações destacadas no topo com check verde + linha divisória + 5 a 6 itens comuns com check ciano). NUNCA crie listas gigantescas de dezenas de itens que quebrem a proporção da página.
   3. NÃO crie seções desconectadas ou avulsas (como fotos de servidores soltas ou depoimentos duplicados) que não existem na página de origem.
   4. NOMEAÇÃO E ROTAS: O nome da função do componente DEVE ser EXATAMENTE IGUAL ao nome usado no objeto const routes (NUNCA adicione sufixos como Legacy, Old, Temp).
+
+⚠️ SEO TÉCNICO E GEO (CRÍTICO PARA GOOGLE E IAs):
+- Mantenha exatamente um <h1> por página, <h2> para seções e <h3> para cards.
+- LINKS RASTREÁVEIS: SEMPRE use <a href="..."> reais para navegação interna, NUNCA troque páginas apenas com onClick em buttons/divs.
+- Não remova preços nem detalhes técnicos vitais de indexação.
+- Mantenha atributos alt descritivos nas tags <img>.
 
 CÓDIGO ATUAL:
 ${baseHTML}
@@ -500,6 +512,7 @@ REGRAS CRÍTICAS:
 - PADRÃO DE IMAGENS: Ao alterar ou adicionar <img>, NUNCA deixe com altura descontrolada ou esticada. Mantenha rigorosamente as classes de restrição de altura do layout (ex: max-h-[400px], h-48, object-cover, rounded-xl). Use sempre caminhos absolutos /images/...
 - ROTAS/PÁGINAS: Se o usuário pedir alteração em uma página específica (ex: /cpanel), altere apenas o bloco daquela página.
 - CLONAGEM DE PÁGINAS: Ao clonar ou duplicar uma página existente, copie fielmente a estrutura das seções (Hero 2 colunas, barra de benefícios, planos com toggle mensal/anual) e mantenha a proporção dos cards com dados curtos (máximo 4 specs + divisor + 5-6 comuns). O nome do componente DEVE bater exatamente com o objeto const routes.
+- SEO TÉCNICO E GEO: Mantenha tags <a href="..."> com caminhos reais para navegação interna (nunca troque links por buttons vazios). Preserve a hierarquia <h1>, <h2> e os textos informativos das ofertas e planos.
 
 CÓDIGO ATUAL (base para o SEARCH):
 ${baseHTML}
@@ -798,6 +811,22 @@ Pedido do usuário: ${promptProcessado}`;
           }
           const distPath = path.join(tmpDirPath, 'dist');
           console.log(`[${new Date().toISOString()}] [GERAR_SITE_VITE] ✅ Build concluído após auto-correção!`);
+
+          // 🚀 Aplica Otimizações de SEO Técnico e GEO (robots.txt, sitemap.xml, tags e SSG)
+          try {
+            const siteInfo = await pool.query(`SELECT site_url, site_name FROM public.sites WHERE id_projeto = $1`, [id_projeto]);
+            let sNome = "Meu Site";
+            let sDomain = "sitexpres.com.br";
+            if (siteInfo.rows.length > 0 && siteInfo.rows[0].site_url) {
+              sDomain = siteInfo.rows[0].site_url.replace(/^https?:\/\//, '');
+              sNome = siteInfo.rows[0].site_name || sDomain.replace('.sitexpres.com.br', '');
+              sNome = sNome.charAt(0).toUpperCase() + sNome.slice(1);
+            }
+            await aplicarOtimizacoesDist({ distPath, reactCode: fixedCode, siteName: sNome, domain: sDomain });
+          } catch (seoErr) {
+            console.warn(`[GERAR_SITE_VITE] ⚠️ Aviso ao aplicar otimizações de SEO:`, seoErr.message);
+          }
+
           return { reactCode: fixedCode, distPath, tmpDirPath, hasError: false };
         } catch (retryErr) {
           console.error(`[${new Date().toISOString()}] [GERAR_SITE_VITE] ❌ Build falhou mesmo após auto-correção:`, retryErr.message?.slice(0, 300));
@@ -817,6 +846,21 @@ Pedido do usuário: ${promptProcessado}`;
 
     const distPath = path.join(tmpDirPath, "dist");
     console.log(`[${new Date().toISOString()}] [GERAR_SITE_VITE] ✅ Build concluído com sucesso em ${distPath}`);
+
+    // 🚀 Aplica Otimizações de SEO Técnico e GEO (robots.txt, sitemap.xml, tags e SSG)
+    try {
+      const siteInfo = await pool.query(`SELECT site_url, site_name FROM public.sites WHERE id_projeto = $1`, [id_projeto]);
+      let sNome = "Meu Site";
+      let sDomain = "sitexpres.com.br";
+      if (siteInfo.rows.length > 0 && siteInfo.rows[0].site_url) {
+        sDomain = siteInfo.rows[0].site_url.replace(/^https?:\/\//, '');
+        sNome = siteInfo.rows[0].site_name || sDomain.replace('.sitexpres.com.br', '');
+        sNome = sNome.charAt(0).toUpperCase() + sNome.slice(1);
+      }
+      await aplicarOtimizacoesDist({ distPath, reactCode, siteName: sNome, domain: sDomain });
+    } catch (seoErr) {
+      console.warn(`[GERAR_SITE_VITE] ⚠️ Aviso ao aplicar otimizações de SEO:`, seoErr.message);
+    }
 
     return { reactCode, distPath, tmpDirPath, hasError: false };
 

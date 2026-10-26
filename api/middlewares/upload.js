@@ -11,27 +11,28 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname || "").toLowerCase() || ".png";
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const uniqueName = uniqueSuffix + path.extname(file.originalname);
+    const uniqueName = uniqueSuffix + ext;
     cb(null, uniqueName);
   },
 });
 
-// Validação de tipo de arquivo
+// Validação de tipo de arquivo abrangente (MIME type ou extensão)
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png|gif|webp|svg/;
-  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-  const mimetype = allowedTypes.test(file.mimetype);
+  const allowedExtensions = /\.(jpeg|jpg|png|gif|webp|svg|ico|bmp|avif)$/i;
+  const isImageMime = file.mimetype && (file.mimetype.startsWith("image/") || /jpeg|jpg|png|gif|webp|svg|ico|bmp/i.test(file.mimetype));
+  const hasImageExt = allowedExtensions.test(file.originalname || "");
 
-  if (mimetype && extname) {
+  if (isImageMime || hasImageExt) {
     return cb(null, true);
   } else {
-    cb(new Error("Apenas imagens são permitidas (jpeg, jpg, png, gif, webp, svg)"));
+    cb(new Error("Apenas imagens são permitidas (jpeg, jpg, png, gif, webp, svg, ico, bmp, avif)"));
   }
 };
 
 export const upload = multer({ 
   storage,
   fileFilter,
-  limits: { fileSize: 20 * 1024 * 1024 } // Limite de 20MB (opcional)
+  limits: { fileSize: 30 * 1024 * 1024 } // Limite de 30MB
 });

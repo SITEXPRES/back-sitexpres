@@ -1,4 +1,5 @@
 import dotenv from "dotenv";
+import fs from "fs/promises";
 import { gerarAplicacaoPromax } from "./promaxService.js";
 import { configurarProxySubdominio } from "../controllers/integracao_directadmin.js";
 
@@ -98,10 +99,10 @@ export async function fetchAppFilesFromVPS(name_app) {
  * @param {Object} [params.existingMetadata] - Metadados do projeto existente se for edição
  * @param {Array} [params.existingFiles] - Arquivos prévios do projeto se já salvos
  */
-export async function executarFluxoPromax({ prompt, id_projeto, userId, mockCode = null, existingMetadata = null, existingFiles = null }) {
+export async function executarFluxoPromax({ prompt, id_projeto, userId, mockCode = null, existingMetadata = null, existingFiles = null, uploadedFiles = [] }) {
   const startTime = Date.now();
   console.log(`\n================================================================`);
-  console.log(`🎼 [MAESTRO] INICIANDO ORQUESTRAÇÃO PROMAX | Projeto: ${id_projeto}`);
+  console.log(`🎼 [MAESTRO] INICIANDO ORQUESTRAÇÃO PROMAX | Projeto: ${id_projeto} | Anexos: ${uploadedFiles.length}`);
   console.log(`================================================================\n`);
 
   // Define nome único e imutável do projeto
@@ -142,6 +143,24 @@ export async function executarFluxoPromax({ prompt, id_projeto, userId, mockCode
   } else {
     console.log(`[MAESTRO] 🧠 Solicitando código à IA Claude (Modo: ${existingContext ? 'EDIÇÃO INCREMENTAL' : 'CRIAÇÃO INICIAL'})...`);
     appData = await gerarAplicacaoPromax(prompt, existingContext);
+  }
+
+  // Injeta imagens enviadas pelo usuário em public/images/ da aplicação
+  if (uploadedFiles && uploadedFiles.length > 0) {
+    if (!Array.isArray(appData.files)) appData.files = [];
+    for (const f of uploadedFiles) {
+      try {
+        const fileBuf = await fs.readFile(f.path);
+        appData.files.push({
+          path: `public/images/${f.filename}`,
+          content: fileBuf.toString('base64'),
+          encoding: 'base64'
+        });
+        console.log(`[MAESTRO] 🖼️ Imagem anexada adicionada à VPS: public/images/${f.filename} (${f.originalname})`);
+      } catch (readErr) {
+        console.warn(`[MAESTRO] ⚠️ Erro ao preparar imagem para VPS:`, readErr.message);
+      }
+    }
   }
 
   const finalProjectName = existingMetadata?.projectName || (appData.name_app ? `${appData.name_app.replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase()}_${id_projeto}` : uniqueProjectName);
