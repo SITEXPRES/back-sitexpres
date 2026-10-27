@@ -1,5 +1,6 @@
 import pool from "../config/db.js";
 import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { v4 as uuidv4 } from "uuid";
 import fs from "fs/promises";
 import fsSync from "fs";
@@ -39,7 +40,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const anthropic = new Anthropic({
-  apiKey: process.env.CLAUDE_API_KEY,
+  apiKey: process.env.CLAUDE_API_KEY || "dummy_claude",
+});
+
+const deepseek = new OpenAI({
+  baseURL: "https://api.deepseek.com",
+  apiKey: process.env.DEEPSEEK_API_KEY || "dummy_deepseek",
 });
 
 // Baseline de tokens para cálculo de progresso
@@ -556,6 +562,59 @@ export default function App() {
       if (onProgress) onProgress(80);
       await uso_creditos(userId, 50, 50, id_projeto);
     } else {
+      // Chamada com streaming para DeepSeek (OpenAI-compatible)
+      const streamDeepSeek = async (systemText, userContent, maxTok, label, modelo = "deepseek-chat") => {
+        const cappedTokens = Math.min(maxTok || 8192, 8192);
+        console.log(`[${new Date().toISOString()}] [GERAR_SITE_VITE] 🧠 Chamando DeepSeek API (${label}) | modelo: ${modelo} | max_tokens: ${cappedTokens}`);
+        let stream;
+        try {
+          stream = await deepseek.chat.completions.create({
+            model: modelo,
+            max_tokens: cappedTokens,
+            messages: [
+              { role: "system", content: systemText },
+              { role: "user", content: userContent }
+            ],
+            stream: true,
+            stream_options: { include_usage: true },
+            temperature: 0.2
+          });
+        } catch (apiErr) {
+          console.error(`[${new Date().toISOString()}] [GERAR_SITE_VITE] ⚠️ ERRO DEEPSEEK (${label}):`, apiErr.message);
+          throw apiErr;
+        }
+
+        if (onProgress) onProgress(5);
+        let out = '';
+        let lastReportedPercent = 0;
+        let finalUsage = null;
+        try {
+          for await (const chunk of stream) {
+            if (chunk.usage) {
+              finalUsage = chunk.usage;
+            }
+            const content = chunk.choices[0]?.delta?.content || "";
+            if (content) {
+              out += content;
+              const percent = Math.min(Math.round((out.length / expectedChars) * 75) + 5, 80);
+              if (onProgress && percent !== lastReportedPercent) {
+                onProgress(percent);
+                lastReportedPercent = percent;
+              }
+            }
+          }
+        } catch (streamErr) {
+          console.error(`[${new Date().toISOString()}] [GERAR_SITE_VITE] ⚠️ ERRO DURANTE STREAM DEEPSEEK (${label}):`, streamErr.message);
+          throw streamErr;
+        }
+
+        const inputTokens = finalUsage?.prompt_tokens ?? Math.round((systemText.length + userContent.length) / 4);
+        const outputTokens = finalUsage?.completion_tokens ?? Math.round(out.length / 4);
+        console.log(`[${new Date().toISOString()}] [GERAR_SITE_VITE] 📊 Tokens DeepSeek: input=${inputTokens} output=${outputTokens}`);
+        await uso_creditos(userId, inputTokens + outputTokens, inputTokens + outputTokens, id_projeto);
+        return out;
+      };
+
       // Chamada com streaming; o system vai com cache_control (releituras ~90% mais baratas)
       const streamClaude = async (systemText, userContent, maxTok, label, modelo = MODELO) => {
         console.log(`[${new Date().toISOString()}] [GERAR_SITE_VITE] 🧠 Chamando Claude API (${label}) | modelo: ${modelo} | max_tokens: ${maxTok}`);
@@ -610,10 +669,23 @@ export default function App() {
         return out;
       };
 
+      // A CRIAÇÃO sempre usa Claude (não alterada).
+      // A EDIÇÃO permite escolher no .env: AI_PROVIDER_EDICAO='deepseek' ou 'claude'
+      const providerEdicao = (process.env.AI_PROVIDER_EDICAO || 'deepseek').toLowerCase();
+      const isUsingDeepSeekEdicao = (providerEdicao === 'deepseek');
+
+      // Wrapper para EDIÇÃO (DeepSeek ou Claude conforme AI_PROVIDER_EDICAO)
+      const streamAI = async (systemText, userContent, maxTok, label, modelo = MODELO_EDICAO) => {
+        if (isUsingDeepSeekEdicao) {
+          return await streamDeepSeek(systemText, userContent, maxTok, label);
+        }
+        return await streamClaude(systemText, userContent, maxTok, label, modelo);
+      };
+
       let editadoPorBlocos = false;
       if (isEditing && !isLegacyHTML) {
         try {
-          const resp = await streamClaude(systemPromptBlocos, promptProcessado, 16000, 'edição por blocos (Haiku)', MODELO_EDICAO);
+          const resp = await streamAI(systemPromptBlocos, promptProcessado, 16000, 'edição por blocos', MODELO_EDICAO);
           const blocks = parseEditBlocks(resp);
           if (blocks.length > 0) {
             const r = applyEditBlocks(baseHTML, blocks);
@@ -644,7 +716,7 @@ Copie EXATAMENTE 3 a 5 linhas do código original no SEARCH como âncora.
 Se estiver criando ou clonando página, procure por "const routes =" e insira a nova função de página antes dele e registre a rota.
 Pedido do usuário: ${promptProcessado}`;
 
-            const retryResp = await streamClaude(systemPromptBlocos, retryPrompt, 16000, 'edição cirúrgica retry', MODELO_EDICAO);
+            const retryResp = await streamAI(systemPromptBlocos, retryPrompt, 16000, 'edição cirúrgica retry', MODELO_EDICAO);
             const retryBlocks = parseEditBlocks(retryResp);
             if (retryBlocks.length > 0) {
               const r2 = applyEditBlocks(baseHTML, retryBlocks);
@@ -667,12 +739,23 @@ Pedido do usuário: ${promptProcessado}`;
             throw errGigante;
           }
 
-          reactCode = await streamClaude(
-            systemPrompt,
-            isEditing ? promptProcessado : "Crie o componente React conforme solicitado: " + promptProcessado,
-            maxTokens,
-            isEditing ? 'edição completa' : 'criação'
-          );
+          if (isEditing) {
+            // Edição completa usa streamAI (DeepSeek ou Claude conforme AI_PROVIDER_EDICAO)
+            reactCode = await streamAI(
+              systemPrompt,
+              promptProcessado,
+              maxTokens,
+              'edição completa'
+            );
+          } else {
+            // CRIAÇÃO: Mantém 100% no Claude
+            reactCode = await streamClaude(
+              systemPrompt,
+              "Crie o componente React conforme solicitado: " + promptProcessado,
+              maxTokens,
+              'criação'
+            );
+          }
         }
       }
     }

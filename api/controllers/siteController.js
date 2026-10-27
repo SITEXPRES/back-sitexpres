@@ -2,6 +2,7 @@ import * as cheerio from 'cheerio';
 import pool from "../config/db.js";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { v4 as uuidv4 } from "uuid";
 import fs from "fs/promises";
 import fsSync from "fs";
@@ -106,9 +107,13 @@ export function detectarIntencaoPromax(prompt, metadata = null, tipoProjeto = nu
 // ⚠️ REMOVIDO: import { console, url } from "inspector" — esse import sobrescrevia o console global e suprimia os logs no terminal!
 
 const anthropic = new Anthropic({
-  apiKey: process.env.CLAUDE_API_KEY,
+  apiKey: process.env.CLAUDE_API_KEY || "dummy_claude",
 });
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const deepseek = new OpenAI({
+  baseURL: "https://api.deepseek.com",
+  apiKey: process.env.DEEPSEEK_API_KEY || "dummy_deepseek",
+});
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "dummy_gemini");
 const USE_GEMINI = false;
 
 //
@@ -430,10 +435,7 @@ export const newsite = async (req, res) => {
 `;
               }
 
-              const intentResp = await anthropic.messages.create({
-                model: "claude-haiku-4-5-20251001",
-                max_tokens: 650,
-                system: `Você é o assistente técnico virtual da Sitexpres. Avalie a mensagem do usuário dentro do contexto da conversa:
+              const systemIntentPrompt = `Você é o assistente técnico virtual da Sitexpres. Avalie a mensagem do usuário dentro do contexto da conversa:
 
 1. Se for PERGUNTA, DÚVIDA INFORMATIVA ou RESPOSTA CONVERSACIONAL / CONFIRMAÇÃO (ex: "Sim", "Não", "Ok", "Beleza", "Entendido", "Pode ser", "Combinado", "Vou mandar", "Obrigado", "Bom dia", ou qualquer resposta concordando/conversando sem conter instruções concretas de código):
    - Responda EXATAMENTE com [PERGUNTA] seguido de uma resposta amigável, natural e prestativa no contexto do chat (sempre comece com um emoji).
@@ -443,16 +445,40 @@ export const newsite = async (req, res) => {
 ${REGRAS_SEGURANCA_SYSTEM_PROMPT}
 
 2. Se for uma MODIFICAÇÃO REAL no site/sistema (ex: "mude a cor", "adicione botão", "troque o texto X por Y", "remova o rodapé", "insira a foto", "coloque a imagem abaixo da localização"):
-   - Responda EXATAMENTE com [MODIFICACAO].`,
-                messages: [
-                  ...chatHistory,
-                  {
-                    role: "user",
-                    content: `[CÓDIGO ATUAL DO SITE PARA REFERÊNCIA]\n\`\`\`html\n${baseHTML ? baseHTML.substring(0, 30000) : "Nenhum código ainda"}\n\`\`\`\n\nO usuário diz: ${prompt}`
-                  }
-                ]
-              });
-              const intentText = intentResp.content[0].text.trim();
+   - Responda EXATAMENTE com [MODIFICACAO].`;
+
+              const isUsingDeepSeek = (process.env.AI_PROVIDER || (process.env.USE_DEEPSEEK === 'true' ? 'deepseek' : 'claude')).toLowerCase() === 'deepseek';
+              let intentText = "";
+
+              if (isUsingDeepSeek) {
+                const deepIntentResp = await deepseek.chat.completions.create({
+                  model: "deepseek-chat",
+                  max_tokens: 650,
+                  messages: [
+                    { role: "system", content: systemIntentPrompt },
+                    ...chatHistory.map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) })),
+                    {
+                      role: "user",
+                      content: `[CÓDIGO ATUAL DO SITE PARA REFERÊNCIA]\n\`\`\`html\n${baseHTML ? baseHTML.substring(0, 30000) : "Nenhum código ainda"}\n\`\`\`\n\nO usuário diz: ${prompt}`
+                    }
+                  ]
+                });
+                intentText = deepIntentResp.choices[0]?.message?.content?.trim() || "";
+              } else {
+                const intentResp = await anthropic.messages.create({
+                  model: "claude-haiku-4-5-20251001",
+                  max_tokens: 650,
+                  system: systemIntentPrompt,
+                  messages: [
+                    ...chatHistory,
+                    {
+                      role: "user",
+                      content: `[CÓDIGO ATUAL DO SITE PARA REFERÊNCIA]\n\`\`\`html\n${baseHTML ? baseHTML.substring(0, 30000) : "Nenhum código ainda"}\n\`\`\`\n\nO usuário diz: ${prompt}`
+                    }
+                  ]
+                });
+                intentText = intentResp.content[0].text.trim();
+              }
               if (intentText.startsWith("[PERGUNTA]")) {
                 isQuestionOnly = true;
                 questionAnswer = sanitizarRespostaSeguranca(intentText.replace("[PERGUNTA]", "").trim());
@@ -627,7 +653,10 @@ Suas alterações${anexosMsg} foram aplicadas diretamente no container da sua ap
               console.error("[PROMAX] ⚠️ Erro ao descontar créditos:", credErr.message);
             }
           } else {
-            const nomeModeloIa = baseHTML ? 'Claude Haiku' : 'Claude Sonnet 5.5';
+            const isUsingDeepSeekEdicao = !primeiraVez && ((process.env.AI_PROVIDER_EDICAO || 'deepseek').toLowerCase() === 'deepseek');
+            const nomeModeloIa = primeiraVez
+              ? 'Claude Sonnet 5.5'
+              : (isUsingDeepSeekEdicao ? 'DeepSeek V3 (deepseek-chat)' : 'Claude Haiku');
             logStep(jobId, `🤖 Enviando prompt para a IA (${nomeModeloIa})... aguarde`);
             const tIA = Date.now();
             geracaoResult = await gerar_site(
@@ -891,19 +920,36 @@ ${html}
                 const attachmentsNote = uploadedFiles.length > 0
                   ? `\n[ARQUIVOS/IMAGENS RECEBIDOS E APLICADOS NO CÓDIGO: ${uploadedFiles.map(f => `"${f.originalname}" (caminho: /images/${f.filename})`).join(', ')}]`
                   : "";
-                const aiResp = await anthropic.messages.create({
-                  model: "claude-haiku-4-5-20251001",
-                  max_tokens: 250,
-                  system: `Você é o assistente virtual da Sitexpres, amigável e proativo. Informe de forma clara e objetiva o que você acabou de alterar no site dele com base ESTRITAMENTE no pedido atual do usuário ("${prompt}"), usando entre 20 a 40 palavras, e convide-o a conferir o resultado.${uploadedFiles.length > 0 ? ' ATENÇÃO CRÍTICA: O usuário enviou imagem(ns)/arquivo(s) que foram processados e aplicados com sucesso! Confirme expressamente a inclusão/atualização da(s) imagem(ns) no site. NUNCA diga que não recebeu, que não visualizou ou peça para enviar novamente!' : ''} NUNCA mencione alterações antigas (como favicon, logo, rodapé) a menos que o usuário tenha pedido especificamente isso no pedido atual! Sempre comece com um emoji.`,
-                  messages: [
-                    ...chatHistory,
-                    {
-                      role: "user",
-                      content: `[CÓDIGO NOVO GERADO PARA O SITE]\n\`\`\`html\n${html ? html.substring(0, 30000) : "Nenhum código"}\n\`\`\`\n\nO usuário pediu: ${prompt}${attachmentsNote}`
-                    }
-                  ]
-                });
-                assistantMessage = aiResp.content[0].text;
+                const isUsingDeepSeek = (process.env.AI_PROVIDER || (process.env.USE_DEEPSEEK === 'true' ? 'deepseek' : 'claude')).toLowerCase() === 'deepseek';
+                const assistantSystemPrompt = `Você é o assistente virtual da Sitexpres, amigável e proativo. Informe de forma clara e objetiva o que você acabou de alterar no site dele com base ESTRITAMENTE no pedido atual do usuário ("${prompt}"), usando entre 20 a 40 palavras, e convide-o a conferir o resultado.${uploadedFiles.length > 0 ? ' ATENÇÃO CRÍTICA: O usuário enviou imagem(ns)/arquivo(s) que foram processados e aplicados com sucesso! Confirme expressamente a inclusão/atualização da(s) imagem(ns) no site. NUNCA diga que não recebeu, que não visualizou ou peça para enviar novamente!' : ''} NUNCA mencione alterações antigas (como favicon, logo, rodapé) a menos que o usuário tenha pedido especificamente isso no pedido atual! Sempre comece com um emoji.`;
+                const assistantUserContent = `[CÓDIGO NOVO GERADO PARA O SITE]\n\`\`\`html\n${html ? html.substring(0, 30000) : "Nenhum código"}\n\`\`\`\n\nO usuário pediu: ${prompt}${attachmentsNote}`;
+
+                if (isUsingDeepSeek) {
+                  const deepAiResp = await deepseek.chat.completions.create({
+                    model: "deepseek-chat",
+                    max_tokens: 250,
+                    messages: [
+                      { role: "system", content: assistantSystemPrompt },
+                      ...chatHistory.map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) })),
+                      { role: "user", content: assistantUserContent }
+                    ]
+                  });
+                  assistantMessage = deepAiResp.choices[0]?.message?.content || "";
+                } else {
+                  const aiResp = await anthropic.messages.create({
+                    model: "claude-haiku-4-5-20251001",
+                    max_tokens: 250,
+                    system: assistantSystemPrompt,
+                    messages: [
+                      ...chatHistory,
+                      {
+                        role: "user",
+                        content: assistantUserContent
+                      }
+                    ]
+                  });
+                  assistantMessage = aiResp.content[0].text;
+                }
               }
             } catch (err) {
               console.error("Erro ao gerar mensagem com Haiku", err);
