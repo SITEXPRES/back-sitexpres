@@ -1242,23 +1242,44 @@ export const getSites = async (req, res) => {
        [req.userId]
      ); */
     const result = await pool.query(
-      `SELECT DISTINCT ON (id_projeto)
-            id,
-            name,
-            prompt,
-            views,
-            created_at,
-            html_content,
-            subdominio,
-            id_projeto
-        FROM generated_sites
-        WHERE user_id = $1
-        AND status = $2
-        ORDER BY id_projeto, created_at DESC`,
+      `SELECT DISTINCT ON (g.id_projeto)
+            g.id,
+            g.name,
+            g.prompt,
+            g.views,
+            g.created_at,
+            g.html_content,
+            g.subdominio,
+            g.id_projeto,
+            s.metadata
+        FROM generated_sites g
+        LEFT JOIN (
+            SELECT DISTINCT ON (id_projeto) id_projeto, metadata 
+            FROM public.sites 
+            ORDER BY id_projeto, id DESC
+        ) s ON s.id_projeto = g.id_projeto
+        WHERE g.user_id = $1
+        AND g.status = $2
+        ORDER BY g.id_projeto, g.created_at DESC`,
       [req.userId, 'ativo']
     );
 
-    res.json({ success: true, sites: result.rows });
+    const sitesWithPromax = result.rows.map(row => {
+      let is_promax = false;
+      if (row.metadata) {
+        try {
+          const meta = typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata;
+          is_promax = !!meta?.is_promax;
+        } catch (e) {}
+      }
+      const { metadata, ...rest } = row;
+      return {
+        ...rest,
+        is_promax
+      };
+    });
+
+    res.json({ success: true, sites: sitesWithPromax });
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: "Erro ao buscar sites" });
