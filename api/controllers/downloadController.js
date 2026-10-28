@@ -1,5 +1,8 @@
-import fs from "fs";
+import "dotenv/config";
+import fsSync from "fs";
+import fs from "fs/promises";
 import path from "path";
+import ftp from "basic-ftp";
 import pool from "../config/db.js";
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
@@ -26,7 +29,7 @@ export const downloadSite = async (req, res) => {
   const tipo = (req.query.tipo || req.query.type || 'vps').toLowerCase(); // 'hospedagem' ou 'vps'
 
   try {
-    // 1. Busca dados do site no banco
+    // 1. Busca dados do site no banco (suporta id_projeto, subdominio ou ID numérico)
     const siteRes = await pool.query(
       `SELECT g.html_content, g.js_content, g.name, g.id_projeto, g.subdominio, s.metadata
        FROM generated_sites g
@@ -35,7 +38,7 @@ export const downloadSite = async (req, res) => {
          FROM public.sites 
          ORDER BY id_projeto, id DESC
        ) s ON s.id_projeto = g.id_projeto
-       WHERE g.id_projeto = $1 AND g.status = 'ativo' 
+       WHERE (g.id_projeto = $1 OR g.subdominio = $1 OR g.id::text = $1) AND g.status = 'ativo' 
        ORDER BY g.created_at DESC LIMIT 1`,
       [id]
     );
@@ -68,7 +71,90 @@ export const downloadSite = async (req, res) => {
         });
       }
 
-      // Empacota o html_content sanitizado + todas as imagens (locais e remotas) + .htaccess
+      // 1. Tenta baixar a árvore completa (rotas de SEO, assets, images, etc.) diretamente do DirectAdmin
+      const subdominioCompleto = subdominio ? (subdominio.includes('.') ? subdominio : `${subdominio}.sitexpres.com.br`) : null;
+      let baixouDoDirectAdmin = false;
+
+      if (subdominioCompleto) {
+        const tmpDir = path.join(process.cwd(), "tmp", `da_download_${Date.now()}_${Math.random().toString(36).substring(7)}`);
+        const ftpHosts = ["ftp.sitexpres.com.br", "srv3br.com.br"];
+
+        try {
+          const existeHosp = await pool.query(`SELECT * FROM hospedagens WHERE id_projeto = $1 LIMIT 1`, [id]);
+          let ftpUser = process.env.user_directamin || "sitexpres";
+          let ftpPass = process.env.pass_directamin || "SNLBvZykJcyXzgCZD7u3";
+          let remoteDir = `/domains/${subdominioCompleto}/public_html`;
+
+          if (existeHosp.rows.length > 0) {
+            ftpUser = existeHosp.rows[0].username || ftpUser;
+            ftpPass = existeHosp.rows[0].senha || ftpPass;
+            if (existeHosp.rows[0].dominio) {
+              remoteDir = `/domains/${existeHosp.rows[0].dominio}/public_html`;
+            }
+          }
+
+          if (!fsSync.existsSync(tmpDir)) {
+            await fs.mkdir(tmpDir, { recursive: true });
+          }
+
+          for (const host of ftpHosts) {
+            const clientFTP = new ftp.Client();
+            clientFTP.ftp.verbose = false;
+            clientFTP.ftp.timeout = 25000;
+            try {
+              await clientFTP.access({
+                host,
+                user: ftpUser,
+                password: ftpPass,
+                secure: false
+              });
+
+              await clientFTP.downloadToDir(tmpDir, remoteDir);
+
+              const arquivosBaixados = await fs.readdir(tmpDir);
+              if (arquivosBaixados.length > 0) {
+                res.attachment(`${safeName}-hospedagem.zip`);
+                const archive = getArchiverInstance();
+                archive.pipe(res);
+
+                // Empacota toda a árvore de diretórios exatamente igual ao gerenciador de arquivos do DirectAdmin!
+                archive.directory(tmpDir, false);
+
+                const readmeHospedagem = `ARQUIVOS PARA HOSPEDAGEM (DirectAdmin / cPanel / Apache / Nginx)
+================================================================
+1. Acesse o Gerenciador de Arquivos do DirectAdmin ou cPanel.
+2. Abra a pasta "public_html" do seu domínio.
+3. Envie este arquivo ZIP e descompacte (Extract).
+4. Todas as páginas, rotas de SEO, imagens e assets estão inclusos exatamente como no servidor.
+5. Seu site estará funcionando imediatamente com nota máxima de SEO!
+`;
+                archive.append(readmeHospedagem, { name: "LEIA-ME-HOSPEDAGEM.txt" });
+
+                await archive.finalize();
+                baixouDoDirectAdmin = true;
+                clientFTP.close();
+                break;
+              }
+            } catch (errHost) {
+              console.warn(`⚠️ Tentativa FTP no host ${host} falhou:`, errHost.message);
+            } finally {
+              clientFTP.close();
+            }
+          }
+        } catch (ftpErr) {
+          console.warn("⚠️ Aviso ao sincronizar via FTP do DirectAdmin:", ftpErr.message);
+        } finally {
+          if (fsSync.existsSync(tmpDir)) {
+            await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+          }
+        }
+
+        if (baixouDoDirectAdmin) {
+          return;
+        }
+      }
+
+      // Fallback: se não conseguir conectar ao FTP, empacota o html_content sanitizado + todas as imagens + .htaccess
       res.attachment(`${safeName}-hospedagem.zip`);
       const archive = getArchiverInstance();
       archive.pipe(res);
