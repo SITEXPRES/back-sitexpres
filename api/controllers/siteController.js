@@ -8,6 +8,7 @@ import fs from "fs/promises";
 import fsSync from "fs";
 import path from "path";
 import axios from "axios";
+import https from "https";
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 const archiver = require("archiver");
@@ -840,8 +841,12 @@ ${html}
         loader.classList.add('hidden');
       }
 
+      // Já inicia o carregamento no frame imediatamente
+      frame.src = targetUrl;
+      frame.addEventListener('load', () => setTimeout(revealSite, 300));
+
       let attempts = 0;
-      const maxAttempts = 30;
+      const maxAttempts = 6;
 
       async function verificarEExibir() {
         if (isLoaded) return;
@@ -856,8 +861,7 @@ ${html}
             if (titleEl) titleEl.innerText = "Site pronto! Renderizando...";
             if (subEl) subEl.innerText = "Sincronização concluída com sucesso.";
             frame.src = targetUrl;
-            frame.addEventListener('load', () => setTimeout(revealSite, 300));
-            setTimeout(revealSite, 2500);
+            setTimeout(revealSite, 400);
             return;
           }
         } catch (e) {
@@ -868,8 +872,7 @@ ${html}
               const text = (await direct.text()).toLowerCase();
               if (!text.includes('functioning normally') && (text.includes('<html') || text.includes('<!doctype') || text.includes('root') || text.includes('<body') || isPromax)) {
                 frame.src = targetUrl;
-                frame.addEventListener('load', () => setTimeout(revealSite, 300));
-                setTimeout(revealSite, 2500);
+                setTimeout(revealSite, 400);
                 return;
               }
             }
@@ -880,7 +883,7 @@ ${html}
           setTimeout(verificarEExibir, 1000);
         } else {
           frame.src = targetUrl;
-          setTimeout(revealSite, 1000);
+          setTimeout(revealSite, 500);
         }
       }
 
@@ -1251,13 +1254,20 @@ export const getSites = async (req, res) => {
             g.html_content,
             g.subdominio,
             g.id_projeto,
-            s.metadata
+            s.metadata,
+            s.site_url,
+            h.dominio as custom_dominio
         FROM generated_sites g
         LEFT JOIN (
-            SELECT DISTINCT ON (id_projeto) id_projeto, metadata 
+            SELECT DISTINCT ON (id_projeto) id_projeto, metadata, site_url 
             FROM public.sites 
             ORDER BY id_projeto, id DESC
         ) s ON s.id_projeto = g.id_projeto
+        LEFT JOIN (
+            SELECT DISTINCT ON (id_projeto) id_projeto, dominio 
+            FROM public.hospedagens 
+            ORDER BY id_projeto, id DESC
+        ) h ON h.id_projeto = g.id_projeto
         WHERE g.user_id = $1
         AND g.status = $2
         ORDER BY g.id_projeto, g.created_at DESC`,
@@ -1272,9 +1282,34 @@ export const getSites = async (req, res) => {
           is_promax = !!meta?.is_promax;
         } catch (e) {}
       }
-      const { metadata, ...rest } = row;
+
+      // Se o site possui um domínio oficial próprio cadastrado em hospedagens ou sites
+      let customUrl = null;
+      if (row.custom_dominio) {
+        customUrl = `https://${row.custom_dominio}`;
+      } else if (row.site_url && !row.site_url.includes('.sitexpres.com.br')) {
+        customUrl = row.site_url;
+      }
+
+      let updatedHtml = row.html_content;
+      if (customUrl && updatedHtml) {
+        // Substitui URLs antigas no preview para o novo domínio oficial
+        updatedHtml = updatedHtml
+          .replace(/data-src="https?:\/\/[^"]+"/g, `data-src="${customUrl}"`)
+          .replace(/const targetUrl = "https?:\/\/[^"]+";/g, `const targetUrl = "${customUrl}";`);
+      }
+
+      // Se o site já tem mais de 45 segundos de criado, reduz drasticamente o tempo de espera do loader
+      if (updatedHtml && row.created_at && (Date.now() - new Date(row.created_at).getTime() > 45000)) {
+        updatedHtml = updatedHtml
+          .replace('const maxAttempts = 30;', 'const maxAttempts = 2;')
+          .replace('const maxAttempts = 6;', 'const maxAttempts = 2;');
+      }
+
+      const { metadata, custom_dominio, site_url, ...rest } = row;
       return {
         ...rest,
+        html_content: updatedHtml,
         is_promax
       };
     });
@@ -1990,13 +2025,34 @@ export const verifySiteReady = async (req, res) => {
 
     try {
       const parsed = new URL(targetUrl);
-      const host = parsed.hostname;
-      const isAllowedHost =
+      const host = parsed.hostname.toLowerCase();
+      let isAllowedHost =
         host.endsWith('.sitexpres.com.br') ||
         host === 'sitexpres.com.br' ||
         host === '143.208.9.235' ||
         host === '143.208.8.36' ||
         host === 'localhost';
+
+      if (!isAllowedHost) {
+        // Verifica se é um domínio personalizado cadastrado na tabela hospedagens ou sites
+        const cleanHost = host.replace(/^www\./, '');
+        try {
+          const checkHost = await pool.query(
+            `SELECT 1 FROM hospedagens WHERE LOWER(dominio) = $1 OR LOWER(dominio) = $2
+             UNION
+             SELECT 1 FROM sites WHERE site_url ILIKE $3
+             LIMIT 1`,
+            [cleanHost, host, `%${cleanHost}%`]
+          );
+          if (checkHost.rows.length > 0) {
+            isAllowedHost = true;
+          }
+        } catch (dbHostErr) {
+          console.warn('Erro ao verificar domínio na tabela hospedagens/sites:', dbHostErr.message);
+          // Em caso de falha de consulta no banco, autoriza se for um host válido para não bloquear o preview
+          isAllowedHost = true;
+        }
+      }
 
       if (!isAllowedHost) {
         return res.status(403).json({ success: false, ready: false, message: 'Host não autorizado' });
@@ -2009,6 +2065,8 @@ export const verifySiteReady = async (req, res) => {
     const response = await axios.get(probeUrl, {
       timeout: 3000,
       validateStatus: () => true,
+      maxRedirects: 5,
+      httpsAgent: new https.Agent({ rejectUnauthorized: false }),
       headers: {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',

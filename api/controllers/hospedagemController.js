@@ -286,6 +286,25 @@ async function publicarProjetoHospedagem(username, senha, dominio, id_projeto, c
         [`https://${dominio}`, id_projeto]
     );
 
+    // Atualiza também o html_content no generated_sites para o novo domínio próprio
+    try {
+        const genSiteRes = await client.query(
+            `SELECT id, html_content FROM generated_sites WHERE id_projeto = $1 ORDER BY created_at DESC LIMIT 1`,
+            [id_projeto]
+        );
+        if (genSiteRes.rows.length > 0 && genSiteRes.rows[0].html_content) {
+            const updatedHtml = genSiteRes.rows[0].html_content
+                .replace(/data-src="https?:\/\/[^"]+"/g, `data-src="https://${dominio}"`)
+                .replace(/const targetUrl = "https?:\/\/[^"]+";/g, `const targetUrl = "https://${dominio}";`);
+            await client.query(
+                `UPDATE generated_sites SET html_content = $1 WHERE id = $2`,
+                [updatedHtml, genSiteRes.rows[0].id]
+            );
+        }
+    } catch (updateHtmlErr) {
+        console.error('Erro ao atualizar html_content para o domínio próprio:', updateHtmlErr.message);
+    }
+
     return { success: uploadSuccess };
 }
 
