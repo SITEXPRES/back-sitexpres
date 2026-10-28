@@ -28,7 +28,7 @@ export const downloadSite = async (req, res) => {
   try {
     // 1. Busca dados do site no banco
     const siteRes = await pool.query(
-      `SELECT g.html_content, g.js_content, g.name, g.id_projeto, s.metadata
+      `SELECT g.html_content, g.js_content, g.name, g.id_projeto, g.subdominio, s.metadata
        FROM generated_sites g
        LEFT JOIN (
          SELECT DISTINCT ON (id_projeto) id_projeto, metadata 
@@ -44,7 +44,7 @@ export const downloadSite = async (req, res) => {
       return res.status(404).json({ success: false, message: "Site não encontrado para download" });
     }
 
-    const { html_content, js_content, name } = siteRes.rows[0];
+    const { html_content, js_content, name, subdominio } = siteRes.rows[0];
     let isPromax = false;
     if (siteRes.rows[0].metadata) {
       try {
@@ -68,19 +68,13 @@ export const downloadSite = async (req, res) => {
         });
       }
 
-      // Se já temos o ZIP compilado do distPath gerado no deploy
-      const zipDistPath = path.join(process.cwd(), 'uploads', 'zips', `${id}.zip`);
-      if (fs.existsSync(zipDistPath)) {
-        return res.download(zipDistPath, `${safeName}-hospedagem.zip`);
-      }
-
-      // Fallback: se não tiver o zip compilado em disco, empacota o html_content + images + .htaccess
+      // Empacota o html_content sanitizado + todas as imagens (locais e remotas) + .htaccess
       res.attachment(`${safeName}-hospedagem.zip`);
       const archive = getArchiverInstance();
       archive.pipe(res);
 
       const html = desatrelarHtmlSitexpress(html_content);
-      const arquivosExtras = await coletarArquivosProjeto(id, html, null, pool);
+      const arquivosExtras = await coletarArquivosProjeto(id, html, null, pool, subdominio);
 
       archive.append(html, { name: "index.html" });
 
@@ -101,13 +95,18 @@ export const downloadSite = async (req, res) => {
 1. Acesse o Gerenciador de Arquivos do DirectAdmin ou cPanel.
 2. Abra a pasta "public_html" do seu domínio.
 3. Envie este arquivo ZIP e descompacte (Extract).
-4. Seu site estará funcionando imediatamente!
+4. Todas as imagens estão inclusas na pasta "images/".
+5. Seu site estará funcionando imediatamente!
 `;
       archive.append(readmeHospedagem, { name: "LEIA-ME-HOSPEDAGEM.txt" });
 
       if (Array.isArray(arquivosExtras)) {
         for (const arq of arquivosExtras) {
-          archive.file(arq.localPath, { name: `images/${arq.remoteName}` });
+          if (arq.localPath) {
+            archive.file(arq.localPath, { name: `images/${arq.remoteName}` });
+          } else if (arq.buffer) {
+            archive.append(arq.buffer, { name: `images/${arq.remoteName}` });
+          }
         }
       }
 
@@ -214,10 +213,14 @@ COMO RODAR LOCALMENTE NO COMPUTADOR (DESENVOLVIMENTO):
       archive.append(readmeVps, { name: "LEIA-ME-VPS.txt" });
 
       const html = desatrelarHtmlSitexpress(html_content);
-      const arquivosExtras = await coletarArquivosProjeto(id, html, null, pool);
+      const arquivosExtras = await coletarArquivosProjeto(id, html, null, pool, subdominio);
       if (Array.isArray(arquivosExtras)) {
         for (const arq of arquivosExtras) {
-          archive.file(arq.localPath, { name: `public/images/${arq.remoteName}` });
+          if (arq.localPath) {
+            archive.file(arq.localPath, { name: `public/images/${arq.remoteName}` });
+          } else if (arq.buffer) {
+            archive.append(arq.buffer, { name: `public/images/${arq.remoteName}` });
+          }
         }
       }
     }
