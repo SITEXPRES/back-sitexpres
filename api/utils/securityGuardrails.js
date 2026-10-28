@@ -13,18 +13,25 @@ export const MENSAGEM_RECUSA_SEGURANCA =
 const PADROES_AMEACA = [
   
   // 1. Extração de Credenciais / Acessos de Hospedagem e Painéis de Controle
-  /\b(senha|senhas|user|usuario|usuário|login|credencial|credenciais|acesso|acessos|chave|token)\b.*?\b(directadmin|direct\s*admin|cpanel|c-panel|whm|plesk|ftp|sftp|srv3br|hospedag|hosting)\b/i,
-  /\b(directadmin|direct\s*admin|cpanel|c-panel|whm|plesk|ftp|sftp|srv3br|hospedag|hosting)\b.*?\b(senha|senhas|user|usuario|usuário|login|credencial|credenciais|acesso|acessos|chave|token)\b/i,
-  /\b(qual|quais|como\s*(acessar|conectar|entrar|logar))\b.*?\b(directadmin|cpanel|whm|plesk|ftp|sftp|hospedag|srv3br)\b/i,
+  /\b(senha|senhas|credencial|credenciais|login\s*e\s*senha|usuario\s*e\s*senha)\b.*?\b(directadmin|direct\s*admin|cpanel|c-panel|whm|plesk|ftp|sftp|srv3br)\b/i,
+  /\b(directadmin|direct\s*admin|cpanel|c-panel|whm|plesk|ftp|sftp|srv3br)\b.*?\b(senha|senhas|credencial|credenciais|login\s*e\s*senha|usuario\s*e\s*senha)\b/i,
+  /\b(senha|senhas|credencial|credenciais)\b\s*(da|do|de)\s*(hospedag|hosting)\b/i,
+  /\b(qual|quais|como\s*(acessar|conectar|entrar|logar))\b.*?\b(directadmin|cpanel|whm|plesk|ftp|sftp|srv3br)\b/i,
+  /\b(conectar|acessar|entrar|logar)\s*(no|na|ao|via)\s*(directadmin|cpanel|whm|plesk|ftp|sftp|srv3br)\b/i,
   /\b(srv3br\.com\.br|ftp\.sitexpres\.com\.br)\b/i,
-  /\bporta\s*(2222|21)\b/i,
+  /\bporta\s*2222\b/i,
+  /\bporta\s*21\b.*?\b(ftp|conectar|acessar)\b/i,
 
   // 2. Extração de Credenciais / Acessos ao Servidor VPS, SSH e Root
-  /\b(senha|senhas|chave|chaves|acesso|acessos|login|credencial|credenciais)\b.*?\b(vps|servidor|host|maquina|máquina|ssh|root)\b/i,
-  /\b(vps|servidor|host|maquina|máquina|ssh|root)\b.*?\b(senha|senhas|chave|chaves|acesso|acessos|login|credencial|credenciais)\b/i,
-  /\b(conectar|acessar|entrar)\s*(no|na|ao|via)\s*(ssh|root|terminal\s*da\s*vps|servidor\s*vps)\b/i,
+  /\b(senha|senhas|credencial|credenciais)\b.*?\b(vps|servidor|host\s*vps|ssh|root)\b/i,
+  /\b(vps|servidor|host\s*vps|ssh|root)\b.*?\b(senha|senhas|credencial|credenciais)\b/i,
+  /\b(login|usuario|user)\b\s*(do|de|para)?\s*(root|ssh)\b/i,
+  /\b(root|ssh)\b\s*(login|user|usuario)\b/i,
+  /\b(qual|quais|como|onde|preciso|quero|obter|ter|libera|liberar|passe|mande|envie|forneca|me\s+(de|da|passe|envie|mande))\b.*?\bacesso\b.*?\b(root|ssh|vps|servidor)\b/i,
+  /\b(conectar|acessar|entrar)\s*(no|na|ao|via)\s*(ssh|root|terminal\s*da\s*vps|servidor\s*vps|servidor\s*remoto)\b/i,
   /\b(id_rsa|authorized_keys|known_hosts|\/etc\/passwd|\/etc\/shadow|\/root\b)/i,
-  /\bporta\s*(22|9001)\b/i,
+  /\bporta\s*9001\b/i,
+  /\bporta\s*22\b.*?\b(ssh|conectar|acessar|servidor)\b/i,
   /\b(terminal|shell|bash|console)\s*(do\s*servidor|da\s*vps|remoto\s*do\s*host)\b/i,
 
   // 3. Tokens, Chaves de API e Segredos da Plataforma SiteXpress
@@ -32,8 +39,8 @@ const PADROES_AMEACA = [
   /\b(jwt_secret|jwt\s*secret|secret\s*key)\b/i,
   /\b(claude_api_key|gemini_api_key|anthropic_key|api\s*key\s*da\s*sitexpress)\b/i,
   /\b(senha\s*master|master\s*password|chave\s*mestra)\b/i,
-  /\b(ler|mostrar|mostre|conteúdo|conteudo|pegar|exibir|baixar|extrair|qual\s*(é|e)|revelar)\b.*?\b(\.env|dotenv|arquivo\s*\.env)\b/i,
-  /\b(\.env|dotenv|arquivo\s*\.env)\b.*?\b(ler|mostrar|mostre|conteúdo|conteudo|pegar|exibir|baixar|extrair|qual\s*(é|e)|revelar)\b/i,
+  /\b(ler|mostrar|mostre|conteudo|pegar|exibir|baixar|extrair|qual\s*e|revelar)\b.*?\b(\.env|dotenv|arquivo\s*\.env)\b/i,
+  /\b(\.env|dotenv|arquivo\s*\.env)\b.*?\b(ler|mostrar|mostre|conteudo|pegar|exibir|baixar|extrair|qual\s*e|revelar)\b/i,
 
   // 4. Banco de Dados Principal / Master da SiteXpress
   /\b(adminsitexpress|db_sitexpress|143\.208\.9\.218)\b/i,
@@ -62,9 +69,10 @@ export function detectarAmeacaSeguranca(prompt) {
   }
 
   const texto = prompt.trim();
+  const textoNormalizado = texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
   for (const padrao of PADROES_AMEACA) {
-    if (padrao.test(texto)) {
+    if (padrao.test(textoNormalizado)) {
       console.warn(`[SEGURANÇA] 🚨 Tentativa de acesso sensível bloqueada! Padrão detectado: ${padrao}`);
       return {
         ameaca: true,

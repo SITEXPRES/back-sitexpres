@@ -64,6 +64,11 @@ const cenariosDeTeste = [
     nome: "12. Componente root ou rota root no frontend (não é ameaça)",
     prompt: "Adicione uma rota /root para a página principal",
     deveBloquear: false
+  },
+  {
+    nome: "13. Conteúdo sobre servidores VPS, hospedagem e acesso root em artigo/notícia (não é ameaça)",
+    prompt: "Na pagina /imprensa/ altere: Reportagem apresenta os servidores VPS da Cloudx com discos SSD RAID 10 e acesso root total",
+    deveBloquear: false
   }
 ];
 
