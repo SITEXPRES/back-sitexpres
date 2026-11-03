@@ -888,6 +888,34 @@ export const criarCobrancaUnica = async (req, res) => {
         });
     }
 
+    // Garantir valor no formato decimal correto (duas casas decimais)
+    const valorFormatado = valorNumerico.toFixed(2);
+
+    // Identificar documento (CPF ou CNPJ) e nome do pagador
+    let doc = cpf || cnpj_cpf;
+    let nomeCliente = nome || razao_social;
+
+    if ((!doc || !nomeCliente) && userid && userid !== "00") {
+        try {
+            const userRes = await pool.query(
+                "SELECT name, cnpj_cpf FROM users WHERE id = $1 LIMIT 1",
+                [userid]
+            );
+            if (userRes.rows.length > 0) {
+                if (!doc && userRes.rows[0].cnpj_cpf) {
+                    doc = userRes.rows[0].cnpj_cpf;
+                }
+                if (!nomeCliente && userRes.rows[0].name) {
+                    nomeCliente = userRes.rows[0].name;
+                }
+            }
+        } catch (errUser) {
+            console.warn("⚠️ Aviso ao buscar dados do usuário para Pix:", errUser.message);
+        }
+    }
+
+    const docLimpo = doc ? String(doc).replace(/\D/g, '') : '';
+
     // Gerar TXID compatível: 26 a 35 caracteres, apenas alfanumérico
     // Ex: "SITEXPRES" (9) + Timestamp (13) + Random (8) = 30 chars
     const txid = "SITEXPRES" + Date.now() + Math.random().toString(36).substring(2, 10);
@@ -897,17 +925,18 @@ export const criarCobrancaUnica = async (req, res) => {
             expiracao: 3600 // 1 hora
         },
         valor: {
-            original: valor
+            original: valorFormatado
         },
         chave: process.env.INTER_CHAVE_PIX,
         solicitacaoPagador: "Pagamento Servico Sitexpres IA e WebHosting"
     };
 
-    const cpfLimpo = cpf ? cpf.replace(/\D/g, '') : '';
-    if (cpfLimpo.length === 11) {
-        payload.devedor = { nome: nome || 'Consumidor', cpf: cpfLimpo };
-    } else if (cpfLimpo.length === 14) {
-        payload.devedor = { nome: nome || 'Consumidor', cnpj: cpfLimpo };
+    if (docLimpo.length === 11) {
+        payload.devedor = { nome: nomeCliente || 'Consumidor', cpf: docLimpo };
+    } else if (docLimpo.length === 14) {
+        payload.devedor = { nome: nomeCliente || 'Consumidor', cnpj: docLimpo };
+    } else {
+        console.warn("⚠️ Cobrança PIX gerada sem CPF/CNPJ válido do pagador (doc recebido:", doc, ")");
     }
 
     const dataString = JSON.stringify(payload);
@@ -933,10 +962,10 @@ export const criarCobrancaUnica = async (req, res) => {
         const transacao = await criarTransacao({
             ID_user,
             txid,
-            valor,
+            valor: valorFormatado,
             qtd_creditos,
-            nome,
-            cpf,
+            nome: nomeCliente,
+            cpf: docLimpo,
             descricao: 'Compra via pix Sitexpres IA e WebHosting',
             chave: process.env.INTER_CHAVE_PIX,
             expiracao: 3600,
@@ -969,17 +998,27 @@ export const criarCobrancaUnica = async (req, res) => {
         });
 
         response.on("end", () => {
+            let parsedData;
+            try {
+                parsedData = JSON.parse(data);
+            } catch (e) {
+                parsedData = data;
+            }
+
             if (response.statusCode >= 200 && response.statusCode < 300) {
+                console.log(`✅ [PIX INTER] Cobrança criada com sucesso! TXID: ${txid}`);
                 return res.json({
                     sucesso: true,
                     txid,
-                    resposta: JSON.parse(data)
+                    resposta: parsedData
                 });
             } else {
+                console.error(`❌ [PIX INTER] Erro ${response.statusCode} ao criar cobrança (txid: ${txid}):`, parsedData);
+                console.error("Payload enviado:", JSON.stringify(payload));
                 return res.status(400).json({
-                    erro: "Erro ao criar cobrança",
+                    erro: "Erro ao criar cobrança no Banco Inter",
                     status: response.statusCode,
-                    detalhes: data
+                    detalhes: parsedData
                 });
             }
         });
@@ -1020,7 +1059,9 @@ const criarTransacao = async ({
                 payment_method,
                 payment_id,
                 url_payment,
-                value
+                value,
+                customer_cpf,
+                cpf_cnpj
             ) VALUES (
                 $1,
                 'purchase_credits',
@@ -1031,18 +1072,21 @@ const criarTransacao = async ({
                 'PIX',
                 $6,
                 '',   -- PIX ainda nao tem URL, pode preencher depois
-                $7
+                $7,
+                $8,
+                $8
             )
             RETURNING *
             `,
             [
                 ID_user,                        // $1
                 status,                         // $2
-                "Compra PIX",      // $3
+                "Compra PIX",                   // $3
                 qtd_creditos,                   // $4
                 valor,                          // $5 (monetary_value)
                 txid,                           // $6 (payment_id)
-                valor                           // $7 (value)
+                valor,                          // $7 (value)
+                cpf || null                     // $8 (customer_cpf e cpf_cnpj)
             ]
         );
 
@@ -1310,10 +1354,19 @@ export const pagamentoDominio = async (req, res) => {
                         [ordem.id]
                     );
 
+                    let parsedData;
+                    try {
+                        parsedData = JSON.parse(data);
+                    } catch (e) {
+                        parsedData = data;
+                    }
+
+                    console.error(`❌ [PIX DOMINIO] Erro ${response.statusCode} ao criar cobrança:`, parsedData);
+
                     return res.status(400).json({
                         erro: "Erro ao criar cobrança PIX",
                         status: response.statusCode,
-                        detalhes: data
+                        detalhes: parsedData
                     });
                 }
             });

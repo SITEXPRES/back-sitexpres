@@ -1235,11 +1235,7 @@ export const jobStatus = (req, res) => {
 };
 
 export const getSites = async (req, res) => {
-
-  let client;
-
   try {
-    client = await pool.connect();
     /*  const result = await pool.query(
        "SELECT id, name, prompt, views, created_at FROM generated_sites WHERE user_id = $1 ORDER BY created_at DESC",
        [req.userId]

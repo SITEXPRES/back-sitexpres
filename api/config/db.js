@@ -38,6 +38,7 @@ originalPool.on("error", (err) => {
 let totalQueries = 0;
 let failedQueries = 0;
 let autoReleases = 0;
+let lastReportedAutoReleases = 0;
 
 // 🎯 Wrapper com retry e auto-recovery
 const pool = {
@@ -210,8 +211,10 @@ const monitorInterval = setInterval(() => {
     console.warn(`⚠️ ALERTA: ${stats.waitingRequests} requisições esperando conexão!`);
   }
   
-  if (stats.autoReleases > 10) {
-    console.warn(`⚠️ ALERTA: ${stats.autoReleases} auto-releases (possível vazamento de conexões)`);
+  const novosAutoReleases = stats.autoReleases - lastReportedAutoReleases;
+  if (novosAutoReleases > 0) {
+    console.warn(`⚠️ ALERTA: +${novosAutoReleases} auto-release(s) detectado(s) (total acumulado: ${stats.autoReleases} - possível vazamento de conexões)`);
+    lastReportedAutoReleases = stats.autoReleases;
   }
 
   // Log informativo a cada 5 minutos
