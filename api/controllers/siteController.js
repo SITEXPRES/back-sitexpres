@@ -54,6 +54,18 @@ export function detectarIntencaoPromax(prompt, metadata = null, tipoProjeto = nu
 
   const p = (prompt || '').toLowerCase();
 
+  // 0. Se o prompt declara explicitamente ser um Site Institucional, Landing Page, Portfólio ou Site Vitrine
+
+  // (ex: site para fábrica de software, agência ou empresa de TI com mockups e termos técnicos descritivos)
+
+  const ehExplicitamenteSite = /\b(site\s+institucional|landing\s*page|site\s+vitrine|site\s+de\s+uma\s+p[aá]gina|one\s*page|p[aá]gina\s+institucional|portf[oó]lio|p[aá]gina\s+de\s+vendas)\b/i.test(p);
+
+  const querSistemaComBancoReal = /\b(com\s+banco\s+de\s+dados\s+(postgres|sql|relacional)|banco\s+de\s+dados\s+postgresql|api\s+rest\s+com\s+crud|autentica[cç][aã]o\s+jwt)\b/i.test(p);
+
+  if (ehExplicitamenteSite && !querSistemaComBancoReal) return false;
+
+  
+
   // 1. Termos técnicos explícitos (caso o usuário ou desenvolvedor seja técnico)
   const termosTecnicos = [
     'crm', 'banco de dados', 'postgres', 'postgresql', 'saas', 'fullstack',

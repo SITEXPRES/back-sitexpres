@@ -1,0 +1,2468 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CREATCODE | Fábrica de Software — Aplicativos e sistemas sob medida</title>
+  <meta name="description" content="Desenvolvemos aplicativos para iOS/Android e sistemas web sob medida para sua empresa. Tecnologia de ponta, design HUD sci-fi e alta performance.">
+  
+  <!-- Open Graph / Redes Sociais -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="CREATCODE | Fábrica de Software — Aplicativos e sistemas sob medida">
+  <meta property="og:description" content="Aplicativos e sistemas sob medida para a sua empresa. Da ideia ao código em produção.">
+  <meta property="og:image" content="https://creatcode.com.br/og-image.png">
+
+  <!-- Favicon SVG com o Logo Hexagonal Duplo -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='cg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%235ce8ff'/%3E%3Cstop offset='50%25' stop-color='%231ec8e6'/%3E%3Cstop offset='100%25' stop-color='%231f6bff'/%3E%3C/linearGradient%3E%3ClinearGradient id='og' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23ffa040'/%3E%3Cstop offset='100%25' stop-color='%23ff6a00'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M75 22 L35 22 L15 50 L35 78 L75 78' fill='none' stroke='url(%23cg)' stroke-width='9' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M68 36 L43 36 L30 50 L43 64 L68 64' fill='none' stroke='url(%23og)' stroke-width='8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@800;900&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Montserrat:wght@800;900&display=swap" rel="stylesheet">
+
+  <style>
+    /* ==========================================================================
+       RESET & VARIÁVEIS CSS (SEGUINDO À RISCA A IDENTIDADE VISUAL)
+       ========================================================================== */
+    :root {
+      --bg-dark-1: #050c1d;
+      --bg-dark-2: #071431;
+      --cyan-main: #1ec8e6;
+      --cyan-glow: #5ce8ff;
+      --blue-support: #1f6bff;
+      --orange-start: #ff6a00;
+      --orange-end: #ff9a2e;
+      --orange-text: #0a1428;
+      --text-white: #ffffff;
+      --text-sec-1: #c6d4ee;
+      --text-sec-2: #8fa3c4;
+      --success-green: #2ee59d;
+      
+      --font-title: 'Barlow Condensed', sans-serif;
+      --font-body: 'Inter', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --font-brand: 'Montserrat', sans-serif;
+
+      --hud-border: rgba(30, 200, 230, 0.28);
+      --hud-glass: rgba(7, 20, 49, 0.72);
+      --hud-glow: 0 0 20px rgba(30, 200, 230, 0.25);
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      color-scheme: dark;
+    }
+
+    body {
+      background: linear-gradient(180deg, var(--bg-dark-1) 0%, var(--bg-dark-2) 100%);
+      color: var(--text-white);
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.6;
+      min-height: 100vh;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* Leve efeito de scanlines retrô-futurista e vinheta */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, 0.12) 0px,
+        rgba(0, 0, 0, 0.12) 1px,
+        transparent 1px,
+        transparent 3px
+      );
+      pointer-events: none;
+      z-index: 999;
+      opacity: 0.55;
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle at center, transparent 55%, rgba(2, 6, 16, 0.85) 100%);
+      pointer-events: none;
+      z-index: 998;
+    }
+
+    /* Grade fina de fundo */
+    .bg-grid {
+      position: fixed;
+      inset: 0;
+      background-image: 
+        linear-gradient(to right, rgba(30, 200, 230, 0.04) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(30, 200, 230, 0.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Facetas/polígonos translúcidos decorativos nos cantos */
+    .facet-poly {
+      position: fixed;
+      pointer-events: none;
+      z-index: 1;
+      opacity: 0.15;
+    }
+    .facet-poly-tl {
+      top: -100px;
+      left: -100px;
+      width: 450px;
+      height: 450px;
+      background: linear-gradient(135deg, var(--cyan-glow), transparent 60%);
+      clip-path: polygon(0 0, 100% 0, 70% 70%, 0 100%);
+      filter: blur(40px);
+    }
+    .facet-poly-br {
+      bottom: -120px;
+      right: -120px;
+      width: 500px;
+      height: 500px;
+      background: linear-gradient(315deg, var(--blue-support), transparent 65%);
+      clip-path: polygon(30% 0, 100% 30%, 100% 100%, 0 100%);
+      filter: blur(45px);
+    }
+
+    /* Container base */
+    .container {
+      width: 100%;
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 0 24px;
+      position: relative;
+      z-index: 2;
+    }
+
+    /* Tipografia de títulos e códigos */
+    h1, h2, h3, h4 {
+      font-family: var(--font-title);
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      line-height: 1.05;
+    }
+
+    .font-mono {
+      font-family: var(--font-mono);
+    }
+
+    .font-brand {
+      font-family: var(--font-brand);
+      font-weight: 800;
+      letter-spacing: 0.14em;
+    }
+
+    .text-cyan {
+      color: var(--cyan-main);
+      text-shadow: 0 0 16px rgba(92, 232, 255, 0.45);
+    }
+
+    .text-orange {
+      color: #ff9a2e;
+    }
+
+    .text-green {
+      color: var(--success-green);
+    }
+
+    .text-muted {
+      color: var(--text-sec-2);
+    }
+
+    .text-sec {
+      color: var(--text-sec-1);
+    }
+
+    /* Moldura HUD com cantos cortados a 45° */
+    .hud-cut-corner {
+      clip-path: polygon(
+        16px 0%,
+        calc(100% - 16px) 0%,
+        100% 16px,
+        100% calc(100% - 16px),
+        calc(100% - 16px) 100%,
+        16px 100%,
+        0% calc(100% - 16px),
+        0% 16px
+      );
+    }
+
+    .hud-card {
+      background: var(--hud-glass);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--hud-border);
+      position: relative;
+      transition: all 0.3s ease;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+    }
+
+    .hud-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 20px;
+      width: 35px;
+      height: 2px;
+      background: var(--cyan-main);
+      box-shadow: 0 0 8px var(--cyan-glow);
+    }
+
+    .hud-card:hover {
+      border-color: rgba(92, 232, 255, 0.6);
+      transform: translateY(-4px);
+      box-shadow: 0 14px 40px rgba(30, 200, 230, 0.18);
+    }
+
+    /* Botão Principal Laranja com degradê e texto azul marinho */
+    .btn-orange {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      background: linear-gradient(90deg, var(--orange-start) 0%, var(--orange-end) 100%);
+      color: var(--orange-text);
+      font-family: var(--font-body);
+      font-weight: 800;
+      font-size: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 15px 30px;
+      border: none;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      text-decoration: none;
+      transition: all 0.3s ease;
+      clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+      box-shadow: 0 4px 20px rgba(255, 106, 0, 0.4);
+    }
+
+    /* Shimmer periódico no botão laranja */
+    .btn-orange::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: -120%;
+      width: 60%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.65), transparent);
+      transform: skewX(-25deg);
+      animation: btnShimmer 4s infinite ease-in-out;
+    }
+
+    @keyframes btnShimmer {
+      0%, 70% { left: -120%; }
+      100% { left: 160%; }
+    }
+
+    .btn-orange:hover {
+      transform: translateY(-2px) scale(1.02);
+      box-shadow: 0 6px 28px rgba(255, 106, 0, 0.65);
+    }
+
+    .btn-orange:active {
+      transform: translateY(1px);
+    }
+
+    /* Botão secundário com contorno ciano */
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      background: rgba(30, 200, 230, 0.06);
+      color: var(--cyan-glow);
+      border: 1px solid var(--cyan-main);
+      font-family: var(--font-body);
+      font-weight: 700;
+      font-size: 0.95rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: 14px 28px;
+      text-decoration: none;
+      cursor: pointer;
+      clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+      transition: all 0.3s ease;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(30, 200, 230, 0.16);
+      border-color: var(--cyan-glow);
+      box-shadow: 0 0 20px rgba(30, 200, 230, 0.35);
+      color: #ffffff;
+      transform: translateY(-2px);
+    }
+
+    /* Trilhas de Circuito SVG animadas */
+    .circuit-container {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+      overflow: hidden;
+    }
+
+    .circuit-line {
+      stroke: rgba(30, 200, 230, 0.22);
+      stroke-width: 1.5;
+      fill: none;
+    }
+
+    .circuit-node {
+      fill: var(--cyan-main);
+      filter: drop-shadow(0 0 6px var(--cyan-glow));
+    }
+
+    .circuit-pulse {
+      stroke: var(--cyan-glow);
+      stroke-width: 2.5;
+      stroke-linecap: round;
+      stroke-dasharray: 40 400;
+      animation: pulseCircuit 6s linear infinite;
+    }
+
+    @keyframes pulseCircuit {
+      0% { stroke-dashoffset: 440; }
+      100% { stroke-dashoffset: 0; }
+    }
+
+    /* Glitch em títulos */
+    .glitch-text {
+      position: relative;
+      display: inline-block;
+    }
+
+    .glitch-active {
+      animation: textGlitch 3.5s infinite;
+    }
+
+    @keyframes textGlitch {
+      0%, 92%, 100% {
+        transform: translate(0);
+        text-shadow: none;
+      }
+      93% {
+        transform: translate(-2px, 1px);
+        text-shadow: 2px 0 #ff0055, -2px 0 var(--cyan-main);
+      }
+      95% {
+        transform: translate(2px, -1px);
+        text-shadow: -2px 0 #ff0055, 2px 0 var(--cyan-main);
+      }
+      97% {
+        transform: translate(0, 0);
+      }
+    }
+
+    /* Terminal HUD Badge */
+    .hud-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--cyan-main);
+      background: rgba(30, 200, 230, 0.08);
+      border: 1px solid rgba(30, 200, 230, 0.3);
+      padding: 5px 12px;
+      clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .dot-status {
+      width: 7px;
+      height: 7px;
+      background: var(--success-green);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--success-green);
+      animation: blinkDot 1.6s infinite ease-in-out;
+    }
+
+    @keyframes blinkDot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.3; transform: scale(0.8); }
+    }
+
+    /* Cursor de terminal */
+    .cursor-blink {
+      display: inline-block;
+      width: 9px;
+      height: 1.1em;
+      background-color: var(--cyan-main);
+      vertical-align: middle;
+      margin-left: 4px;
+      animation: cursorBlink 0.9s infinite;
+    }
+
+    @keyframes cursorBlink {
+      0%, 49% { opacity: 1; }
+      50%, 100% { opacity: 0; }
+    }
+
+    /* ==========================================================================
+       1. MENU FIXO NO TOPO
+       ========================================================================== */
+    .site-header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      background: rgba(5, 12, 29, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(30, 200, 230, 0.2);
+      transition: all 0.3s ease;
+    }
+
+    .site-header.scrolled {
+      background: rgba(5, 12, 29, 0.95);
+      box-shadow: 0 4px 25px rgba(0, 0, 0, 0.6);
+    }
+
+    .header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 80px;
+    }
+
+    /* Logo CREATCODE */
+    .brand-logo {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      text-decoration: none;
+      color: var(--text-white);
+    }
+
+    .logo-svg {
+      width: 44px;
+      height: 44px;
+      filter: drop-shadow(0 0 10px rgba(30, 200, 230, 0.4));
+      transition: transform 0.3s ease;
+    }
+
+    .brand-logo:hover .logo-svg {
+      transform: rotate(5deg) scale(1.05);
+    }
+
+    .brand-text {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .brand-title {
+      font-family: var(--font-brand);
+      font-weight: 800;
+      font-size: 1.35rem;
+      letter-spacing: 0.15em;
+      line-height: 1;
+      color: #ffffff;
+    }
+
+    .brand-subtitle {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      letter-spacing: 0.08em;
+      color: var(--cyan-main);
+      text-transform: uppercase;
+      margin-top: 3px;
+    }
+
+    /* Navegação */
+    .nav-menu {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+      list-style: none;
+    }
+
+    .nav-link {
+      font-family: var(--font-mono);
+      font-size: 0.88rem;
+      color: var(--text-sec-1);
+      text-decoration: none;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      position: relative;
+      transition: color 0.3s ease;
+      padding: 6px 0;
+    }
+
+    .nav-link::after {
+      content: "";
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 0%;
+      height: 2px;
+      background: var(--cyan-main);
+      box-shadow: 0 0 8px var(--cyan-glow);
+      transition: width 0.3s ease;
+    }
+
+    .nav-link:hover {
+      color: var(--cyan-glow);
+    }
+
+    .nav-link:hover::after {
+      width: 100%;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .menu-toggle {
+      display: none;
+      background: transparent;
+      border: 1px solid var(--hud-border);
+      color: var(--cyan-main);
+      padding: 8px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+
+    .menu-toggle svg {
+      width: 24px;
+      height: 24px;
+      display: block;
+    }
+
+    /* ==========================================================================
+       2. HERO SECTION
+       ========================================================================== */
+    .hero-section {
+      padding-top: 150px;
+      padding-bottom: 80px;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 48px;
+      align-items: center;
+      width: 100%;
+    }
+
+    .hero-terminal-line {
+      font-family: var(--font-mono);
+      font-size: 0.92rem;
+      color: var(--cyan-main);
+      margin-bottom: 16px;
+      display: inline-block;
+    }
+
+    .hero-title {
+      font-size: 3.5rem;
+      font-weight: 800;
+      color: #ffffff;
+      margin-bottom: 20px;
+      line-height: 1.05;
+      text-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+    }
+
+    .terminal-subblock {
+      background: rgba(3, 10, 24, 0.7);
+      border-left: 3px solid var(--cyan-main);
+      padding: 12px 18px;
+      margin-bottom: 24px;
+      font-family: var(--font-mono);
+      font-size: 0.95rem;
+    }
+
+    .terminal-result-orange {
+      color: var(--orange-start);
+      font-weight: 700;
+      margin-left: 10px;
+    }
+
+    .hero-answer {
+      font-size: 2.2rem;
+      font-family: var(--font-title);
+      font-weight: 800;
+      margin-bottom: 12px;
+      color: #ffffff;
+    }
+
+    .hero-subtitle {
+      font-size: 1.25rem;
+      color: var(--text-sec-1);
+      margin-bottom: 36px;
+      max-width: 540px;
+    }
+
+    .hero-buttons {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      flex-wrap: wrap;
+    }
+
+    /* Piso em perspectiva 3D no rodapé do Hero */
+    .hero-perspective-floor {
+      position: absolute;
+      bottom: 0;
+      left: -20%;
+      right: -20%;
+      height: 180px;
+      background-image: 
+        linear-gradient(to right, rgba(30, 200, 230, 0.12) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(30, 200, 230, 0.12) 1px, transparent 1px);
+      background-size: 50px 30px;
+      transform: perspective(300px) rotateX(65deg);
+      transform-origin: bottom center;
+      mask-image: linear-gradient(to top, rgba(0,0,0,1) 0%, transparent 90%);
+      -webkit-mask-image: linear-gradient(to top, rgba(0,0,0,1) 0%, transparent 90%);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* MOCKUP DO CELULAR COM DASHBOARD */
+    .mockup-wrapper {
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 2;
+    }
+
+    .phone-frame {
+      width: 320px;
+      background: #091326;
+      border: 3px solid rgba(30, 200, 230, 0.4);
+      border-radius: 40px;
+      padding: 16px 14px;
+      box-shadow: 
+        0 0 30px rgba(30, 200, 230, 0.25),
+        inset 0 0 15px rgba(30, 200, 230, 0.15);
+      position: relative;
+    }
+
+    .phone-notch {
+      width: 120px;
+      height: 18px;
+      background: #050c1d;
+      margin: 0 auto 12px;
+      border-bottom-left-radius: 12px;
+      border-bottom-right-radius: 12px;
+      border: 1px solid rgba(30, 200, 230, 0.2);
+      border-top: none;
+    }
+
+    .phone-screen {
+      background: linear-gradient(180deg, #061127 0%, #0a1838 100%);
+      border-radius: 26px;
+      padding: 16px 12px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .app-topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--cyan-main);
+    }
+
+    .stat-card-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .stat-item {
+      background: rgba(30, 200, 230, 0.06);
+      border: 1px solid rgba(30, 200, 230, 0.18);
+      border-radius: 8px;
+      padding: 8px 6px;
+      text-align: center;
+    }
+
+    .stat-item .label {
+      font-size: 0.65rem;
+      color: var(--text-sec-2);
+      display: block;
+      margin-bottom: 3px;
+    }
+
+    .stat-item .value {
+      font-size: 0.82rem;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .chart-container {
+      background: rgba(5, 12, 29, 0.85);
+      border: 1px solid rgba(30, 200, 230, 0.2);
+      border-radius: 10px;
+      padding: 10px;
+      margin-bottom: 14px;
+    }
+
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.72rem;
+      font-family: var(--font-mono);
+      color: var(--text-sec-1);
+      margin-bottom: 6px;
+    }
+
+    .feed-container {
+      background: rgba(5, 12, 29, 0.6);
+      border-radius: 10px;
+      padding: 10px;
+    }
+
+    .feed-title {
+      font-size: 0.72rem;
+      font-family: var(--font-mono);
+      color: var(--cyan-main);
+      margin-bottom: 8px;
+    }
+
+    .feed-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      font-size: 0.7rem;
+    }
+
+    .feed-item:last-child {
+      border-bottom: none;
+    }
+
+    .feed-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--cyan-main);
+    }
+
+    /* Etiquetas HUD em volta do Mockup */
+    .hud-tag {
+      position: absolute;
+      background: rgba(7, 20, 49, 0.9);
+      border: 1px solid var(--cyan-main);
+      padding: 6px 14px;
+      font-family: var(--font-mono);
+      font-size: 0.76rem;
+      color: var(--text-white);
+      white-space: nowrap;
+      box-shadow: 0 0 15px rgba(30, 200, 230, 0.3);
+      clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+      z-index: 3;
+      animation: floatTag 4s ease-in-out infinite alternate;
+    }
+
+    .hud-tag-1 {
+      top: 15%;
+      left: -40px;
+      animation-delay: 0s;
+    }
+
+    .hud-tag-2 {
+      top: 48%;
+      right: -45px;
+      animation-delay: 1.2s;
+    }
+
+    .hud-tag-3 {
+      bottom: 12%;
+      left: -35px;
+      animation-delay: 2.4s;
+    }
+
+    @keyframes floatTag {
+      0% { transform: translateY(0px); }
+      100% { transform: translateY(-8px); }
+    }
+
+    /* ==========================================================================
+       3. SERVIÇOS ("// o que a gente constrói")
+       ========================================================================== */
+    .section-padding {
+      padding: 100px 0;
+      position: relative;
+    }
+
+    .section-header {
+      margin-bottom: 56px;
+      text-align: center;
+    }
+
+    .section-tag {
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      color: var(--cyan-main);
+      display: inline-block;
+      margin-bottom: 10px;
+      letter-spacing: 0.08em;
+    }
+
+    .section-title {
+      font-size: 2.8rem;
+      color: #ffffff;
+    }
+
+    .services-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 28px;
+      margin-bottom: 36px;
+    }
+
+    .service-card {
+      padding: 36px 30px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .service-num {
+      font-family: var(--font-title);
+      font-size: 3.5rem;
+      font-weight: 900;
+      line-height: 1;
+      color: rgba(30, 200, 230, 0.25);
+      margin-bottom: 16px;
+      transition: color 0.3s ease;
+    }
+
+    .service-card:hover .service-num {
+      color: var(--cyan-main);
+      text-shadow: 0 0 16px rgba(92, 232, 255, 0.4);
+    }
+
+    .service-icon-box {
+      width: 56px;
+      height: 56px;
+      border: 1px solid var(--hud-border);
+      background: rgba(30, 200, 230, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--cyan-main);
+      margin-bottom: 24px;
+      clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+    }
+
+    .service-name {
+      font-size: 1.6rem;
+      margin-bottom: 14px;
+      color: #ffffff;
+    }
+
+    .service-desc {
+      color: var(--text-sec-1);
+      font-size: 0.96rem;
+      line-height: 1.6;
+    }
+
+    .services-footer-phrase {
+      text-align: center;
+      font-family: var(--font-mono);
+      font-size: 1.1rem;
+      color: var(--cyan-glow);
+      letter-spacing: 0.05em;
+    }
+
+    /* ==========================================================================
+       4. COMO TRABALHAMOS (LINHA DO TEMPO & EDITOR DE CÓDIGO)
+       ========================================================================== */
+    .timeline-wrapper {
+      position: relative;
+      margin: 40px 0 60px;
+    }
+
+    .timeline-steps {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 16px;
+      position: relative;
+    }
+
+    .step-card {
+      background: var(--hud-glass);
+      border: 1px solid var(--hud-border);
+      padding: 24px 18px;
+      position: relative;
+      clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+      transition: all 0.3s ease;
+    }
+
+    .step-card:hover {
+      border-color: var(--cyan-main);
+      transform: translateY(-5px);
+    }
+
+    .step-badge {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--orange-start);
+      margin-bottom: 10px;
+    }
+
+    .step-title {
+      font-size: 1.15rem;
+      color: #ffffff;
+      margin-bottom: 8px;
+      line-height: 1.2;
+    }
+
+    .step-desc {
+      font-size: 0.85rem;
+      color: var(--text-sec-2);
+    }
+
+    /* Janela de Código Decorativa */
+    .code-window {
+      max-width: 860px;
+      margin: 0 auto;
+      background: #040916;
+      border: 1px solid var(--hud-border);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6);
+    }
+
+    .code-window-bar {
+      background: #081226;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(30, 200, 230, 0.15);
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--text-sec-2);
+    }
+
+    .code-dots {
+      display: flex;
+      gap: 6px;
+    }
+
+    .code-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .code-dot.red { background: #ff5f56; }
+    .code-dot.yellow { background: #ffbd2e; }
+    .code-dot.green { background: #27c93f; }
+
+    .code-content {
+      padding: 20px 24px;
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      line-height: 1.7;
+      color: #d1dced;
+    }
+
+    .code-kw { color: #ff6a00; }
+    .code-fn { color: var(--cyan-glow); }
+    .code-str { color: var(--success-green); }
+    .code-comment { color: #587199; font-style: italic; }
+
+    .code-statusbar {
+      background: #071329;
+      padding: 10px 20px;
+      border-top: 1px solid rgba(30, 200, 230, 0.15);
+      font-family: var(--font-mono);
+      font-size: 0.84rem;
+      color: var(--success-green);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* ==========================================================================
+       5. POR QUE A CREATCODE (4 DIFERENCIAIS)
+       ========================================================================== */
+    .differentials-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 24px;
+    }
+
+    .differential-card {
+      padding: 30px 24px;
+    }
+
+    .diff-icon {
+      color: var(--cyan-main);
+      margin-bottom: 18px;
+    }
+
+    .diff-title {
+      font-size: 1.35rem;
+      margin-bottom: 10px;
+      color: #ffffff;
+    }
+
+    .diff-desc {
+      font-size: 0.9rem;
+      color: var(--text-sec-1);
+    }
+
+    /* ==========================================================================
+       6. PROJETOS (COM MARCAÇÃO [EXEMPLO — SUBSTITUIR])
+       ========================================================================== */
+    .projects-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 28px;
+    }
+
+    .project-card {
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .project-image-box {
+      width: 100%;
+      height: 200px;
+      background: #081329;
+      border-bottom: 1px solid var(--hud-border);
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .project-badge-example {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: rgba(255, 106, 0, 0.9);
+      color: #050c1d;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .project-info {
+      padding: 24px;
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .project-name {
+      font-size: 1.4rem;
+      color: #ffffff;
+      margin-bottom: 8px;
+    }
+
+    .project-desc {
+      color: var(--text-sec-2);
+      font-size: 0.9rem;
+      margin-bottom: 16px;
+    }
+
+    .project-tag {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--cyan-main);
+    }
+
+    /* ==========================================================================
+       7. DEPOIMENTOS (MARCADOS COM [EXEMPLO — SUBSTITUIR])
+       ========================================================================== */
+    .testimonials-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 28px;
+    }
+
+    .testimonial-card {
+      padding: 32px 26px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .testimonial-quote {
+      font-style: italic;
+      color: var(--text-sec-1);
+      font-size: 0.98rem;
+      line-height: 1.6;
+      margin-bottom: 24px;
+      position: relative;
+    }
+
+    .testimonial-author {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      border-top: 1px solid rgba(30, 200, 230, 0.15);
+      padding-top: 16px;
+    }
+
+    .author-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(30, 200, 230, 0.15);
+      border: 1px solid var(--cyan-main);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      color: var(--cyan-glow);
+    }
+
+    .author-name {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .author-role {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--orange-start);
+    }
+
+    /* ==========================================================================
+       8. CAPTAÇÃO DE LEADS (FORMULÁRIO ESTILO TERMINAL)
+       ========================================================================== */
+    .lead-section-box {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 48px 40px;
+    }
+
+    .form-group {
+      margin-bottom: 22px;
+      position: relative;
+    }
+
+    .form-label {
+      display: block;
+      font-family: var(--font-mono);
+      font-size: 0.88rem;
+      color: var(--cyan-main);
+      margin-bottom: 8px;
+      letter-spacing: 0.05em;
+    }
+
+    .form-input, .form-textarea {
+      width: 100%;
+      background: #040a18;
+      border: 1px solid rgba(30, 200, 230, 0.35);
+      color: #ffffff;
+      font-family: var(--font-mono);
+      font-size: 1rem; /* Mínimo 16px para iOS não aplicar zoom */
+      padding: 14px 16px;
+      outline: none;
+      transition: all 0.25s ease;
+      clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+    }
+
+    .form-input:focus, .form-textarea:focus {
+      border-color: var(--cyan-glow);
+      box-shadow: 0 0 18px rgba(92, 232, 255, 0.4);
+      background: #050d20;
+    }
+
+    .form-input.is-invalid, .form-textarea.is-invalid {
+      border-color: var(--orange-start);
+      box-shadow: 0 0 12px rgba(255, 106, 0, 0.3);
+    }
+
+    .form-textarea {
+      min-height: 120px;
+      resize: vertical;
+    }
+
+    .form-footer-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 6px;
+    }
+
+    .form-error-msg {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--orange-start);
+      min-height: 20px;
+    }
+
+    .char-counter {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--text-sec-2);
+    }
+
+    .form-submit-row {
+      margin-top: 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .privacy-text {
+      font-size: 0.8rem;
+      color: var(--text-sec-2);
+      text-align: center;
+    }
+
+    /* Terminal de status do Lead */
+    .lead-status-box {
+      margin-top: 20px;
+      padding: 14px 18px;
+      background: rgba(46, 229, 157, 0.08);
+      border: 1px solid var(--success-green);
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      color: var(--success-green);
+      display: none;
+    }
+
+    /* ==========================================================================
+       9. CHAMADA FINAL (CTA)
+       ========================================================================== */
+    .final-cta-section {
+      text-align: center;
+      padding: 120px 0;
+      position: relative;
+    }
+
+    .cta-hud-ring-wrapper {
+      position: relative;
+      width: 140px;
+      height: 140px;
+      margin: 0 auto 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .hud-rotating-ring {
+      position: absolute;
+      inset: -12px;
+      border: 2px dashed rgba(30, 200, 230, 0.5);
+      border-radius: 50%;
+      animation: rotateRing 18s linear infinite;
+    }
+
+    .hud-rotating-ring-2 {
+      position: absolute;
+      inset: -24px;
+      border: 1px dotted rgba(92, 232, 255, 0.35);
+      border-radius: 50%;
+      animation: rotateRingRev 24s linear infinite;
+    }
+
+    @keyframes rotateRing {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    @keyframes rotateRingRev {
+      0% { transform: rotate(360deg); }
+      100% { transform: rotate(0deg); }
+    }
+
+    .cta-title {
+      font-size: 3.2rem;
+      margin-bottom: 20px;
+      color: #ffffff;
+    }
+
+    .cta-wa-direct {
+      margin-top: 24px;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--font-mono);
+      font-size: 1.15rem;
+      color: var(--cyan-glow);
+      text-decoration: none;
+      transition: all 0.3s ease;
+    }
+
+    .cta-wa-direct:hover {
+      color: var(--success-green);
+      transform: scale(1.05);
+    }
+
+    /* ==========================================================================
+       10. RODAPÉ
+       ========================================================================== */
+    .site-footer {
+      background: #030814;
+      border-top: 1px solid rgba(30, 200, 230, 0.15);
+      padding: 60px 0 30px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .footer-grid {
+      display: grid;
+      grid-template-columns: 1.5fr 1fr 1fr 1fr;
+      gap: 40px;
+      margin-bottom: 40px;
+    }
+
+    .footer-col-title {
+      font-family: var(--font-mono);
+      font-size: 0.88rem;
+      color: var(--cyan-main);
+      margin-bottom: 18px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .footer-links {
+      list-style: none;
+    }
+
+    .footer-links li {
+      margin-bottom: 10px;
+    }
+
+    .footer-links a {
+      color: var(--text-sec-2);
+      text-decoration: none;
+      font-size: 0.92rem;
+      transition: color 0.25s ease;
+    }
+
+    .footer-links a:hover {
+      color: var(--cyan-glow);
+    }
+
+    .footer-bottom {
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      padding-top: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--text-sec-2);
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    /* BOTÃO FLUTUANTE DO WHATSAPP */
+    .wa-float-btn {
+      position: fixed;
+      bottom: 28px;
+      right: 28px;
+      z-index: 1050;
+      width: 60px;
+      height: 60px;
+      background: linear-gradient(135deg, #25d366, #128c7e);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      box-shadow: 0 4px 20px rgba(37, 211, 102, 0.45);
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      text-decoration: none;
+    }
+
+    .wa-float-btn:hover {
+      transform: scale(1.1) rotate(6deg);
+      box-shadow: 0 6px 28px rgba(37, 211, 102, 0.7);
+    }
+
+    .wa-float-pulse {
+      position: absolute;
+      inset: -4px;
+      border: 2px solid #25d366;
+      border-radius: 50%;
+      animation: waPulse 2s infinite ease-out;
+      pointer-events: none;
+    }
+
+    @keyframes waPulse {
+      0% { transform: scale(1); opacity: 0.8; }
+      100% { transform: scale(1.45); opacity: 0; }
+    }
+
+    /* ==========================================================================
+       RESPONSIVIDADE (MOBILE-FIRST PRIORITÁRIO)
+       ========================================================================== */
+    @media (max-width: 1024px) {
+      .hero-grid {
+        grid-template-columns: 1fr;
+        gap: 60px;
+      }
+      .mockup-wrapper {
+        margin-top: 20px;
+      }
+      .services-grid, .projects-grid, .testimonials-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .differentials-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .timeline-steps {
+        grid-template-columns: 1fr;
+      }
+      .footer-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .header-inner {
+        height: 70px;
+      }
+      .nav-menu {
+        position: fixed;
+        top: 70px;
+        left: 0;
+        right: 0;
+        background: rgba(4, 9, 22, 0.98);
+        backdrop-filter: blur(20px);
+        flex-direction: column;
+        padding: 30px;
+        gap: 20px;
+        border-bottom: 1px solid var(--hud-border);
+        clip-path: polygon(0 0, 100% 0, 100% 0, 0 0);
+        transition: clip-path 0.4s ease-in-out;
+      }
+      .nav-menu.is-open {
+        clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+      }
+      .menu-toggle {
+        display: block;
+      }
+      .header-actions .btn-orange {
+        display: none;
+      }
+      .hero-title {
+        font-size: 2.5rem;
+      }
+      .hero-answer {
+        font-size: 1.8rem;
+      }
+      .section-title {
+        font-size: 2.2rem;
+      }
+      .cta-title {
+        font-size: 2.3rem;
+      }
+      .services-grid, .projects-grid, .testimonials-grid, .differentials-grid {
+        grid-template-columns: 1fr;
+      }
+      .footer-grid {
+        grid-template-columns: 1fr;
+      }
+      .lead-section-box {
+        padding: 30px 20px;
+      }
+      .hud-tag {
+        display: none; /* Simplifica o visual no mobile para não cortar */
+      }
+      .phone-frame {
+        width: 100%;
+        max-width: 310px;
+      }
+    }
+
+    /* Respeito a prefers-reduced-motion */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- GRADE DE FUNDO & ELEMENTOS SCI-FI -->
+  <div class="bg-grid"></div>
+  <div class="facet-poly facet-poly-tl"></div>
+  <div class="facet-poly facet-poly-br"></div>
+
+  <!-- 1. MENU FIXO NO TOPO -->
+  <header class="site-header" id="navbar">
+    <div class="container header-inner">
+      <!-- LOGO CREATCODE EM SVG -->
+      <a href="#hero" class="brand-logo" aria-label="CREATCODE Página Inicial">
+        <svg class="logo-svg" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="logoCyanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#5ce8ff"/>
+              <stop offset="50%" stop-color="#1ec8e6"/>
+              <stop offset="100%" stop-color="#1f6bff"/>
+            </linearGradient>
+            <linearGradient id="logoOrangeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#ffa040"/>
+              <stop offset="100%" stop-color="#ff6a00"/>
+            </linearGradient>
+          </defs>
+          <!-- Hexágono Externo Ciano aberto para a direita -->
+          <path d="M75 22 L35 22 L15 50 L35 78 L75 78" stroke="url(#logoCyanGrad)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+          <!-- Hexágono Interno Laranja aberto para a direita -->
+          <path d="M68 36 L43 36 L30 50 L43 64 L68 64" stroke="url(#logoOrangeGrad)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="brand-text">
+          <span class="brand-title">CREATCODE</span>
+          <span class="brand-subtitle">Fábrica de Software</span>
+        </div>
+      </a>
+
+      <!-- MENU DE NAVEGAÇÃO -->
+      <nav aria-label="Navegação principal">
+        <ul class="nav-menu" id="navMenu">
+          <li><a href="#servicos" class="nav-link">Serviços</a></li>
+          <li><a href="#como-trabalhamos" class="nav-link">Como trabalhamos</a></li>
+          <li><a href="#projetos" class="nav-link">Projetos</a></li>
+          <li><a href="#lead-form" class="nav-link">Contato</a></li>
+        </ul>
+      </nav>
+
+      <!-- AÇÕES DO HEADER -->
+      <div class="header-actions">
+        <a href="https://wa.me/5594992415595?text=Ol%C3%A1%2C%20vim%20pelo%20site%20e%20quero%20conversar%20sobre%20um%20projeto" target="_blank" rel="noopener noreferrer" class="btn-orange">
+          Fale conosco
+        </a>
+        <button class="menu-toggle" id="menuToggle" aria-label="Abrir Menu">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 2. HERO SECTION -->
+  <section class="hero-section" id="hero">
+    <div class="container">
+      <div class="hero-grid">
+        
+        <!-- COLUNA ESQUERDA: TEXTO & CTA -->
+        <div class="hero-content">
+          <div class="hud-badge" style="margin-bottom: 20px;">
+            <span class="dot-status"></span>
+            <span>CREATCODE://build // SISTEMA ONLINE</span>
+          </div>
+
+          <p class="hero-terminal-line font-mono">> iniciando projeto_<span class="cursor-blink"></span></p>
+
+          <h1 class="hero-title glitch-text" id="heroTitle" data-decode="Sua empresa precisa de um sistema que ainda não existe?">
+            Sua empresa precisa de um sistema que ainda não existe?
+          </h1>
+
+          <div class="terminal-subblock">
+            <span class="text-muted">> buscar sistema pronto...</span>
+            <span class="terminal-result-orange">✕ 0 resultados encontrados</span>
+          </div>
+
+          <h2 class="hero-answer">
+            A gente <span class="text-cyan">desenvolve.</span>
+          </h2>
+
+          <p class="hero-subtitle">
+            Aplicativos sob medida para o seu negócio. Desenvolvemos do zero com tecnologia moderna, robustez e foco no seu resultado.
+          </p>
+
+          <div class="hero-buttons">
+            <a href="#lead-form" class="btn-orange">
+              Vamos conversar sobre seu projeto?
+            </a>
+            <a href="#servicos" class="btn-secondary">
+              Ver serviços
+            </a>
+          </div>
+        </div>
+
+        <!-- COLUNA DIREITA: MOCKUP DE CELULAR COM DASHBOARD & HUD -->
+        <div class="mockup-wrapper">
+          <!-- Etiquetas HUD ao redor -->
+          <div class="hud-tag hud-tag-1 font-mono">MÓDULO 01 ✓ Tela</div>
+          <div class="hud-tag hud-tag-2 font-mono">MÓDULO 02 ✓ Servidor</div>
+          <div class="hud-tag hud-tag-3 font-mono">MÓDULO 03 ✓ Banco de dados</div>
+
+          <!-- Phone Frame -->
+          <div class="phone-frame">
+            <div class="phone-notch"></div>
+            <div class="phone-screen">
+              <!-- Topbar do App -->
+              <div class="app-topbar">
+                <span>DASHBOARD v2.4</span>
+                <span class="text-green">ONLINE</span>
+              </div>
+
+              <!-- Cards de Métricas -->
+              <div class="stat-card-grid">
+                <div class="stat-item">
+                  <span class="label">Receita</span>
+                  <span class="value text-cyan">R$ 84.5k</span>
+                </div>
+                <div class="stat-item">
+                  <span class="label">Novos Clientes</span>
+                  <span class="value text-green">+34</span>
+                </div>
+                <div class="stat-item">
+                  <span class="label">Pedidos</span>
+                  <span class="value text-orange">128</span>
+                </div>
+              </div>
+
+              <!-- Gráfico de Linha Subindo (SVG) -->
+              <div class="chart-container">
+                <div class="chart-header">
+                  <span>DESEMPENHO REAL</span>
+                  <span class="text-green">+32.8% ↑</span>
+                </div>
+                <svg viewBox="0 0 200 80" style="width: 100%; height: 75px; overflow: visible;">
+                  <defs>
+                    <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stop-color="#1ec8e6" stop-opacity="0.45"/>
+                      <stop offset="100%" stop-color="#1ec8e6" stop-opacity="0.0"/>
+                    </linearGradient>
+                  </defs>
+                  <!-- Linhas guia sutis -->
+                  <line x1="0" y1="20" x2="200" y2="20" stroke="rgba(255,255,255,0.06)" stroke-dasharray="3"/>
+                  <line x1="0" y1="50" x2="200" y2="50" stroke="rgba(255,255,255,0.06)" stroke-dasharray="3"/>
+                  <!-- Área sob o gráfico -->
+                  <polygon points="0,75 20,62 50,68 80,48 110,52 140,28 170,34 200,12 200,80 0,80" fill="url(#chartGrad)"/>
+                  <!-- Linha principal com glow -->
+                  <polyline points="0,75 20,62 50,68 80,48 110,52 140,28 170,34 200,12" fill="none" stroke="#5ce8ff" stroke-width="2.5" stroke-linecap="round"/>
+                  <!-- Ponto no final pulsando -->
+                  <circle cx="200" cy="12" r="4" fill="#2ee59d" filter="drop-shadow(0 0 6px #2ee59d)"/>
+                </svg>
+              </div>
+
+              <!-- Lista de Atividades Recentes -->
+              <div class="feed-container">
+                <div class="feed-title">ATIVIDADES RECENTES</div>
+                <div class="feed-item">
+                  <span class="feed-dot" style="background: var(--success-green);"></span>
+                  <span>Novo lead convertido #4092</span>
+                </div>
+                <div class="feed-item">
+                  <span class="feed-dot" style="background: var(--cyan-main);"></span>
+                  <span>Pagamento aprovado via PIX</span>
+                </div>
+                <div class="feed-item">
+                  <span class="feed-dot" style="background: var(--orange-start);"></span>
+                  <span>Notificação enviada ao cliente</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Piso em perspectiva 3D no rodapé do hero -->
+    <div class="hero-perspective-floor"></div>
+  </section>
+
+  <!-- 3. SERVIÇOS ("// o que a gente constrói") -->
+  <section class="section-padding" id="servicos">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag font-mono">// o que a gente constrói</span>
+        <h2 class="section-title">Soluções de software desenvolvidas para o seu negócio</h2>
+      </div>
+
+      <div class="services-grid">
+        <!-- 01 Aplicativos -->
+        <div class="hud-card hud-cut-corner service-card">
+          <span class="service-num">01</span>
+          <div class="service-icon-box">
+            <svg width="28" height="28" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+              <line x1="12" y1="18" x2="12.01" y2="18"></line>
+            </svg>
+          </div>
+          <h3 class="service-name">Aplicativos</h3>
+          <p class="service-desc">
+            Apps para celular (Android e iOS), desenvolvidos sob medida com interface fluida, rápida e integrada ao cotidiano dos seus usuários.
+          </p>
+        </div>
+
+        <!-- 02 Sistemas Web -->
+        <div class="hud-card hud-cut-corner service-card">
+          <span class="service-num">02</span>
+          <div class="service-icon-box">
+            <svg width="28" height="28" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+              <line x1="8" y1="21" x2="16" y2="21"></line>
+              <line x1="12" y1="17" x2="12" y2="21"></line>
+            </svg>
+          </div>
+          <h3 class="service-name">Sistemas Web</h3>
+          <p class="service-desc">
+            Painéis administrativos, sistemas de gestão e plataformas completas que rodam direto no navegador, acessíveis de qualquer lugar.
+          </p>
+        </div>
+
+        <!-- 03 Integrações -->
+        <div class="hud-card hud-cut-corner service-card">
+          <span class="service-num">03</span>
+          <div class="service-icon-box">
+            <svg width="28" height="28" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <polyline points="16 18 22 12 16 6"></polyline>
+              <polyline points="8 6 2 12 8 18"></polyline>
+              <circle cx="12" cy="12" r="2"></circle>
+            </svg>
+          </div>
+          <h3 class="service-name">Integrações</h3>
+          <p class="service-desc">
+            Conexão entre sistemas legados, APIs, CRMs e automações inteligentes para eliminar tarefas manuais e integrar ferramentas.
+          </p>
+        </div>
+      </div>
+
+      <p class="services-footer-phrase">
+        // Do jeito que a sua empresa precisa.
+      </p>
+    </div>
+  </section>
+
+  <!-- 4. COMO TRABALHAMOS (LINHA DO TEMPO & EDITOR DE CÓDIGO) -->
+  <section class="section-padding" id="como-trabalhamos">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag font-mono">// fluxo de engenharia</span>
+        <h2 class="section-title">Como trabalhamos</h2>
+      </div>
+
+      <!-- Linha do tempo com 5 passos -->
+      <div class="timeline-wrapper">
+        <div class="timeline-steps">
+          <div class="step-card">
+            <div class="step-badge">PASSO 01</div>
+            <h3 class="step-title">Conversa e entendimento</h3>
+            <p class="step-desc">Mapeamos as regras de negócio, dores e objetivos específicos da sua operação.</p>
+          </div>
+
+          <div class="step-card">
+            <div class="step-badge">PASSO 02</div>
+            <h3 class="step-title">Protótipo das telas</h3>
+            <p class="step-desc">Você navega e valida as interfaces antes mesmo de escrevermos a primeira linha de código.</p>
+          </div>
+
+          <div class="step-card">
+            <div class="step-badge">PASSO 03</div>
+            <h3 class="step-title">Desenvolvimento</h3>
+            <p class="step-desc">Construção em sprints ágeis, com entregas parciais para você acompanhar a evolução.</p>
+          </div>
+
+          <div class="step-card">
+            <div class="step-badge">PASSO 04</div>
+            <h3 class="step-title">Testes rigorosos</h3>
+            <p class="step-desc">Testes de segurança, carga, usabilidade e estabilidade em múltiplos dispositivos.</p>
+          </div>
+
+          <div class="step-card">
+            <div class="step-badge">PASSO 05</div>
+            <h3 class="step-title">Entrega e suporte</h3>
+            <p class="step-desc">Implantação em produção com suporte contínuo, monitoramento e treinamento da equipe.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Janela de Editor de Código Decorativa -->
+      <div class="code-window">
+        <div class="code-window-bar">
+          <div class="code-dots">
+            <span class="code-dot red"></span>
+            <span class="code-dot yellow"></span>
+            <span class="code-dot green"></span>
+          </div>
+          <span>creatcode-core.ts — UTF-8</span>
+          <span class="text-green">READY</span>
+        </div>
+        <div class="code-content">
+          <p><span class="code-comment">// Criando arquitetura escalável e sob medida</span></p>
+          <p><span class="code-kw">import</span> { SoftwareEngine, CloudScale } <span class="code-kw">from</span> <span class="code-str">"@creatcode/framework"</span>;</p>
+          <br>
+          <p><span class="code-kw">export async function</span> <span class="code-fn">buildTailoredSolution</span>(clientNeed: <span class="code-str">"Personalizado"</span>) {</p>
+          <p style="padding-left: 20px;"><span class="code-kw">const</span> solution = <span class="code-kw">new</span> SoftwareEngine({ cleanCode: <span class="code-str">true</span>, highPerformance: <span class="code-str">true</span> });</p>
+          <p style="padding-left: 20px;"><span class="code-kw">await</span> solution.validatePipeline();</p>
+          <p style="padding-left: 20px;"><span class="code-kw">return</span> solution.deployToProduction({ monitoring: <span class="code-str">"24/7"</span> });</p>
+          <p>}</p>
+        </div>
+        <div class="code-statusbar">
+          <span>> build ████████████████ 100%</span>
+          <span class="text-green">✓ pronto para produção</span>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 5. POR QUE A CREATCODE (4 DIFERENCIAIS) -->
+  <section class="section-padding" id="diferenciais">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag font-mono">// diferenciais competitivos</span>
+        <h2 class="section-title">Por que escolher a CREATCODE?</h2>
+      </div>
+
+      <div class="differentials-grid">
+        <div class="hud-card hud-cut-corner differential-card">
+          <div class="diff-icon">
+            <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+            </svg>
+          </div>
+          <h3 class="diff-title">Feito sob medida</h3>
+          <p class="diff-desc">Não usamos templates genéricos ou sistemas engessados. Cada funcionalidade é desenhada para a sua rotina.</p>
+        </div>
+
+        <div class="hud-card hud-cut-corner differential-card">
+          <div class="diff-icon">
+            <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+            </svg>
+          </div>
+          <h3 class="diff-title">Tecnologia moderna</h3>
+          <p class="diff-desc">Código limpo, arquitetura em nuvem, APIs de alta velocidade e design preparado para escalar com o seu crescimento.</p>
+        </div>
+
+        <div class="hud-card hud-cut-corner differential-card">
+          <div class="diff-icon">
+            <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+          </div>
+          <h3 class="diff-title">Acompanhamento de perto</h3>
+          <p class="diff-desc">Comunicação clara e direta pelo WhatsApp com os engenheiros responsáveis pelo seu projeto, sem enrolação.</p>
+        </div>
+
+        <div class="hud-card hud-cut-corner differential-card">
+          <div class="diff-icon">
+            <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            </svg>
+          </div>
+          <h3 class="diff-title">Suporte pós-entrega</h3>
+          <p class="diff-desc">Garantia ativa, correções imediatas, melhorias contínuas e evolução técnica do seu software após o lançamento.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. PROJETOS (COM CONTEÚDO DE EXEMPLO CLARAMENTE MARCADO) -->
+  <section class="section-padding" id="projetos">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag font-mono">// portfólio de engenharia</span>
+        <h2 class="section-title">Projetos recentes</h2>
+      </div>
+
+      <div class="projects-grid">
+        <!-- Projeto 1 -->
+        <div class="hud-card hud-cut-corner project-card">
+          <div class="project-image-box">
+            <span class="project-badge-example">[exemplo — substituir]</span>
+            <svg width="48" height="48" fill="none" stroke="var(--cyan-main)" viewBox="0 0 24 24" stroke-width="1.5">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+              <line x1="8" y1="21" x2="16" y2="21"></line>
+              <line x1="12" y1="17" x2="12" y2="21"></line>
+            </svg>
+          </div>
+          <div class="project-info">
+            <div>
+              <h3 class="project-name">Plataforma Logística Express</h3>
+              <p class="project-desc">Sistema web em tempo real para rastreamento de frotas e roteirização automatizada de entregas.</p>
+            </div>
+            <span class="project-tag font-mono">// REACT + CLOUD API</span>
+          </div>
+        </div>
+
+        <!-- Projeto 2 -->
+        <div class="hud-card hud-cut-corner project-card">
+          <div class="project-image-box">
+            <span class="project-badge-example">[exemplo — substituir]</span>
+            <svg width="48" height="48" fill="none" stroke="var(--cyan-main)" viewBox="0 0 24 24" stroke-width="1.5">
+              <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+              <line x1="12" y1="18" x2="12.01" y2="18"></line>
+            </svg>
+          </div>
+          <div class="project-info">
+            <div>
+              <h3 class="project-name">App de Telemedicina Saúde+</h3>
+              <p class="project-desc">Aplicativo iOS e Android com prontuário eletrônico integrado, prescrição digital e videoconferência.</p>
+            </div>
+            <span class="project-tag font-mono">// FLUTTER + WEBRTC</span>
+          </div>
+        </div>
+
+        <!-- Projeto 3 -->
+        <div class="hud-card hud-cut-corner project-card">
+          <div class="project-image-box">
+            <span class="project-badge-example">[exemplo — substituir]</span>
+            <svg width="48" height="48" fill="none" stroke="var(--cyan-main)" viewBox="0 0 24 24" stroke-width="1.5">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+            </svg>
+          </div>
+          <div class="project-info">
+            <div>
+              <h3 class="project-name">Hub de Automação Financeira</h3>
+              <p class="project-desc">Integração omnichannel entre gateways bancários, conciliação de pagamentos PIX e ERP fiscal.</p>
+            </div>
+            <span class="project-tag font-mono">// NODE.JS + MICROSERVIÇOS</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7. DEPOIMENTOS (ESTRUTURA COM [EXEMPLO — SUBSTITUIR]) -->
+  <section class="section-padding" id="depoimentos">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag font-mono">// feedbacks de clientes</span>
+        <h2 class="section-title">O que dizem os parceiros</h2>
+      </div>
+
+      <div class="testimonials-grid">
+        <!-- Depoimento 1 -->
+        <div class="hud-card hud-cut-corner testimonial-card">
+          <p class="testimonial-quote">
+            "[exemplo — substituir] A CREATCODE entendeu perfeitamente a complexidade do nosso modelo de negócio e entregou uma solução muito superior aos softwares prontos de mercado."
+          </p>
+          <div class="testimonial-author">
+            <div class="author-avatar">CC</div>
+            <div>
+              <div class="author-name">[Nome do Cliente — substituir]</div>
+              <div class="author-role">[Diretor de Operações — substituir]</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Depoimento 2 -->
+        <div class="hud-card hud-cut-corner testimonial-card">
+          <p class="testimonial-quote">
+            "[exemplo — substituir] O aplicativo transformou o atendimento dos nossos técnicos no campo. Economizamos centenas de horas operacionais todo mês."
+          </p>
+          <div class="testimonial-author">
+            <div class="author-avatar">CC</div>
+            <div>
+              <div class="author-name">[Nome do Cliente — substituir]</div>
+              <div class="author-role">[Fundador & CEO — substituir]</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Depoimento 3 -->
+        <div class="hud-card hud-cut-corner testimonial-card">
+          <p class="testimonial-quote">
+            "[exemplo — substituir] O suporte contínuo pós-lançamento nos dá total segurança. A equipe da CREATCODE é ágil, técnica e transparente."
+          </p>
+          <div class="testimonial-author">
+            <div class="author-avatar">CC</div>
+            <div>
+              <div class="author-name">[Nome do Cliente — substituir]</div>
+              <div class="author-role">[Gerente de Tecnologia — substituir]</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8. CAPTAÇÃO DE LEADS (FORMULÁRIO ESTILO TERMINAL HUD) -->
+  <section class="section-padding" id="lead-form">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag font-mono">// conte seu projeto</span>
+        <h2 class="section-title glitch-text" id="leadTitle" data-decode="Vamos tirar sua ideia do papel?">
+          Vamos tirar sua ideia do papel?
+        </h2>
+        <p class="text-sec" style="margin-top: 10px;">Preencha os dados e a gente chama você no WhatsApp.</p>
+      </div>
+
+      <div class="hud-card hud-cut-corner lead-section-box">
+        <form id="leadCaptureForm" novalidate>
+          
+          <!-- CAMPO HONEYPOT ANTI-SPAM (ESCONDIDO) -->
+          <div style="display: none;" aria-hidden="true">
+            <input type="text" name="empresa_website_hp" id="empresa_website_hp" tabindex="-1" autocomplete="off">
+          </div>
+
+          <!-- NOME COMPLETO -->
+          <div class="form-group">
+            <label for="leadNome" class="form-label">> nome completo *</label>
+            <input 
+              type="text" 
+              id="leadNome" 
+              name="nome" 
+              class="form-input" 
+              placeholder="Digite seu nome completo" 
+              required
+              autocomplete="name"
+            >
+            <div class="form-error-msg" id="errNome" aria-live="polite"></div>
+          </div>
+
+          <!-- E-MAIL -->
+          <div class="form-group">
+            <label for="leadEmail" class="form-label">> e-mail corporativo ou pessoal *</label>
+            <input 
+              type="email" 
+              id="leadEmail" 
+              name="email" 
+              class="form-input" 
+              placeholder="seuemail@empresa.com.br" 
+              required
+              autocomplete="email"
+            >
+            <div class="form-error-msg" id="errEmail" aria-live="polite"></div>
+          </div>
+
+          <!-- TELEFONE / WHATSAPP -->
+          <div class="form-group">
+            <label for="leadTelefone" class="form-label">> telefone / whatsapp com ddd *</label>
+            <input 
+              type="tel" 
+              id="leadTelefone" 
+              name="telefone" 
+              class="form-input" 
+              placeholder="(00) 00000-0000" 
+              required
+              maxlength="15"
+              autocomplete="tel"
+            >
+            <div class="form-error-msg" id="errTelefone" aria-live="polite"></div>
+          </div>
+
+          <!-- DESCRIÇÃO DO PROJETO -->
+          <div class="form-group">
+            <label for="leadProjeto" class="form-label">> descreva brevemente o projeto *</label>
+            <textarea 
+              id="leadProjeto" 
+              name="projeto" 
+              class="form-textarea" 
+              maxlength="500" 
+              placeholder="Ex: Preciso de um aplicativo sob medida para controle de serviços e um painel web administrativo..."
+              required
+            ></textarea>
+            <div class="form-footer-info">
+              <div class="form-error-msg" id="errProjeto" aria-live="polite"></div>
+              <div class="char-counter" id="charCounter">0 / 500</div>
+            </div>
+          </div>
+
+          <!-- BOTÃO DE ENVIO & PRIVACIDADE -->
+          <div class="form-submit-row">
+            <button type="submit" id="btnSubmitLead" class="btn-orange" style="width: 100%;">
+              Enviar e falar no WhatsApp
+            </button>
+            <p class="privacy-text">
+              Seus dados são usados apenas para entrarmos em contato sobre o seu projeto.
+            </p>
+          </div>
+
+          <!-- TERMINAL DE CONFIRMAÇÃO -->
+          <div class="lead-status-box" id="leadStatus">
+            > lead recebido ✓ abrindo WhatsApp...
+          </div>
+
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9. CHAMADA FINAL (CTA) -->
+  <section class="final-cta-section" id="contato">
+    <div class="container">
+      
+      <!-- LOGO GRANDE COM ANEL HUD GIRANDO -->
+      <div class="cta-hud-ring-wrapper">
+        <div class="hud-rotating-ring"></div>
+        <div class="hud-rotating-ring-2"></div>
+        <svg class="logo-svg" style="width: 80px; height: 80px;" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Hexágono Externo Ciano -->
+          <path d="M75 22 L35 22 L15 50 L35 78 L75 78" stroke="url(#logoCyanGrad)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+          <!-- Hexágono Interno Laranja -->
+          <path d="M68 36 L43 36 L30 50 L43 64 L68 64" stroke="url(#logoOrangeGrad)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+
+      <h2 class="cta-title">CREATCODE — Fábrica de Software</h2>
+      <p class="hero-subtitle" style="margin: 0 auto 36px;">
+        Pronto para criar uma solução sob medida com tecnologia de ponta?
+      </p>
+
+      <div>
+        <a href="#lead-form" class="btn-orange">
+          Vamos conversar sobre seu projeto?
+        </a>
+      </div>
+
+      <div style="margin-top: 36px;">
+        <a href="https://wa.me/5594992415595?text=Ol%C3%A1%2C%20vim%20pelo%20site%20e%20quero%20conversar%20sobre%20um%20projeto" target="_blank" rel="noopener noreferrer" class="cta-wa-direct font-mono">
+          <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86s.274.072.376-.043c.101-.116.433-.506.549-.68.116-.173.231-.145.39-.087s1.011.477 1.184.564.289.13.332.202c.045.072.045.419-.099.824zm-3.423-14.416c-6.627 0-12 5.373-12 12 0 2.155.57 4.179 1.564 5.926l-1.636 5.974 6.136-1.609c1.705.932 3.655 1.469 5.736 1.469 6.627 0 12-5.373 12-12s-5.373-12-12-12z"/>
+          </svg>
+          <span>// chame no WhatsApp: (94) 99241-5595</span>
+        </a>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 10. RODAPÉ -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="brand-logo" style="margin-bottom: 14px;">
+            <svg class="logo-svg" viewBox="0 0 100 100" fill="none">
+              <path d="M75 22 L35 22 L15 50 L35 78 L75 78" stroke="url(#logoCyanGrad)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M68 36 L43 36 L30 50 L43 64 L68 64" stroke="url(#logoOrangeGrad)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <div class="brand-text">
+              <span class="brand-title">CREATCODE</span>
+              <span class="brand-subtitle">Fábrica de Software</span>
+            </div>
+          </div>
+          <p class="text-sec" style="font-size: 0.9rem; max-width: 300px;">
+            Engenharia de software personalizada para impulsionar a operação de empresas ambiciosas.
+          </p>
+        </div>
+
+        <div>
+          <h4 class="footer-col-title">// navegação</h4>
+          <ul class="footer-links font-mono">
+            <li><a href="#hero">Início</a></li>
+            <li><a href="#servicos">Serviços</a></li>
+            <li><a href="#como-trabalhamos">Como trabalhamos</a></li>
+            <li><a href="#projetos">Projetos</a></li>
+            <li><a href="#lead-form">Contato</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 class="footer-col-title">// contato</h4>
+          <ul class="footer-links font-mono">
+            <li><span class="text-muted">WhatsApp:</span> <a href="https://wa.me/5594992415595" target="_blank" rel="noopener noreferrer">(94) 99241-5595</a></li>
+            <li><span class="text-muted">Status:</span> <span class="text-green">Atendimento online</span></li>
+            <li><span class="text-muted">Local:</span> Brasil</li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 class="footer-col-title">// conexão</h4>
+          <ul class="footer-links font-mono">
+            <li><a href="#" target="_blank" rel="noopener noreferrer">Instagram [exemplo]</a></li>
+            <li><a href="#" target="_blank" rel="noopener noreferrer">LinkedIn [exemplo]</a></li>
+            <li><a href="#" target="_blank" rel="noopener noreferrer">GitHub [exemplo]</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <div>
+          © CREATCODE — Fábrica de Software. Todos os direitos reservados.
+        </div>
+        <div class="hud-badge">
+          <span class="dot-status"></span>
+          <span>SECURITY LEVEL: NORMAL // ENCRYPTED</span>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- BOTÃO FLUTUANTE DO WHATSAPP -->
+  <a href="https://wa.me/5594992415595?text=Ol%C3%A1%2C%20vim%20pelo%20site%20e%20quero%20conversar%20sobre%20um%20projeto" 
+     class="wa-float-btn" 
+     target="_blank" 
+     rel="noopener noreferrer" 
+     aria-label="Falar pelo WhatsApp">
+    <div class="wa-float-pulse"></div>
+    <svg width="32" height="32" fill="currentColor" viewBox="0 0 24 24">
+      <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86s.274.072.376-.043c.101-.116.433-.506.549-.68.116-.173.231-.145.39-.087s1.011.477 1.184.564.289.13.332.202c.045.072.045.419-.099.824zm-3.423-14.416c-6.627 0-12 5.373-12 12 0 2.155.57 4.179 1.564 5.926l-1.636 5.974 6.136-1.609c1.705.932 3.655 1.469 5.736 1.469 6.627 0 12-5.373 12-12s-5.373-12-12-12z"/>
+    </svg>
+  </a>
+
+  <!-- ==========================================================================
+       SCRIPTS COM CONFIGURAÇÕES EDITÁVEIS NO TOPO
+       ========================================================================== -->
+  <script>
+    /**
+     * CONFIGURAÇÕES EDITÁVEIS DA CREATCODE
+     */
+    const CONFIG = {
+      WHATSAPP_NUMERO: "5594992415595",
+      TELEFONE_EXIBIDO: "(94) 99241-5595",
+      MENSAGEM_PADRAO: "Olá, vim pelo site e quero conversar sobre um projeto",
+      ENDPOINT_LEADS: "" // Opcional: URL Webhook, Make, Google Sheets Apps Script, Formspree
+    };
+
+    document.addEventListener("DOMContentLoaded", () => {
+      // 1. Menu Mobile Hamburger
+      const menuToggle = document.getElementById("menuToggle");
+      const navMenu = document.getElementById("navMenu");
+      if (menuToggle && navMenu) {
+        menuToggle.addEventListener("click", () => {
+          navMenu.classList.toggle("is-open");
+        });
+        navMenu.querySelectorAll(".nav-link").forEach(link => {
+          link.addEventListener("click", () => navMenu.classList.remove("is-open"));
+        });
+      }
+
+      // 2. Efeito Header ao Rolar
+      const navbar = document.getElementById("navbar");
+      window.addEventListener("scroll", () => {
+        if (window.scrollY > 40) {
+          navbar.classList.add("scrolled");
+        } else {
+          navbar.classList.remove("scrolled");
+        }
+      });
+
+      // 3. Efeito de Decodificação de Texto HUD (0 1 < > / { } # $)
+      const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      
+      function decodeText(element) {
+        if (prefersReducedMotion) return;
+        const targetText = element.getAttribute("data-decode") || element.innerText;
+        const chars = "01<>{}/#$!*?%_~[]";
+        let iteration = 0;
+        const interval = setInterval(() => {
+          element.innerText = targetText
+            .split("")
+            .map((char, index) => {
+              if (index < iteration) return targetText[index];
+              if (char === " ") return " ";
+              return chars[Math.floor(Math.random() * chars.length)];
+            })
+            .join("");
+
+          if (iteration >= targetText.length) {
+            clearInterval(interval);
+            element.classList.add("glitch-active");
+          }
+          iteration += 1;
+        }, 30);
+      }
+
+      // Executa decodificação no Hero e no título do Lead ao carregar
+      const heroTitle = document.getElementById("heroTitle");
+      if (heroTitle) decodeText(heroTitle);
+
+      const leadTitle = document.getElementById("leadTitle");
+      if (leadTitle) {
+        const observer = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              decodeText(leadTitle);
+              observer.unobserve(leadTitle);
+            }
+          });
+        }, { threshold: 0.3 });
+        observer.observe(leadTitle);
+      }
+
+      // 4. Máscara de Telefone Brasileira: (00) 00000-0000
+      const inputTel = document.getElementById("leadTelefone");
+      if (inputTel) {
+        inputTel.addEventListener("input", (e) => {
+          let v = e.target.value.replace(/\D/g, "");
+          if (v.length > 11) v = v.slice(0, 11);
+
+          if (v.length > 10) {
+            // (11) 98765-4321
+            v = v.replace(/^(\d{2})(\d{5})(\d{4})$/, "($1) $2-$3");
+          } else if (v.length > 6) {
+            // (11) 9876-5432
+            v = v.replace(/^(\d{2})(\d{4,5})(\d{0,4})$/, "($1) $2-$3");
+          } else if (v.length > 2) {
+            v = v.replace(/^(\d{2})(\d{0,5})$/, "($1) $2");
+          } else if (v.length > 0) {
+            v = v.replace(/^(\d{0,2})$/, "($1");
+          }
+          e.target.value = v;
+        });
+      }
+
+      // 5. Contador de Caracteres da Descrição
+      const inputProjeto = document.getElementById("leadProjeto");
+      const charCounter = document.getElementById("charCounter");
+      if (inputProjeto && charCounter) {
+        inputProjeto.addEventListener("input", () => {
+          charCounter.innerText = `${inputProjeto.value.length} / 500`;
+        });
+      }
+
+      // 6. Validação e Envio do Formulário de Leads
+      const leadForm = document.getElementById("leadCaptureForm");
+      const btnSubmit = document.getElementById("btnSubmitLead");
+      const leadStatus = document.getElementById("leadStatus");
+
+      if (leadForm) {
+        leadForm.addEventListener("submit", async (e) => {
+          e.preventDefault();
+
+          // Honeypot anti-spam check
+          const honeypot = document.getElementById("empresa_website_hp")?.value;
+          if (honeypot) {
+            console.warn("Spam detectado via honeypot.");
+            return;
+          }
+
+          // Elementos de erro
+          const errNome = document.getElementById("errNome");
+          const errEmail = document.getElementById("errEmail");
+          const errTelefone = document.getElementById("errTelefone");
+          const errProjeto = document.getElementById("errProjeto");
+
+          errNome.innerText = "";
+          errEmail.innerText = "";
+          errTelefone.innerText = "";
+          errProjeto.innerText = "";
+
+          const nomeVal = document.getElementById("leadNome").value.trim();
+          const emailVal = document.getElementById("leadEmail").value.trim();
+          const telVal = document.getElementById("leadTelefone").value.trim();
+          const projVal = document.getElementById("leadProjeto").value.trim();
+
+          let isValid = true;
+
+          // Validação Nome
+          if (!nomeVal || nomeVal.length < 3) {
+            errNome.innerText = "> informe seu nome completo.";
+            document.getElementById("leadNome").classList.add("is-invalid");
+            isValid = false;
+          } else {
+            document.getElementById("leadNome").classList.remove("is-invalid");
+          }
+
+          // Validação Email
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailVal || !emailRegex.test(emailVal)) {
+            errEmail.innerText = "> insira um e-mail válido.";
+            document.getElementById("leadEmail").classList.add("is-invalid");
+            isValid = false;
+          } else {
+            document.getElementById("leadEmail").classList.remove("is-invalid");
+          }
+
+          // Validação Telefone
+          const rawTel = telVal.replace(/\D/g, "");
+          if (rawTel.length < 10) {
+            errTelefone.innerText = "> digite o telefone com DDD.";
+            document.getElementById("leadTelefone").classList.add("is-invalid");
+            isValid = false;
+          } else {
+            document.getElementById("leadTelefone").classList.remove("is-invalid");
+          }
+
+          // Validação Projeto
+          if (!projVal || projVal.length < 10) {
+            errProjeto.innerText = "> descreva seu projeto com pelo menos 10 caracteres.";
+            document.getElementById("leadProjeto").classList.add("is-invalid");
+            isValid = false;
+          } else {
+            document.getElementById("leadProjeto").classList.remove("is-invalid");
+          }
+
+          if (!isValid) return;
+
+          // Bloqueio contra clique duplo
+          btnSubmit.disabled = true;
+          btnSubmit.innerText = "Processando lead...";
+
+          // Mensagem formatada para o WhatsApp
+          const waMessage = `Olá, vim pelo site. Meu nome é ${nomeVal}. E-mail: ${emailVal}. Telefone: ${telVal}. Projeto: ${projVal}`;
+          const waUrl = `https://wa.me/${CONFIG.WHATSAPP_NUMERO}?text=${encodeURIComponent(waMessage)}`;
+
+          // Se houver ENDPOINT_LEADS configurado, envia em background via POST JSON
+          if (CONFIG.ENDPOINT_LEADS && CONFIG.ENDPOINT_LEADS.trim() !== "") {
+            try {
+              const payload = {
+                nome: nomeVal,
+                email: emailVal,
+                telefone: telVal,
+                projeto: projVal,
+                data_hora: new Date().toISOString(),
+                pagina_origem: window.location.href
+              };
+
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+              await fetch(CONFIG.ENDPOINT_LEADS, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+                signal: controller.signal
+              });
+              clearTimeout(timeoutId);
+            } catch (err) {
+              console.warn("Aviso: Falha ao enviar para ENDPOINT_LEADS em segundo plano, prosseguindo com WhatsApp.", err);
+            }
+          }
+
+          // Feedback visual estilo terminal
+          if (leadStatus) {
+            leadStatus.style.display = "block";
+            leadStatus.innerText = "> lead recebido ✓ abrindo WhatsApp...";
+          }
+
+          // Redireciona para o WhatsApp após breve delay para feedback
+          setTimeout(() => {
+            window.open(waUrl, "_blank");
+            btnSubmit.disabled = false;
+            btnSubmit.innerText = "Enviar e falar no WhatsApp";
+          }, 800);
+        });
+      }
+    });
+  </script>
+</body>
+</html>
+
