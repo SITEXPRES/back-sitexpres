@@ -97,6 +97,12 @@ export const check_domain_availability = async (req, res) => {
         // 🌐 Se for domínio .br, consulta diretamente na API Cloux / Registro.br (100% grátis e preciso)
         if (isDominioBr(domainFull)) {
             const consultaBr = await consultarDisponibilidadeBr(domainFull);
+            if (!consultaBr || consultaBr.success === false) {
+                return res.status(502).json({
+                    success: false,
+                    message: consultaBr?.error || 'Erro ao consultar disponibilidade no Registro.br'
+                });
+            }
             const disponivel = Boolean(consultaBr?.disponivel);
 
             return res.status(200).json({

@@ -111,13 +111,13 @@ export function extrairNumeroEndereco(endereco, numeroFornecido) {
 
 /**
  * 🌐 Rota 1: Consulta de Disponibilidade (100% Grátis)
- * URL: https://painel.cloux.com.br/registrabr/api/consultar.php
+ * URL: https://painel.cloudx.com.br/registrabr/api/consultar.php
  */
 export async function consultarDisponibilidadeBr(dominio) {
   const inicio = Date.now();
   const dominioFormatado = normalizarDominio(dominio);
 
-  const baseUrl = process.env.REGISTROBR_API_URL || 'https://painel.cloux.com.br/registrabr/api';
+  const baseUrl = process.env.REGISTROBR_API_URL || 'https://painel.cloudx.com.br/registrabr/api';
   const token = process.env.REGISTROBR_API_TOKEN || 'sitexpress_sec_token_9f83b2a7e4c1d682490ac9e';
 
   const url = `${baseUrl.replace(/\/+$/, '')}/consultar.php`;
@@ -129,7 +129,7 @@ export async function consultarDisponibilidadeBr(dominio) {
         'Authorization': `Bearer ${token}`,
         'Accept': 'application/json'
       },
-      timeout: 15000
+      timeout: 10000
     });
 
     const tempoMs = Date.now() - inicio;
@@ -137,28 +137,62 @@ export async function consultarDisponibilidadeBr(dominio) {
 
     return response.data;
   } catch (error) {
-    const tempoMs = Date.now() - inicio;
-    const erroData = error.response ? error.response.data : { message: error.message };
-    logOperacao('CONSULTAR_DISPONIBILIDADE', { dominio: dominioFormatado }, erroData, error, tempoMs);
+    console.warn(`[REGISTRO.BR] Falha na API Cloudx (${error.message}). Tentando consulta direta no Registro.br...`);
 
-    return {
-      success: false,
-      code: error.response?.status || 500,
-      dominio: dominioFormatado,
-      disponivel: false,
-      error: erroData.error || erroData.message || 'Falha ao consultar disponibilidade no Registro.br'
-    };
+    // Fallback de alta disponibilidade: consulta direta oficial do Registro.br
+    try {
+      const fbInicio = Date.now();
+      const fbResp = await axios.get(`https://registro.br/v2/ajax/avail/raw/${dominioFormatado}`, {
+        timeout: 8000,
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+        }
+      });
+
+      const fbData = fbResp.data;
+      // status: 0 = disponível, 2 = registrado, 1 = em processo de liberação, 3 = inválido/reservado
+      const disponivel = fbData?.status === 0;
+
+      const resultadoFallback = {
+        success: true,
+        code: 200,
+        dominio: dominioFormatado,
+        disponivel: disponivel,
+        message: disponivel
+          ? `O domínio ${dominioFormatado} está disponível para registro.`
+          : `O domínio ${dominioFormatado} já se encontra registrado ou não está disponível.`,
+        origem: 'registro.br (fallback direto)',
+        raw: fbData
+      };
+
+      const tempoMs = Date.now() - fbInicio;
+      logOperacao('CONSULTAR_DISPONIBILIDADE_FALLBACK', { dominio: dominioFormatado }, resultadoFallback, null, tempoMs);
+      return resultadoFallback;
+    } catch (fallbackErr) {
+      const tempoMs = Date.now() - inicio;
+      const erroData = error.response ? error.response.data : { message: error.message };
+      logOperacao('CONSULTAR_DISPONIBILIDADE', { dominio: dominioFormatado }, erroData, error, tempoMs);
+
+      return {
+        success: false,
+        code: error.response?.status || 500,
+        dominio: dominioFormatado,
+        disponivel: false,
+        error: erroData.error || erroData.message || 'Falha ao consultar disponibilidade no Registro.br'
+      };
+    }
   }
 }
 
 /**
  * 🚀 Rota 2: Registro de Domínio via API Registro.br / Cloux
- * URL: https://painel.cloux.com.br/registrabr/api/registrar.php
+ * URL: https://painel.cloudx.com.br/registrabr/api/registrar.php
  */
 export async function registrarDominioBr(dados) {
   const inicio = Date.now();
 
-  const baseUrl = process.env.REGISTROBR_API_URL || 'https://painel.cloux.com.br/registrabr/api';
+  const baseUrl = process.env.REGISTROBR_API_URL || 'https://painel.cloudx.com.br/registrabr/api';
   const token = process.env.REGISTROBR_API_TOKEN || 'sitexpress_sec_token_9f83b2a7e4c1d682490ac9e';
   const url = `${baseUrl.replace(/\/+$/, '')}/registrar.php`;
 
