@@ -329,6 +329,8 @@ export const consultarPix = async (req, res) => {
                 status: "CONCLUIDA",
                 jaProcessado: true,
                 mensagem: "Pagamento já creditado!",
+                domain: transacao.full_domain,
+                full_domain: transacao.full_domain,
                 redirect: `https://sitexpres.com.br/sucesso?order=${txid}`
             });
         }
@@ -1453,7 +1455,7 @@ export const consultarPix_dominio = async (req, res) => {
         });
 
         // 3. Se NÃO estiver CONCLUIDA → só retorna o status (não faz nada no banco)
-        /*     
+
         if (respostaInter.status !== "CONCLUIDA") {
                 console.log(`Pix ${txid} ainda não pago. Status: ${respostaInter.status || 'não encontrado'}`);
                 return res.json({
@@ -1462,7 +1464,7 @@ export const consultarPix_dominio = async (req, res) => {
                     mensagem: "Aguardando pagamento..."
                 });
             }
-        */
+
 
         // 4. AQUI O PAGAMENTO ESTÁ CONCLUÍDO NO INTER!
         console.log(`PAGAMENTO CONFIRMADO no Inter! Valor: ${respostaInter.valor?.original}`);
@@ -1492,6 +1494,8 @@ export const consultarPix_dominio = async (req, res) => {
                 status: "CONCLUIDA",
                 jaProcessado: true,
                 mensagem: "Pagamento já creditado!",
+                domain: transacao.full_domain,
+                full_domain: transacao.full_domain,
                 redirect: `https://sitexpres.com.br/sucesso?order=${txid}`
             });
         }
