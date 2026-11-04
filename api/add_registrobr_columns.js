@@ -23,7 +23,7 @@ async function addRegistroBrColumns() {
       ADD COLUMN IF NOT EXISTS customer_zipcode VARCHAR(50),
       ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50),
       ADD COLUMN IF NOT EXISTS payment_reference VARCHAR(255),
-      ADD COLUMN IF NOT EXISTS id_projeto INTEGER,
+      ADD COLUMN IF NOT EXISTS id_projeto VARCHAR(255),
       ADD COLUMN IF NOT EXISTS link_nota TEXT,
       ADD COLUMN IF NOT EXISTS cpf_cnpj VARCHAR(50),
       ADD COLUMN IF NOT EXISTS data_nascimento VARCHAR(50),
