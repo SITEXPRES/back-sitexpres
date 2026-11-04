@@ -271,13 +271,17 @@ export async function registrarDominioBr(dados) {
     const tempoMs = Date.now() - inicio;
     logOperacao('REGISTRAR_DOMINIO', payload, response.data, null, tempoMs);
 
+    const isSuccess = Boolean(response.data?.success);
+
     return {
-      success: true,
-      code: response.status,
+      success: isSuccess,
+      code: response.data?.code || response.status,
       data: response.data,
       dominio: dominioFormatado,
       ticket: response.data?.ticket || null,
-      message: response.data?.message || 'Domínio registrado com sucesso no Registro.br!'
+      error: !isSuccess ? (response.data?.error || response.data?.message || 'Falha no registro do Registro.br') : null,
+      erros: response.data?.erros || null,
+      message: response.data?.message || (isSuccess ? 'Domínio registrado com sucesso no Registro.br!' : 'Falha ao registrar domínio no Registro.br')
     };
   } catch (error) {
     const tempoMs = Date.now() - inicio;
