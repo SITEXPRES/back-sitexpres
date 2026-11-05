@@ -34,13 +34,37 @@ export function extrairRotasDoReact(reactCode) {
 }
 
 // Extrai metadados da rota com base no nome do site e no componente correspondente
-export function gerarMetadadosPorRota(rota, siteName, domain = 'cloudx.com.br') {
-  const baseDomain = domain.replace(/^https?:\/\//, '').replace(/\/$/, '');
+export function gerarMetadadosPorRota(rota, siteName, domain = 'sitexpres.com.br') {
+  const baseDomain = (domain || 'sitexpres.com.br').replace(/^https?:\/\//, '').replace(/\/$/, '');
   const baseUrl = `https://${baseDomain}`;
   const rotaChave = (rota === '' || rota === '/') ? '/' : (rota.startsWith('/') ? rota : `/${rota}`).replace(/\/$/, '');
   const canonicalUrl = rotaChave === '/' ? `${baseUrl}/` : `${baseUrl}${rotaChave}/`;
 
-  // Mapeamento semântico inteligente baseado no slug da rota
+  const isCloudX = (domain && domain.toLowerCase().includes('cloudx')) || (siteName && siteName.toLowerCase().includes('cloudx'));
+
+  // Para sites de clientes comuns, NÃO usar textos ou palavras-chave de hospedagem/VPS da CloudX
+  if (!isCloudX) {
+    const nomeLimpo = (siteName && siteName !== 'Meu Site') ? siteName : 'Meu Site';
+    if (rotaChave === '/') {
+      return {
+        title: `${nomeLimpo}`,
+        description: `Bem-vindo ao site oficial de ${nomeLimpo}. Conheça nossos produtos e serviços online.`,
+        keywords: `${nomeLimpo.toLowerCase()}, site oficial, servicos, novidades`,
+        type: 'WebSite',
+        canonicalUrl
+      };
+    }
+    const nomeAmigavel = rotaChave.replace(/^\//, '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    return {
+      title: `${nomeAmigavel} | ${nomeLimpo}`,
+      description: `Confira ${nomeAmigavel} no site oficial de ${nomeLimpo}.`,
+      keywords: `${nomeAmigavel.toLowerCase()}, ${nomeLimpo.toLowerCase()}, servicos`,
+      type: 'WebPage',
+      canonicalUrl
+    };
+  }
+
+  // Mapeamento semântico exclusivo para o site oficial da CloudX
   const routeDefinitions = {
     '/': {
       title: `${siteName} | Hospedagem de Sites, VPS e Cloud de Alta Performance no Brasil`,
@@ -158,7 +182,7 @@ export function gerarMetadadosPorRota(rota, siteName, domain = 'cloudx.com.br') 
 /**
  * Injeta metadados de SEO, OpenGraph e JSON-LD no HTML de uma página.
  */
-export function aplicarSeoNoHtml(htmlContent, metaInfo, siteName, domain = 'cloudx.com.br') {
+export function aplicarSeoNoHtml(htmlContent, metaInfo, siteName, domain = 'sitexpres.com.br') {
   let html = htmlContent;
 
   // Garante lang="pt-BR"
@@ -172,8 +196,10 @@ export function aplicarSeoNoHtml(htmlContent, metaInfo, siteName, domain = 'clou
   html = html.replace(/<meta\s+property=["']og:[^"']*["'][^>]*>/gi, '');
   html = html.replace(/<meta\s+name=["']twitter:[^"']*["'][^>]*>/gi, '');
 
-  const baseDomain = domain.replace(/^https?:\/\//, '').replace(/\/$/, '');
+  const baseDomain = (domain || 'sitexpres.com.br').replace(/^https?:\/\//, '').replace(/\/$/, '');
   const baseUrl = `https://${baseDomain}`;
+
+  const isCloudX = (domain && domain.toLowerCase().includes('cloudx')) || (siteName && siteName.toLowerCase().includes('cloudx'));
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -185,9 +211,32 @@ export function aplicarSeoNoHtml(htmlContent, metaInfo, siteName, domain = 'clou
       "@type": "Organization",
       "name": siteName,
       "url": baseUrl,
-      "logo": `${baseUrl}/images/1790969492713.png`
+      ...(isCloudX ? { "logo": `${baseUrl}/images/1790969492713.png` } : {})
     }
   };
+
+  const ogImages = isCloudX ? `
+    <meta property="og:image" content="${baseUrl}/images/1790969492713.png" />
+    <meta property="og:image:alt" content="${siteName} - Hospedagem e Cloud" />
+    <meta name="twitter:image" content="${baseUrl}/images/1790969492713.png" />
+    <link rel="preconnect" href="https://ui-avatars.com" crossorigin />
+    <link rel="preload" as="image" href="/images/1790969492713.png" type="image/png" />
+  ` : '';
+
+  const criticalStyle = isCloudX ? `
+    <!-- Estilo Crítico Inicial (Design System CloudX & Zero FOUC) -->
+    <style>
+      html, body {
+        background: #05050a;
+        color: #ffffff;
+        min-height: 100vh;
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      * { box-sizing: border-box; }
+    </style>
+  ` : '';
 
   const seoBlock = `
     <title>${metaInfo.title}</title>
@@ -205,35 +254,18 @@ export function aplicarSeoNoHtml(htmlContent, metaInfo, siteName, domain = 'clou
     <meta property="og:description" content="${metaInfo.description}" />
     <meta property="og:url" content="${metaInfo.canonicalUrl}" />
     <meta property="og:site_name" content="${siteName}" />
-    <meta property="og:image" content="${baseUrl}/images/1790969492713.png" />
-    <meta property="og:image:alt" content="${siteName} - Hospedagem e Cloud" />
+    ${ogImages}
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="${metaInfo.title}" />
     <meta name="twitter:description" content="${metaInfo.description}" />
-    <meta name="twitter:image" content="${baseUrl}/images/1790969492713.png" />
 
     <!-- Dados Estruturados Schema.org para o Google e IAs (GEO) -->
     <script type="application/ld+json">
 ${JSON.stringify(jsonLd, null, 2)}
     </script>
-
-        <link rel="preconnect" href="https://ui-avatars.com" crossorigin />
-    <link rel="preload" as="image" href="/images/1790969492713.png" type="image/png" />
-
-    <!-- Estilo Crítico Inicial (Design System CloudX & Zero FOUC) -->
-    <style>
-      html, body {
-        background: #05050a;
-        color: #ffffff;
-        min-height: 100vh;
-        margin: 0;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        -webkit-font-smoothing: antialiased;
-      }
-      * { box-sizing: border-box; }
-    </style>
+    ${criticalStyle}
   `;
 
   // Pré-carregamento antecipado de chunks JS (acelera LCP e TBT no GTmetrix)
@@ -247,7 +279,7 @@ ${JSON.stringify(jsonLd, null, 2)}
 /**
  * Cria o arquivo robots.txt otimizado para SEO técnico e GEO (IAs generativas).
  */
-export function gerarRobotsTxt(domain = 'cloudx.com.br') {
+export function gerarRobotsTxt(domain = 'sitexpres.com.br') {
   const baseDomain = domain.replace(/^https?:\/\//, '').replace(/\/$/, '');
   return `# robots.txt gerado para ${baseDomain}
 User-agent: *
@@ -286,7 +318,7 @@ Sitemap: https://${baseDomain}/sitemap.xml
 /**
  * Cria o sitemap.xml com todas as rotas canônicas.
  */
-export function gerarSitemapXml(rotas, domain = 'cloudx.com.br') {
+export function gerarSitemapXml(rotas, domain = 'sitexpres.com.br') {
   const baseDomain = domain.replace(/^https?:\/\//, '').replace(/\/$/, '');
   const baseUrl = `https://${baseDomain}`;
   const now = new Date().toISOString().split('T')[0];
@@ -316,8 +348,14 @@ ${urlsXml}
  * Extrai o H1, parágrafos e lista de planos do componente React para que o HTML inicial
  * possua conteúdo textual legível por robôs que não executam JavaScript.
  */
-export function injetarPreRenderSemantico(htmlContent, reactCode, rota = '/') {
+export function injetarPreRenderSemantico(htmlContent, reactCode, rota = '/', domain = '', siteName = '') {
   if (!htmlContent.includes('<div id="root"></div>')) {
+    return htmlContent;
+  }
+
+  // IMPORTANTE: O pré-render abaixo é específico do site da CloudX. Para sites de clientes, NÃO injetar esse layout!
+  const isCloudX = (domain && domain.toLowerCase().includes('cloudx')) || (siteName && siteName.toLowerCase().includes('cloudx'));
+  if (!isCloudX) {
     return htmlContent;
   }
 
@@ -454,7 +492,7 @@ export async function aplicarOtimizacoesDist({ distPath, reactCode, siteName, do
   // 2. Otimiza o index.html da raiz
   const metaHome = gerarMetadadosPorRota('/', siteName, domain);
   let homeHtml = aplicarSeoNoHtml(rawHtml, metaHome, siteName, domain);
-  homeHtml = injetarPreRenderSemantico(homeHtml, reactCode, '/');
+  homeHtml = injetarPreRenderSemantico(homeHtml, reactCode, '/', domain, siteName);
   await fs.writeFile(baseHtmlPath, homeHtml, "utf8");
   console.log(`[SEO_OPTIMIZER] ✅ dist/index.html atualizado com SEO e Pré-render`);
 
@@ -468,7 +506,7 @@ export async function aplicarOtimizacoesDist({ distPath, reactCode, siteName, do
 
     const metaRota = gerarMetadadosPorRota(rota, siteName, domain);
     let rotaHtml = aplicarSeoNoHtml(rawHtml, metaRota, siteName, domain);
-    rotaHtml = injetarPreRenderSemantico(rotaHtml, reactCode, rota);
+    rotaHtml = injetarPreRenderSemantico(rotaHtml, reactCode, rota, domain, siteName);
 
     await fs.writeFile(path.join(targetDir, "index.html"), rotaHtml, "utf8");
     console.log(`[SEO_OPTIMIZER] 📄 Página estática criada: ${rotaPathRel}/index.html`);
