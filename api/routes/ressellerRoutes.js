@@ -3,6 +3,7 @@ import {
   create_domain_reseller,
   check_domain_availability,
   consultar_dominio_br,
+  testar_conexao_painel_controller,
   create_customer_reseller,
   get_domain_details,
   renew_domain_reseller,
@@ -24,6 +25,9 @@ router.post('/domains/check-availability',  check_domain_availability);
 // Consulta direta de disponibilidade .br via API Registro.br / Cloux (100% grátis)
 router.get('/domains/consultar-br', consultar_dominio_br);
 router.post('/domains/consultar-br', consultar_dominio_br);
+
+// Teste de conectividade e diagnóstico com o painel Registro.br / Cloudx
+router.get('/domains/testar-conexao-painel', testar_conexao_painel_controller);
 
 // Registra/cria um novo domínio
 router.post('/domains/register',  create_domain_reseller);

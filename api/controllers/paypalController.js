@@ -604,13 +604,17 @@ export async function paymentSuccess(req, res) {
           // 🔒 Dados do usuário
           const user = result_user?.rows?.[0];
 
-          let dados_reseller = null;
+                    let dados_reseller = null;
           let dados_registro_br = null;
+          let registroSucesso = false;
+          let registroDetalhe = null;
+          const ehDominioBr = isDominioBr(transacao.full_domain);
+          const tipoRegistro = ehDominioBr ? 'Registro.br (Cloudx)' : 'Internacional (ResellerClub)';
 
           // 🌐 REGISTRO DE DOMÍNIO:
-          // Se for domínio .com.br (ou qualquer .br), registra fora via API Registro.br / Cloux!
-          if (isDominioBr(transacao.full_domain)) {
-            console.log(`[REGISTRO.BR CLOUX] Domínio .br detectado: ${transacao.full_domain}. Registrando na API Registro.br / Cloux...`);
+          // Se for domínio .com.br (ou qualquer .br), registra fora via API Registro.br / Cloudx!
+          if (ehDominioBr) {
+            console.log(`[REGISTRO.BR CLOUDX] Domínio .br detectado: ${transacao.full_domain}. Registrando na API Registro.br / Cloudx...`);
 
             const dadosParaRegistro = {
               dominio: transacao.full_domain,
@@ -629,6 +633,8 @@ export async function paymentSuccess(req, res) {
             };
 
             dados_registro_br = await registrarDominioBr(dadosParaRegistro);
+            registroSucesso = Boolean(dados_registro_br?.success);
+            registroDetalhe = dados_registro_br;
 
             try {
               await pool.query(
@@ -639,40 +645,13 @@ export async function paymentSuccess(req, res) {
                  WHERE id = $4`,
                 [
                   JSON.stringify(dados_registro_br),
-                  dados_registro_br.success ? 'REGISTRADO' : 'ERRO_REGISTRO',
-                  dados_registro_br.ticket || null,
+                  registroSucesso ? 'REGISTRADO' : 'ERRO_REGISTRO',
+                  dados_registro_br?.ticket || null,
                   transacao.id
                 ]
               );
             } catch (errDb) {
               console.error("Erro ao salvar retorno do Registro.br no banco:", errDb.message);
-            }
-
-            if (dados_registro_br.success) {
-              try {
-                await sendMail(
-                  "contato@sitexpres.com",
-                  `✅ Domínio .BR Registrado com Sucesso: ${transacao.full_domain}`,
-                  `<p>O domínio <b>${transacao.full_domain}</b> foi registrado no Registro.br via Cloux!</p>
-                   <p><b>Cliente:</b> ${transacao.customer_name} (${transacao.customer_email})</p>
-                   <p><b>Ticket / ID:</b> ${dados_registro_br.ticket || 'Gerado'}</p>
-                   <p><b>Mensagem:</b> ${dados_registro_br.message}</p>
-                   <p><b>Transação:</b> ${token}</p>`
-                );
-              } catch (e) {}
-            } else {
-              try {
-                await sendMail(
-                  "contato@sitexpres.com",
-                  `🚨 ATENÇÃO: Falha no Registro do Domínio .BR (${transacao.full_domain})`,
-                  `<p>O pagamento do domínio <b>${transacao.full_domain}</b> foi confirmado via PayPal, mas o registro no Registro.br retornou erro:</p>
-                   <p><b>Erro:</b> ${dados_registro_br.error || 'Erro desconhecido'}</p>
-                   <p><b>Erros de Validação:</b> ${JSON.stringify(dados_registro_br.erros || {})}</p>
-                   <p><b>Cliente:</b> ${transacao.customer_name} (${transacao.customer_email})</p>
-                   <p><b>Documento informado:</b> ${dadosParaRegistro.cpf_cnpj || 'Não informado'}</p>
-                   <p><b>Data de Nascimento:</b> ${dadosParaRegistro.data_nascimento || 'Não informada (obrigatória para CPF)'}</p>`
-                );
-              } catch (e) {}
             }
           } else {
             // Domínio internacional (.com, .net, etc.) -> ResellerClub
@@ -730,23 +709,102 @@ export async function paymentSuccess(req, res) {
                   }
                 }
               );
+              registroSucesso = Boolean(dados_reseller?.status === 'Success' || dados_reseller?.actionstatus === 'Success' || dados_reseller?.entityid);
+              registroDetalhe = dados_reseller;
             } catch (errReseller) {
               console.error("Erro ao registrar domínio no ResellerClub:", errReseller.message);
+              registroSucesso = false;
+              registroDetalhe = { error: errReseller.message };
             }
           }
 
-          // NOTIFICAR ADMINISTRADOR (SUCESSO DOMÍNIO)
+          // 📧 NOTIFICAR ADMINISTRADOR (ÚNICO E-MAIL CLARO E CONSOLIDADO)
           try {
-            await sendMail(
-              "contato@sitexpres.com",
-              "✅ Domínio Registrado e Pago (PayPal)",
-              `<p>Um novo domínio foi pago via PayPal!</p>
-               <p><b>Domínio:</b> ${transacao.full_domain}</p>
-               <p><b>Cliente:</b> ${transacao.customer_name} (${transacao.customer_email})</p>
-               <p><b>Valor:</b> R$ ${transacao.domain_price}</p>
-               <p><b>Transação:</b> ${token}</p>
-               <p><b>Link de Consulta:</b> <a href="${linkNF}">${linkNF}</a></p>`
-            );
+            const clienteNome = user?.name || transacao.customer_name || 'Cliente';
+            const clienteEmail = user?.email || transacao.customer_email || 'Não informado';
+            const clienteDoc = transacao.cpf_cnpj || transacao.customer_cpf || user?.cnpj_cpf || 'Não informado';
+            const clienteNascimento = transacao.data_nascimento || user?.data_nascimento || 'Não informada';
+            const linkNfHtml = linkNF
+              ? `<a href="${linkNF}" target="_blank" style="color: #2563eb; font-weight: bold; text-decoration: underline;">Visualizar Nota Fiscal</a>`
+              : '<span style="color: #6b7280;">Emissão em processamento</span>';
+
+            if (registroSucesso) {
+              await sendMail(
+                "contato@sitexpres.com",
+                `✅ Domínio Pago e Registrado com Sucesso (PayPal): ${transacao.full_domain}`,
+                `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 8px; padding: 24px; color: #1f2937;">
+                    <h2 style="color: #16a34a; margin-top: 0;">✅ Domínio Pago e Registrado com Sucesso!</h2>
+                    <p style="font-size: 15px;">O pagamento foi confirmado via <b>PayPal</b> e o domínio foi registrado com sucesso.</p>
+                    
+                    <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+                    
+                    <h3 style="color: #374151; font-size: 16px; margin-bottom: 12px;">🌐 Informações do Domínio</h3>
+                    <p><b>Domínio:</b> <span style="font-size: 16px; color: #2563eb; font-weight: bold;">${transacao.full_domain}</span></p>
+                    <p><b>Provedor / Tipo:</b> ${tipoRegistro}</p>
+                    <p><b>Ticket / ID de Registro:</b> ${registroDetalhe?.ticket || registroDetalhe?.entityid || 'Concluído'}</p>
+                    ${registroDetalhe?.message ? `<p><b>Mensagem da API:</b> ${registroDetalhe.message}</p>` : ''}
+                    
+                    <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+                    
+                    <h3 style="color: #374151; font-size: 16px; margin-bottom: 12px;">👤 Dados do Titular</h3>
+                    <p><b>Cliente:</b> ${clienteNome} (${clienteEmail})</p>
+                    <p><b>Documento:</b> ${clienteDoc}</p>
+                    <p><b>Telefone:</b> ${transacao.customer_phone || user?.telefone || 'Não informado'}</p>
+                    
+                    <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+                    
+                    <h3 style="color: #374151; font-size: 16px; margin-bottom: 12px;">💳 Detalhes do Pagamento</h3>
+                    <p><b>Forma de Pagamento:</b> PayPal</p>
+                    <p><b>Valor:</b> R$ ${Number(transacao.domain_price || 0).toFixed(2)}</p>
+                    <p><b>Transação:</b> ${token}</p>
+                    <p><b>Nota Fiscal:</b> ${linkNfHtml}</p>
+                </div>
+                `
+              );
+            } else {
+              // REGISTRO FALHOU (PAGAMENTO APROVADO, MAS FALHA NA API DE REGISTRO)
+              const erroMsg = registroDetalhe?.error || registroDetalhe?.message || 'Erro desconhecido ao comunicar com a API de registro';
+              const errosValidacao = registroDetalhe?.erros ? JSON.stringify(registroDetalhe.erros, null, 2) : null;
+
+              await sendMail(
+                "contato@sitexpres.com",
+                `🚨 ATENÇÃO: Pagamento Confirmado, mas FALHA no Registro (${transacao.full_domain})`,
+                `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #fecaca; border-radius: 8px; padding: 24px; color: #1f2937; background-color: #fffaf0;">
+                    <h2 style="color: #dc2626; margin-top: 0;">🚨 ATENÇÃO: Falha no Registro do Domínio</h2>
+                    <p style="font-size: 15px; color: #991b1b;">O pagamento de <b>R$ ${Number(transacao.domain_price || 0).toFixed(2)}</b> foi <b>CONFIRMADO via PayPal</b>, porém ocorreu um erro na tentativa de registro automático. É necessária verificação ou registro manual.</p>
+                    
+                    <hr style="border: 0; border-top: 1px solid #fed7aa; margin: 20px 0;">
+                    
+                    <h3 style="color: #9a3412; font-size: 16px; margin-bottom: 12px;">⚠️ Motivo da Falha</h3>
+                    <p><b>Domínio:</b> <span style="font-size: 16px; color: #dc2626; font-weight: bold;">${transacao.full_domain}</span></p>
+                    <p><b>Provedor:</b> ${tipoRegistro}</p>
+                    <p><b>Erro Retornado:</b> <code style="background: #fee2e2; color: #991b1b; padding: 4px 8px; border-radius: 4px; display: inline-block;">${erroMsg}</code></p>
+                    ${errosValidacao ? `<p><b>Detalhes da Validação:</b><pre style="background: #f1f5f9; padding: 8px; border-radius: 4px; font-size: 12px; overflow-x: auto;">${errosValidacao}</pre></p>` : ''}
+                    
+                    <hr style="border: 0; border-top: 1px solid #fed7aa; margin: 20px 0;">
+                    
+                    <h3 style="color: #9a3412; font-size: 16px; margin-bottom: 12px;">📋 Dados do Titular para Registro Manual</h3>
+                    <p><b>Nome:</b> ${clienteNome}</p>
+                    <p><b>E-mail:</b> ${clienteEmail}</p>
+                    <p><b>CPF / CNPJ:</b> ${clienteDoc}</p>
+                    <p><b>Data de Nascimento:</b> ${clienteNascimento}</p>
+                    <p><b>Telefone:</b> ${transacao.customer_phone || user?.telefone || 'Não informado'}</p>
+                    <p><b>Endereço:</b> ${transacao.customer_address || user?.endereco || 'Não informado'}, Nº ${transacao.customer_number || user?.numero || 'SN'}</p>
+                    <p><b>Bairro:</b> ${transacao.customer_bairro || user?.bairro || 'Centro'} - ${transacao.customer_city || user?.cidade || 'São Paulo'}/${transacao.customer_state || user?.uf || 'SP'}</p>
+                    <p><b>CEP:</b> ${transacao.customer_zipcode || user?.cep || 'Não informado'}</p>
+                    
+                    <hr style="border: 0; border-top: 1px solid #fed7aa; margin: 20px 0;">
+                    
+                    <h3 style="color: #9a3412; font-size: 16px; margin-bottom: 12px;">💳 Detalhes do Pagamento Recebido</h3>
+                    <p><b>Valor Pago:</b> R$ ${Number(transacao.domain_price || 0).toFixed(2)}</p>
+                    <p><b>Transação:</b> ${token}</p>
+                    <p><b>Nota Fiscal:</b> ${linkNfHtml}</p>
+                </div>
+                `
+              );
+            }
           } catch (mailErr) {
             console.error("Erro ao enviar email de notificação PayPal domínio:", mailErr);
           }

@@ -3,7 +3,7 @@ import http from 'http';
 import { URL } from 'url';
 import axios from 'axios';
 import pool from "../config/db.js";
-import { consultarDisponibilidadeBr, isDominioBr } from '../services/registroBrService.js';
+import { consultarDisponibilidadeBr, isDominioBr, testarConexaoPainel } from '../services/registroBrService.js';
 
 // Configurações da API ResellerClub
 const RESELLER_CONFIG = {
@@ -809,6 +809,22 @@ export const consultar_dominio_br = async (req, res) => {
             success: false,
             message: 'Erro interno ao consultar disponibilidade do domínio .br',
             error: error.message
+        });
+    }
+};
+
+/**
+ * Diagnóstico e teste de conectividade com o Painel Registro.br / Cloudx
+ */
+export const testar_conexao_painel_controller = async (req, res) => {
+    try {
+        const resultado = await testarConexaoPainel();
+        return res.status(resultado.sucesso ? 200 : 502).json(resultado);
+    } catch (error) {
+        return res.status(500).json({
+            sucesso: false,
+            mensagem: 'Erro interno ao testar conexão com o painel',
+            erro: error.message
         });
     }
 };

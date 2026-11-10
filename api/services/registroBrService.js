@@ -110,6 +110,17 @@ export function extrairNumeroEndereco(endereco, numeroFornecido) {
 }
 
 /**
+ * Obtém e sanitiza a URL base da API do Registro.br / Cloudx
+ */
+export function getRegistroBrApiUrl() {
+  let url = (process.env.REGISTROBR_API_URL || 'https://painel.cloudx.com.br/registrabr/api').trim();
+  // Auto-correção para erros de digitação comuns (ex: cloux -> cloudx)
+  url = url.replace(/painel\.cloux\.com\.br/gi, 'painel.cloudx.com.br');
+  url = url.replace(/cloux\.com\.br/gi, 'cloudx.com.br');
+  return url.replace(/\/+$/, '');
+}
+
+/**
  * 🌐 Rota 1: Consulta de Disponibilidade (100% Grátis)
  * URL: https://painel.cloudx.com.br/registrabr/api/consultar.php
  */
@@ -117,10 +128,10 @@ export async function consultarDisponibilidadeBr(dominio) {
   const inicio = Date.now();
   const dominioFormatado = normalizarDominio(dominio);
 
-  const baseUrl = process.env.REGISTROBR_API_URL || 'https://painel.cloudx.com.br/registrabr/api';
+  const baseUrl = getRegistroBrApiUrl();
   const token = process.env.REGISTROBR_API_TOKEN || 'sitexpress_sec_token_9f83b2a7e4c1d682490ac9e';
 
-  const url = `${baseUrl.replace(/\/+$/, '')}/consultar.php`;
+  const url = `${baseUrl}/consultar.php`;
 
   try {
     const response = await axios.get(url, {
@@ -192,9 +203,9 @@ export async function consultarDisponibilidadeBr(dominio) {
 export async function registrarDominioBr(dados) {
   const inicio = Date.now();
 
-  const baseUrl = process.env.REGISTROBR_API_URL || 'https://painel.cloudx.com.br/registrabr/api';
+  const baseUrl = getRegistroBrApiUrl();
   const token = process.env.REGISTROBR_API_TOKEN || 'sitexpress_sec_token_9f83b2a7e4c1d682490ac9e';
-  const url = `${baseUrl.replace(/\/+$/, '')}/registrar.php`;
+  const url = `${baseUrl}/registrar.php`;
 
   const dominioFormatado = normalizarDominio(dados.dominio || dados.full_domain);
 
@@ -302,9 +313,52 @@ export async function registrarDominioBr(dados) {
   }
 }
 
+/**
+ * 🔍 Função para testar a conectividade e integridade do Painel Cloudx / Registro.br
+ */
+export async function testarConexaoPainel() {
+  const inicio = Date.now();
+  const baseUrl = getRegistroBrApiUrl();
+  const token = process.env.REGISTROBR_API_TOKEN || 'sitexpress_sec_token_9f83b2a7e4c1d682490ac9e';
+
+  try {
+    const response = await axios.get(`${baseUrl}/consultar.php`, {
+      params: { dominio: 'sitexpress.com.br' },
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json'
+      },
+      timeout: 10000
+    });
+
+    const tempoMs = Date.now() - inicio;
+
+    return {
+      sucesso: true,
+      mensagem: "Conexão com o painel Registro.br (Cloudx) realizada com sucesso!",
+      url: baseUrl,
+      tempoResposta: `${tempoMs}ms`,
+      statusHttp: response.status,
+      dadosResposta: response.data
+    };
+  } catch (error) {
+    const tempoMs = Date.now() - inicio;
+    return {
+      sucesso: false,
+      mensagem: `Falha na conexão com o painel: ${error.message}`,
+      url: baseUrl,
+      tempoResposta: `${tempoMs}ms`,
+      statusHttp: error.response?.status || 500,
+      erro: error.response?.data || error.message
+    };
+  }
+}
+
 export default {
   consultarDisponibilidadeBr,
   registrarDominioBr,
+  testarConexaoPainel,
+  getRegistroBrApiUrl,
   isDominioBr,
   normalizarDominio,
   normalizarDataNascimento,
