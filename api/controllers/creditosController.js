@@ -57,6 +57,9 @@ export async function uso_creditos(id_user, qtd_tokens, id_projeto) {
             [novosCreditos, id_user]
         );
 
+        // 4.1 Registra o consumo para o painel admin (nunca deve quebrar o desconto)
+        await registrarUsoCreditos(id_user, id_projeto, qtd_tokens, creditosParaDescontar);
+
         // 5. (Opcional) salvar tokens usados no projeto
         /* if (id_projeto) {
             await pool.query(
@@ -75,6 +78,54 @@ export async function uso_creditos(id_user, qtd_tokens, id_projeto) {
     }
 }
 
+
+let tabelaLogGarantida = false;
+export async function garantirTabelaLog() {
+    if (tabelaLogGarantida) return;
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS public.credit_usage_log (
+            id BIGSERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            id_projeto TEXT,
+            site_prompt_id INTEGER,
+            tokens INTEGER NOT NULL DEFAULT 0,
+            credits NUMERIC(10,2) NOT NULL DEFAULT 0,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_credit_usage_projeto ON public.credit_usage_log (id_projeto);
+        CREATE INDEX IF NOT EXISTS idx_credit_usage_prompt ON public.credit_usage_log (site_prompt_id);
+        CREATE INDEX IF NOT EXISTS idx_credit_usage_user ON public.credit_usage_log (user_id);
+    `);
+    tabelaLogGarantida = true;
+}
+
+// Salva cada consumo de IA. Depois, vincularUsoAoPrompt() associa os registros pendentes ao prompt.
+async function registrarUsoCreditos(id_user, id_projeto, tokens, creditos) {
+    try {
+        await garantirTabelaLog();
+        await pool.query(
+            `INSERT INTO public.credit_usage_log (user_id, id_projeto, tokens, credits) VALUES ($1, $2, $3, $4)`,
+            [id_user, id_projeto != null ? String(id_projeto) : null, Math.round(tokens || 0), creditos]
+        );
+    } catch (err) {
+        console.error("Erro ao registrar log de créditos:", err.message);
+    }
+}
+
+// Liga os consumos ainda sem prompt (deste usuário/projeto) ao site_prompts recém-criado.
+export async function vincularUsoAoPrompt(id_user, id_projeto, site_prompt_id) {
+    try {
+        if (!site_prompt_id) return;
+        await garantirTabelaLog();
+        await pool.query(
+            `UPDATE public.credit_usage_log SET site_prompt_id = $1
+             WHERE user_id = $2 AND id_projeto = $3 AND site_prompt_id IS NULL`,
+            [site_prompt_id, id_user, String(id_projeto)]
+        );
+    } catch (err) {
+        console.error("Erro ao vincular créditos ao prompt:", err.message);
+    }
+}
 export async function verificar_creditos_prompt(id_user, prompt_cliente, basehtml = "") {
     try {
         // ========================

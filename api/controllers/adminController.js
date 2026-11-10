@@ -4,6 +4,7 @@ import checkoutNodeJssdk from '@paypal/checkout-server-sdk';
 import fetch from 'node-fetch';
 import 'dotenv/config';
 import pool from "../config/db.js";
+import { garantirTabelaLog } from "./creditosController.js";
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -130,4 +131,85 @@ export async function getPricingPlans(req, res) {
         console.error('Erro ao buscar planos de preços:', error);
         return res.status(500).json({ error: 'Erro ao buscar planos de preços' });
     }
-}
+}
+
+// ========== CONSUMO DE CRÉDITOS (Painel Admin) ==========
+
+export async function verificarAdmin(req, res, next) {
+    try {
+        const r = await pool.query("SELECT role FROM public.users WHERE id = $1", [req.userId]);
+        if (r.rows[0]?.role !== 'admin') {
+            return res.status(403).json({ success: false, message: "Acesso restrito ao administrador" });
+        }
+        next();
+    } catch (error) {
+        console.error('Erro ao verificar admin:', error);
+        res.status(500).json({ success: false, message: "Erro ao verificar permissão" });
+    }
+}
+
+// Resumo: total geral + consumo por site (créditos, nº de prompts, média por prompt)
+export async function getCreditsUsageSummary(req, res) {
+    try {
+        await garantirTabelaLog();
+        const sites = await pool.query(`
+            WITH uso AS (
+                SELECT id_projeto, user_id,
+                       SUM(credits) AS credits, SUM(tokens) AS tokens, MAX(created_at) AS ultimo_uso
+                FROM public.credit_usage_log
+                WHERE id_projeto IS NOT NULL
+                GROUP BY id_projeto, user_id
+            ), pr AS (
+                SELECT id_projeto::text AS id_projeto, COUNT(*) AS prompts
+                FROM public.site_prompts
+                GROUP BY id_projeto::text
+            )
+            SELECT uso.id_projeto, uso.user_id, u.email AS user_email,
+                   (SELECT g.name FROM public.generated_sites g
+                     WHERE g.id_projeto::text = uso.id_projeto ORDER BY g.created_at DESC LIMIT 1) AS site_name,
+                   uso.credits::float AS total_credits, uso.tokens::bigint AS total_tokens,
+                   COALESCE(pr.prompts, 0)::int AS total_prompts, uso.ultimo_uso
+            FROM uso
+            LEFT JOIN pr ON pr.id_projeto = uso.id_projeto
+            LEFT JOIN public.users u ON u.id = uso.user_id
+            ORDER BY uso.credits DESC
+        `);
+        const rows = sites.rows.map(r => ({
+            ...r,
+            avg_credits_per_prompt: r.total_prompts > 0 ? Number((r.total_credits / r.total_prompts).toFixed(2)) : 0
+        }));
+        const totals = rows.reduce((a, r) => ({
+            total_credits: a.total_credits + r.total_credits,
+            total_tokens: a.total_tokens + Number(r.total_tokens),
+            total_prompts: a.total_prompts + r.total_prompts
+        }), { total_credits: 0, total_tokens: 0, total_prompts: 0 });
+        totals.total_credits = Number(totals.total_credits.toFixed(2));
+        res.json({ success: true, totals, sites: rows });
+    } catch (error) {
+        console.error('Erro no resumo de créditos:', error);
+        res.status(500).json({ success: false, message: "Erro ao buscar consumo de créditos" });
+    }
+}
+
+// Detalhe de um site: cada prompt com os créditos gastos
+export async function getCreditsUsageBySite(req, res) {
+    try {
+        await garantirTabelaLog();
+        const { id_projeto } = req.params;
+        const prompts = await pool.query(`
+            SELECT sp.id, sp.prompt, sp.status, sp.created_at,
+                   COALESCE(SUM(l.credits), 0)::float AS credits,
+                   COALESCE(SUM(l.tokens), 0)::bigint AS tokens
+            FROM public.site_prompts sp
+            LEFT JOIN public.credit_usage_log l ON l.site_prompt_id = sp.id
+            WHERE sp.id_projeto::text = $1
+            GROUP BY sp.id
+            ORDER BY sp.created_at DESC
+        `, [String(id_projeto)]);
+        const total_credits = Number(prompts.rows.reduce((s, p) => s + p.credits, 0).toFixed(2));
+        res.json({ success: true, id_projeto, total_credits, total_prompts: prompts.rows.length, prompts: prompts.rows });
+    } catch (error) {
+        console.error('Erro no detalhe de créditos:', error);
+        res.status(500).json({ success: false, message: "Erro ao buscar prompts do site" });
+    }
+}

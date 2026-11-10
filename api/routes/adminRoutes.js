@@ -1,5 +1,6 @@
 import express from "express";
-import { getApiCheck, getInfo_dom, getPricingPlans } from "../controllers/adminController.js";
+import { getApiCheck, getInfo_dom, getPricingPlans, verificarAdmin, getCreditsUsageSummary, getCreditsUsageBySite } from "../controllers/adminController.js";
+import { authMiddleware } from "../middlewares/authMiddleware.js";
 import { 
     getAllWithdrawals, 
     getPendingCount, 
@@ -18,5 +19,9 @@ router.get('/pricing/plans', getPricingPlans);
 router.get('/affiliate/withdrawals', getAllWithdrawals);
 router.get('/affiliate/withdrawals/pending-count', getPendingCount);
 router.put('/affiliate/withdrawals/:id', updateWithdrawalStatus);
+
+// Consumo de créditos por site / por prompt (somente admin)
+router.get('/credits/summary', authMiddleware, verificarAdmin, getCreditsUsageSummary);
+router.get('/credits/site/:id_projeto', authMiddleware, verificarAdmin, getCreditsUsageBySite);
 
 export default router;

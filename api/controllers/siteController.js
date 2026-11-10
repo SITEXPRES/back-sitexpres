@@ -21,7 +21,7 @@ import util from "util";
 const execPromise = util.promisify(exec);
 dotenv.config();
 import { updateGitHubIfIntegrated } from "./updateGitHubOnSiteChange.js";
-import { uso_creditos, verificar_creditos_prompt } from "./creditosController.js";
+import { uso_creditos, verificar_creditos_prompt, vincularUsoAoPrompt } from "./creditosController.js";
 import { consultaPlano } from "./planoController.js";
 import { gerar_site } from "./gerar_siteController_vite.js";
 import { desatrelarHtmlSitexpress, coletarArquivosProjeto } from "../utils/siteAssetHelper.js";
@@ -735,11 +735,12 @@ Suas alterações${anexosMsg} foram aplicadas diretamente no container da sua ap
 
             try {
               const activeSiteId = existing?.rows?.[0]?.id || null;
-              await client.query(
+              const rFalha = await client.query(
                 `INSERT INTO site_prompts (user_id, id_projeto, prompt, id_site_gererate, status, assistant_message)
-                 VALUES ($1, $2, $3, $4, $5, $6)`,
+                 VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
                 [userId, id_projeto, prompt, activeSiteId, 'falha', assistantMessageFalha]
               );
+              await vincularUsoAoPrompt(userId, id_projeto, rFalha.rows[0]?.id);
             } catch (errP) {
               console.error("Erro ao salvar prompt de falha:", errP);
             }
@@ -979,19 +980,21 @@ ${html}
           assistantMessage = sanitizarRespostaSeguranca(assistantMessage);
 
           try {
-            await client.query(
+            const rOk = await client.query(
               `INSERT INTO site_prompts (user_id, id_projeto, prompt, id_site_gererate, status, assistant_message)
-                 VALUES ($1, $2, $3, $4, $5, $6)`,
+                 VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
               [userId, id_projeto, prompt, novoId, 'ativo', assistantMessage]
             );
+            await vincularUsoAoPrompt(userId, id_projeto, rOk.rows[0]?.id);
           } catch (promptErr) {
             if (promptErr.code === '42703' || (promptErr.message && promptErr.message.includes('assistant_message'))) {
               console.warn(`[${new Date().toISOString()}] ⚠️ Coluna assistant_message ainda não existe em site_prompts. Inserindo sem ela e criando coluna...`);
-              await client.query(
+              const rFb = await client.query(
                 `INSERT INTO site_prompts (user_id, id_projeto, prompt, id_site_gererate, status)
-                   VALUES ($1, $2, $3, $4, $5)`,
+                   VALUES ($1, $2, $3, $4, $5) RETURNING id`,
                 [userId, id_projeto, prompt, novoId, 'ativo']
               );
+              await vincularUsoAoPrompt(userId, id_projeto, rFb.rows[0]?.id);
               // Executa migration assíncrona para adicionar a coluna para as próximas chamadas
               pool.query(`ALTER TABLE public.site_prompts ADD COLUMN IF NOT EXISTS assistant_message TEXT;`).catch(() => { });
             } else {
