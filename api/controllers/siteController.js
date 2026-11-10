@@ -1,4 +1,4 @@
-import * as cheerio from 'cheerio';
+﻿import * as cheerio from 'cheerio';
 import pool from "../config/db.js";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import Anthropic from "@anthropic-ai/sdk";
@@ -2126,3 +2126,180 @@ export const verifySiteReady = async (req, res) => {
 
 
 
+
+
+// Consumo de créditos do usuário por site (visão amigável para o cliente)
+export const getUserCreditsUsage = async (req, res) => {
+  try {
+    const userId = req.userId;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Não autorizado" });
+    }
+
+    let hasLog = true;
+    try {
+      await pool.query("SELECT 1 FROM public.credit_usage_log LIMIT 1");
+    } catch (e) {
+      if (e && e.code === '42P01') hasLog = false;
+    }
+
+    const query = `
+      WITH pr AS (
+        SELECT 
+          id_projeto::text AS id_projeto,
+          COUNT(*) AS prompts,
+          MAX(created_at) AS ultimo_prompt
+        FROM public.site_prompts
+        WHERE user_id = $1 AND id_projeto IS NOT NULL
+        GROUP BY id_projeto::text
+      ),
+      gs AS (
+        SELECT DISTINCT ON (id_projeto::text)
+          id_projeto::text AS id_projeto,
+          name AS site_name,
+          subdominio,
+          created_at
+        FROM public.generated_sites
+        WHERE user_id = $1 AND id_projeto IS NOT NULL
+        ORDER BY id_projeto::text, created_at DESC
+      ),
+      all_projects AS (
+        SELECT id_projeto FROM pr
+        UNION
+        SELECT id_projeto FROM gs
+        ${hasLog ? 'UNION SELECT DISTINCT id_projeto FROM public.credit_usage_log WHERE user_id = $1 AND id_projeto IS NOT NULL' : ''}
+      ),
+      uso_log AS (
+        ${hasLog ? `
+          SELECT 
+            id_projeto,
+            SUM(credits) AS credits,
+            MAX(created_at) AS ultimo_uso
+          FROM public.credit_usage_log
+          WHERE user_id = $1 AND id_projeto IS NOT NULL
+          GROUP BY id_projeto
+        ` : `
+          SELECT 
+            NULL::text AS id_projeto, 
+            0::numeric AS credits, 
+            NULL::timestamptz AS ultimo_uso 
+          WHERE false
+        `}
+      )
+      SELECT 
+        ap.id_projeto,
+        COALESCE(gs.site_name, 'Site ' || ap.id_projeto) AS site_name,
+        gs.subdominio,
+        COALESCE(pr.prompts, 0)::int AS total_prompts,
+        COALESCE(ul.credits, 0)::float AS total_credits,
+        GREATEST(pr.ultimo_prompt, ul.ultimo_uso, gs.created_at) AS ultimo_uso
+      FROM all_projects ap
+      LEFT JOIN pr ON pr.id_projeto = ap.id_projeto
+      LEFT JOIN gs ON gs.id_projeto = ap.id_projeto
+      LEFT JOIN uso_log ul ON ul.id_projeto = ap.id_projeto
+      ORDER BY total_prompts DESC, total_credits DESC, ultimo_uso DESC NULLS LAST
+    `;
+
+    const result = await pool.query(query, [userId]);
+
+    const sites = result.rows.map((r) => {
+      const prompts = Number(r.total_prompts || 0);
+      const credits = Number(r.total_credits || 0);
+      return {
+        id_projeto: r.id_projeto,
+        site_name: r.site_name,
+        subdominio: r.subdominio,
+        total_prompts: prompts,
+        total_credits: credits,
+        avg_credits_per_prompt: prompts > 0 ? Number((credits / prompts).toFixed(2)) : 0,
+        ultimo_uso: r.ultimo_uso
+      };
+    });
+
+    const totals = sites.reduce(
+      (acc, s) => ({
+        total_credits: acc.total_credits + s.total_credits,
+        total_prompts: acc.total_prompts + s.total_prompts,
+      }),
+      { total_credits: 0, total_prompts: 0 }
+    );
+    totals.total_credits = Number(totals.total_credits.toFixed(2));
+    totals.avg_credits_per_prompt = totals.total_prompts > 0 
+      ? Number((totals.total_credits / totals.total_prompts).toFixed(2)) 
+      : 0;
+
+    res.json({ success: true, totals, sites });
+  } catch (error) {
+    console.error("Erro ao buscar consumo do cliente:", error);
+    res.status(500).json({ success: false, message: "Erro ao obter consumo de créditos" });
+  }
+};
+
+// Detalhes dos prompts do site para o cliente (sem exibir tokens/anthropic)
+export const getUserSitePromptsUsage = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { id_projeto } = req.params;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Não autorizado" });
+    }
+
+    let hasLog = true;
+    try {
+      await pool.query("SELECT 1 FROM public.credit_usage_log LIMIT 1");
+    } catch (e) {
+      if (e && e.code === '42P01') hasLog = false;
+    }
+
+    const query = hasLog ? `
+      SELECT 
+        sp.id,
+        sp.prompt,
+        sp.status,
+        sp.created_at,
+        COALESCE(SUM(l.credits), 0)::float AS credits
+      FROM public.site_prompts sp
+      LEFT JOIN public.credit_usage_log l ON l.site_prompt_id = sp.id
+      WHERE sp.user_id = $1 AND sp.id_projeto::text = $2
+      GROUP BY sp.id
+      ORDER BY sp.created_at DESC
+    ` : `
+      SELECT 
+        sp.id,
+        sp.prompt,
+        sp.status,
+        sp.created_at,
+        0::float AS credits
+      FROM public.site_prompts sp
+      WHERE sp.user_id = $1 AND sp.id_projeto::text = $2
+      ORDER BY sp.created_at DESC
+    `;
+
+    const result = await pool.query(query, [userId, String(id_projeto)]);
+
+    const prompts = result.rows.map((p) => ({
+      id: p.id,
+      prompt: p.prompt,
+      status: p.status,
+      created_at: p.created_at,
+      credits: Number(p.credits || 0)
+    }));
+
+    const total_credits = Number(prompts.reduce((sum, p) => sum + p.credits, 0).toFixed(2));
+    const total_prompts = prompts.length;
+    const avg_credits = total_prompts > 0 ? Number((total_credits / total_prompts).toFixed(2)) : 0;
+
+    res.json({
+      success: true,
+      id_projeto,
+      total_prompts,
+      total_credits,
+      avg_credits_per_prompt: avg_credits,
+      prompts
+    });
+  } catch (error) {
+    console.error("Erro ao buscar prompts do projeto:", error);
+    res.status(500).json({ success: false, message: "Erro ao obter detalhes dos prompts" });
+  }
+};

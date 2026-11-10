@@ -1,5 +1,5 @@
-import express from "express";
-import { getSites, newsite, jobStatus, check_id_projeto, testecret_domin, list_don, get_dominio, getPromts, restauracao_versao, deletar_site, getSiteAnalytics, verifySiteReady } from "../controllers/siteController.js";
+﻿import express from "express";
+import { getSites, newsite, jobStatus, check_id_projeto, testecret_domin, list_don, get_dominio, getPromts, restauracao_versao, deletar_site, getSiteAnalytics, verifySiteReady, getUserCreditsUsage, getUserSitePromptsUsage } from "../controllers/siteController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
 import { upload } from "../middlewares/upload.js";
 const router = express.Router();
@@ -27,6 +27,8 @@ router.post("/restauracao", authMiddleware, restauracao_versao);
 router.put("/deletar", deletar_site);
 router.get("/check_id_projeto/:id_projeto", check_id_projeto);
 router.post("/testedom", testecret_domin);
+router.get("/usage/summary", authMiddleware, getUserCreditsUsage);
+router.get("/usage/site/:id_projeto", authMiddleware, getUserSitePromptsUsage);
 router.get("/analytics/:id_projeto", authMiddleware, getSiteAnalytics);
 
 import { downloadSite } from '../controllers/downloadController.js';
