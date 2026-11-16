@@ -10,35 +10,36 @@ dotenv.config();
 export async function consultaPlano(id_user) {
     try {
         const resultUser = await pool.query(
-            `
-          SELECT plan 
-          FROM public.user_subscriptions 
-          WHERE user_id = $1 
-            AND is_active = true
-          ORDER BY id DESC
-          LIMIT 1
-        `,
+          `SELECT plan, is_active 
+           FROM public.user_subscriptions 
+           WHERE user_id = $1 
+           ORDER BY id DESC
+           LIMIT 1`,
           [id_user]
         );
 
         if (resultUser.rows.length === 0) {
           return {
             isPro: false,
+            isActive: false,
             plan: "free"
           };
         }
 
         const user = resultUser.rows[0];
-        const isPro = user.plan !== "free";
+        const isActive = !!user.is_active;
+        const isPro = isActive && user.plan !== "free";
 
         return {
           isPro,
-          plan: user.plan
+          isActive,
+          plan: user.plan || "free"
         };
       } catch (error) {
         console.error("Erro ao consultar plano:", error);
         return {
           isPro: false,
+          isActive: false,
           plan: "free"
         };
       }

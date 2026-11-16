@@ -276,6 +276,27 @@ export const newsite = async (req, res) => {
       const isPro = plano.isPro;
       const typedo_plano = plano.plan;
       logStep(null, `✅ Plano consultado (${Date.now() - t2}ms) | plano: ${typedo_plano}`);
+      // Bloqueio de Inadimplência: Se o usuário possui fatura pendente vencida
+      if (!plano.isActive) {
+        try {
+          const checkInadimplente = await pool.query(
+            `SELECT id, payment_id FROM public.transactions 
+             WHERE user_id = $1 AND status = 'pending' AND due_date <= NOW() 
+             LIMIT 1`,
+            [userId]
+          );
+          if (checkInadimplente.rows.length > 0) {
+            return res.status(403).json({
+              success: false,
+              message: 'Seu plano está suspenso por pendência financeira. Regularize sua mensalidade na aba de Faturas para voltar a editar e criar sites.',
+              code: 'SUBSCRIPTION_OVERDUE',
+              redirect: '/faturas'
+            });
+          }
+        } catch (errInad) {
+          console.warn('Aviso ao checar inadimplência:', errInad.message);
+        }
+      }
 
       // Validação de tipo de plano vs tipo de projeto (Planos 29,90 / Free NÃO podem criar Sistemas ou CRMs)
       const isPlanoApenasSites = ['site_page', 'starter', 'site', 'free'].includes(typedo_plano);
