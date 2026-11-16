@@ -11,17 +11,33 @@ import path from 'path';
 
 export async function transactions_list(req, res) {
     try {
-        // Se você estiver usando autenticação com middleware (recomendado):
-        // const userId = req.user?.id;
-
-        // Caso ainda esteja vindo no body (não recomendado):
-        const userId = req.body.userid;
+        const userId = req.body.userid || req.user?.id;
 
         if (!userId) {
             return res.status(400).json({
                 success: false,
                 message: "O campo 'userid' é obrigatório."
             });
+        }
+
+        // Auto-correção: Atualizar faturas pendentes de mensalidade que ficaram com 50 créditos para o novo plano de 100 créditos
+        try {
+            await pool.query(`
+                UPDATE public.transactions
+                SET credits = 100
+                WHERE user_id = $1 
+                  AND status = 'pending' 
+                  AND (credits <= 50 OR credits IS NULL)
+                  AND (
+                    monetary_value >= 29.90 
+                    OR value >= 29.90 
+                    OR description ILIKE '%Mensalidade%' 
+                    OR description ILIKE '%Ciclo%'
+                    OR description ILIKE '%Compra%'
+                  )
+            `, [userId]);
+        } catch (updateErr) {
+            console.warn("Aviso ao atualizar créditos da fatura pendente:", updateErr.message);
         }
 
         const query = `

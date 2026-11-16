@@ -176,6 +176,30 @@ export async function createRepo(req, res) {
       });
     }
 
+    // ─────────────────────────────────────────────────────────────
+    // VERIFICAÇÃO DE PLANO ATIVO (Modelo Lovable SaaS)
+    // Para exportar para o GitHub, o usuário precisa ter plano ativo.
+    // ─────────────────────────────────────────────────────────────
+    if (req.userId) {
+      const subCheck = await pool.query(
+        `SELECT plan, is_active FROM public.user_subscriptions 
+         WHERE user_id = $1 AND is_active = true 
+         ORDER BY id DESC LIMIT 1`,
+        [req.userId]
+      );
+
+      const hasActivePlan = subCheck.rows.length > 0 && subCheck.rows[0].is_active && subCheck.rows[0].plan !== 'free';
+
+      if (!hasActivePlan) {
+        return res.status(403).json({
+          success: false,
+          message: "Recurso bloqueado: Você precisa possuir um plano ativo para exportar seus projetos para o GitHub. Acesse suas faturas para ativar seu plano.",
+          code: "PLAN_INACTIVE",
+          redirect: "/faturas"
+        });
+      }
+    }
+
     let accessToken = githubToken;
 
     // Se não veio token manual, busca o token OAuth do banco

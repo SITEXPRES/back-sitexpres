@@ -354,19 +354,34 @@ export const consultarPix = async (req, res) => {
                 console.log(`Créditos free salvos (backup) para o usuário ${transacao.user_id}`);
             }
 
-            console.log(`Adicionando ${transacao.credits} créditos ao usuário ${transacao.user_id}`);
+            const valorPago = parseFloat(transacao.monetary_value || 0);
+            const isMensalidadeOuPlano = valorPago >= 29.90 || (transacao.description && (transacao.description.includes('Mensalidade') || transacao.description.includes('Ciclo')));
+            const creditsToAdd = isMensalidadeOuPlano ? Math.max(100, parseInt(transacao.credits, 10) || 100) : (parseInt(transacao.credits, 10) || 100);
+
+            console.log(`Adicionando ${creditsToAdd} créditos ao usuário ${transacao.user_id}`);
 
             // Adiciona créditos
             await pool.query(
                 `UPDATE public.users SET credits = credits + $1 WHERE id = $2`,
-                [transacao.credits, transacao.user_id]
+                [creditsToAdd, transacao.user_id]
             );
 
-            // Atualiza status da transação
+            // Atualiza status da transação com os créditos normalizados
             await pool.query(
-                `UPDATE public.transactions SET status = 'completed', updated_at = NOW() WHERE payment_id = $1`,
-                [txid]
+                `UPDATE public.transactions SET status = 'completed', credits = $1, updated_at = NOW() WHERE payment_id = $2`,
+                [creditsToAdd, txid]
             );
+
+            // Reativa eventuais serviços suspensos do usuário (hospedagens e sites)
+            await pool.query(
+                `UPDATE public.hospedagens SET status = 'ativo' WHERE user_id = $1 AND status = 'suspended'`,
+                [transacao.user_id]
+            ).catch(e => console.warn("Aviso ao reativar hospedagens:", e.message));
+
+            await pool.query(
+                `UPDATE public.sites SET status = 'active' WHERE user_id = $1 AND status = 'suspended'`,
+                [transacao.user_id]
+            ).catch(e => console.warn("Aviso ao reativar sites:", e.message));
 
             //Consultar dados do usuário para nota fiscal
             const result = await pool.query(
@@ -382,8 +397,7 @@ export const consultarPix = async (req, res) => {
 
             // Determina plano: R$ 29,90 / 100 créditos = 'site_page' (Starter - exclusivo para Sites & Landing Pages)
             // R$ 79,90+ / 1.000+ créditos = 'premium' (Pro / CRM & Sistemas)
-            const valorPago = parseFloat(transacao.monetary_value || 0);
-            const planoAtribuido = (valorPago <= 35.00 || transacao.credits <= 150) ? 'site_page' : 'premium';
+            const planoAtribuido = (valorPago <= 35.00 || creditsToAdd <= 150) ? 'site_page' : 'premium';
 
             await pool.query(
                 `INSERT INTO public.user_subscriptions (user_id, plan, is_active) 
@@ -508,7 +522,14 @@ export const consultarPix = async (req, res) => {
                 if (valorAtual >= 29.90 || isDev) {
                     console.log(`Registrando próximo ciclo para valor: ${valorAtual} (Dev: ${isDev})`);
                     
-                    const due_date = new Date();
+                    let baseDate = new Date();
+                    if (transacao.due_date) {
+                        const dataVencAtual = new Date(transacao.due_date);
+                        if (!isNaN(dataVencAtual.getTime()) && dataVencAtual.getTime() > baseDate.getTime()) {
+                            baseDate = dataVencAtual;
+                        }
+                    }
+                    const due_date = new Date(baseDate);
                     due_date.setMonth(due_date.getMonth() + 1);
 
                     const txidNext = `PENDING-REG-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
@@ -520,7 +541,7 @@ export const consultarPix = async (req, res) => {
                         [
                             transacao.user_id,                               // $1
                             'Mensalidade Sitexpres - Próximo Ciclo',        // $2
-                            50,                                              // $3
+                            100,                                             // $3
                             29.90,                                           // $4
                             txidNext,                                        // $5
                             29.90,                                           // $6
@@ -955,9 +976,10 @@ export const criarCobrancaUnica = async (req, res) => {
     if (existingTxId) {
         // Se já existe um registro (ex: fatura registrada pelo back), atualiza ele
         console.log(`Atualizando transação existente ${existingTxId} com novo txid ${txid}`);
+        const finalCredits = Math.max(100, parseInt(qtd_creditos, 10) || 100);
         await pool.query(
-            `UPDATE public.transactions SET payment_id = $1, status = 'pending', updated_at = NOW() WHERE payment_id = $2 OR id::text = $2`,
-            [txid, existingTxId]
+            `UPDATE public.transactions SET payment_id = $1, credits = $2, status = 'pending', updated_at = NOW() WHERE payment_id = $3 OR id::text = $3`,
+            [txid, finalCredits, existingTxId]
         );
     } else {
         // Senão cria uma nova

@@ -16,6 +16,20 @@ function decrypt(encryptedText) {
 // Função principal para atualizar GitHub
 export async function updateGitHubIfIntegrated(userId, id_projeto, htmlContent, commitMessage = "Atualização automática do site") {
   try {
+    // 0. Verifica se usuário tem plano ativo antes de sincronizar com GitHub
+    if (userId) {
+      const subCheck = await pool.query(
+        `SELECT plan, is_active FROM public.user_subscriptions 
+         WHERE user_id = $1 AND is_active = true 
+         ORDER BY id DESC LIMIT 1`,
+        [userId]
+      );
+      const hasActivePlan = subCheck.rows.length > 0 && subCheck.rows[0].is_active && subCheck.rows[0].plan !== 'free';
+      if (!hasActivePlan) {
+        console.log(`[GitHub Sync] Usuário ${userId} sem plano ativo. Sincronização automática com GitHub pausada.`);
+        return { updated: false, message: "Plano inativo - sincronização GitHub pausada" };
+      }
+    }
     // 1. Verificar se existe integração para este projeto
     let integrationResult;
     try {

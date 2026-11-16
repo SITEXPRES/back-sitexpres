@@ -47,6 +47,59 @@ export const downloadSite = async (req, res) => {
       return res.status(404).json({ success: false, message: "Site não encontrado para download" });
     }
 
+    // ─────────────────────────────────────────────────────────────
+    // VERIFICAÇÃO DE PLANO ATIVO (Modelo Lovable SaaS)
+    // Para baixar código e ZIP, o usuário precisa ter plano ativo.
+    // ─────────────────────────────────────────────────────────────
+    const siteOwnerId = siteRes.rows[0].user_id;
+    if (siteOwnerId) {
+      const subCheck = await pool.query(
+        `SELECT plan, is_active FROM public.user_subscriptions 
+         WHERE user_id = $1 AND is_active = true 
+         ORDER BY id DESC LIMIT 1`,
+        [siteOwnerId]
+      );
+
+      const hasActivePlan = subCheck.rows.length > 0 && subCheck.rows[0].is_active && subCheck.rows[0].plan !== 'free';
+
+      if (!hasActivePlan) {
+        if (req.headers.accept && req.headers.accept.includes('text/html')) {
+          const frontendUrl = process.env.FRONTEND_URL || 'https://sitexpres.com.br';
+          return res.status(403).send(`
+            <!DOCTYPE html>
+            <html lang="pt-BR">
+            <head>
+              <meta charset="UTF-8">
+              <title>Plano Inativo - Sitexpres</title>
+              <style>
+                body { font-family: sans-serif; background: #0f172a; color: #fff; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+                .box { background: #1e293b; padding: 40px; border-radius: 12px; max-width: 500px; text-align: center; border: 1px solid #334155; }
+                h2 { color: #f87171; margin-top: 0; }
+                p { color: #94a3b8; font-size: 16px; line-height: 1.5; }
+                a { display: inline-block; margin-top: 20px; background: #06b6d4; color: #fff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold; }
+                a:hover { background: #0891b2; }
+              </style>
+            </head>
+            <body>
+              <div class="box">
+                <h2>⚠️ Download Bloqueado</h2>
+                <p>Para baixar os arquivos e o código-fonte do seu projeto, é necessário possuir um plano ativo no Sitexpres.</p>
+                <p>Regularize sua mensalidade pendente na aba de Faturas para liberar todos os downloads e exportações.</p>
+                <a href="${frontendUrl}/faturas">Acessar Minhas Faturas</a>
+              </div>
+            </body>
+            </html>
+          `);
+        }
+        return res.status(403).json({
+          success: false,
+          message: "Recurso bloqueado: É necessário possuir um plano ativo para baixar os arquivos do site. Regularize sua fatura para liberar o download.",
+          code: "PLAN_INACTIVE",
+          redirect: "/faturas"
+        });
+      }
+    }
+
     const { html_content, js_content, name, subdominio } = siteRes.rows[0];
     let isPromax = false;
     if (siteRes.rows[0].metadata) {

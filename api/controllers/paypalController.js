@@ -825,18 +825,32 @@ export async function paymentSuccess(req, res) {
 
       // Check if transaction is pending before adding credits
       if (payment.rows[0].status === 'pending') {
-        console.log('Pagamento pendente, adicionando créditos ao usuário!');
+        const valorPago = parseFloat(payment.rows[0].monetary_value || 0);
+        const isMensalidadeOuPlano = valorPago >= 29.90 || (payment.rows[0].description && (payment.rows[0].description.includes('Mensalidade') || payment.rows[0].description.includes('Ciclo')));
+        const creditsToAdd = isMensalidadeOuPlano ? Math.max(100, parseInt(payment.rows[0].credits, 10) || 100) : (parseInt(payment.rows[0].credits, 10) || 100);
+        console.log(`Pagamento pendente, adicionando ${creditsToAdd} créditos ao usuário!`);
         //Atualizando o usuario
         await pool.query(
           `UPDATE public.users SET credits = credits + $1 WHERE id = $2`,
-          [payment.rows[0].credits, payment.rows[0].user_id]
+          [creditsToAdd, payment.rows[0].user_id]
         );
 
-        //Fazendo Update no pagamento
+        //Fazendo Update no pagamento com créditos normalizados
         await pool.query(
-          `UPDATE public.transactions SET status = 'completed' WHERE payment_id = $1`,
-          [token]
+          `UPDATE public.transactions SET status = 'completed', credits = $1 WHERE payment_id = $2`,
+          [creditsToAdd, token]
         );
+
+        // Reativa eventuais serviços suspensos do usuário (hospedagens e sites)
+        await pool.query(
+          `UPDATE public.hospedagens SET status = 'ativo' WHERE user_id = $1 AND status = 'suspended'`,
+          [payment.rows[0].user_id]
+        ).catch(e => console.warn("Aviso ao reativar hospedagens:", e.message));
+
+        await pool.query(
+          `UPDATE public.sites SET status = 'active' WHERE user_id = $1 AND status = 'suspended'`,
+          [payment.rows[0].user_id]
+        ).catch(e => console.warn("Aviso ao reativar sites:", e.message));
 
         const result = await pool.query(
           `SELECT * FROM public.users WHERE id = $1`,
@@ -983,7 +997,14 @@ export async function paymentSuccess(req, res) {
             if (valorAtual >= 29.90 || isDev) {
                 console.log(`Registrando próximo ciclo para valor: ${valorAtual} (Dev: ${isDev})`);
                 
-                const due_date = new Date();
+                let baseDate = new Date();
+                if (payment.rows[0].due_date) {
+                    const dataVencAtual = new Date(payment.rows[0].due_date);
+                    if (!isNaN(dataVencAtual.getTime()) && dataVencAtual.getTime() > baseDate.getTime()) {
+                        baseDate = dataVencAtual;
+                    }
+                }
+                const due_date = new Date(baseDate);
                 due_date.setMonth(due_date.getMonth() + 1);
 
                 const txidNext = `PENDING-REG-PAYPAL-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
@@ -995,7 +1016,7 @@ export async function paymentSuccess(req, res) {
                     [
                         user_id,                                         // $1
                         'Mensalidade Sitexpres - Próximo Ciclo',        // $2
-                        50,                                              // $3
+                        100,                                             // $3
                         29.90,                                           // $4
                         txidNext,                                        // $5
                         29.90,                                           // $6
