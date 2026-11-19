@@ -957,15 +957,15 @@ export async function paymentSuccess(req, res) {
             const monetary_value = payment.rows[0].monetary_value;
             const txid = token;
 
-            // 1. VERIFICA SE O USUÁRIO JÁ É PREMIUM. SE NÃO FOR, SALVA OS CRÉDITOS ATUAIS COMO FREE CREDITS
+            // 1. VERIFICA SE O USUÁRIO JÁ TEM PLANO PAGO ATIVO (premium ou site_page). SE NÃO TIVER, SALVA OS CRÉDITOS ATUAIS COMO FREE CREDITS
             const checkPlan = await pool.query(
                 `SELECT plan FROM public.user_subscriptions WHERE user_id = $1 AND is_active = true`,
                 [user_id]
             );
             
-            const isPremium = checkPlan.rows.length > 0 && checkPlan.rows[0].plan === 'premium';
+            const isPaidPlan = checkPlan.rows.length > 0 && ['premium', 'site_page'].includes(checkPlan.rows[0].plan);
             
-            if (!isPremium) {
+            if (!isPaidPlan) {
                 await pool.query(
                     `UPDATE public.users SET free_credits = credits WHERE id = $1`,
                     [user_id]

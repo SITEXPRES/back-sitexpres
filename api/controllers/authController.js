@@ -113,6 +113,7 @@ export const login = async (req, res) => {
           email: user.email,
           role: user.role,
           status: user.blocked,
+          credits: user.credits,
           qtd_credit: user.credits,
           cnpj_cpf: user.cnpj_cpf,
           razao_social: user.razao_social,

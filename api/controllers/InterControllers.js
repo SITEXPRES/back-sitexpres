@@ -88,7 +88,43 @@ export const ReceberRetorno = async (req, res) => {
         console.log("📩 Webhook recebido do Banco Inter:");
         console.log(JSON.stringify(req.body, null, 2));
 
-        // Sempre responder 200, senão o Inter tenta reenviar
+        // Extrai eventuais txids enviados pelo webhook do Banco Inter (formato BACEN: { pix: [{ txid, ... }] } ou { txid })
+        const txids = [];
+        if (Array.isArray(req.body?.pix)) {
+            for (const item of req.body.pix) {
+                if (item?.txid) txids.push(item.txid);
+            }
+        } else if (Array.isArray(req.body)) {
+            for (const item of req.body) {
+                if (item?.txid) txids.push(item.txid);
+            }
+        } else if (req.body?.txid) {
+            txids.push(req.body.txid);
+        }
+
+        // Processa cada txid em background via consultarPix (garante crédito mesmo se o cliente fechar o navegador)
+        if (txids.length > 0) {
+            setImmediate(async () => {
+                for (const webhookTxid of txids) {
+                    try {
+                        console.log(`🔄 [Webhook Inter] Processando confirmação automática para TXID: ${webhookTxid}`);
+                        const mockReq = { body: { txid: webhookTxid } };
+                        const mockRes = {
+                            status: () => mockRes,
+                            json: (payload) => {
+                                console.log(`✅ [Webhook Inter] Resultado processamento TXID ${webhookTxid}:`, payload?.status, payload?.mensagem || '');
+                                return mockRes;
+                            }
+                        };
+                        await consultarPix(mockReq, mockRes);
+                    } catch (errTx) {
+                        console.error(`❌ [Webhook Inter] Erro ao processar TXID ${webhookTxid}:`, errTx.message);
+                    }
+                }
+            });
+        }
+
+        // Sempre responder 200 imediatamente, senão o Inter tenta reenviar
         return res.status(200).json({ ok: true });
     } catch (error) {
         console.error("Erro ao processar webhook:", error);
@@ -337,16 +373,38 @@ export const consultarPix = async (req, res) => {
 
         // 7. Se ainda estiver pending → PROCESSA!
         if (transacao.status === 'pending') {
-            
-            // VERIFICA SE O USUÁRIO JÁ É PREMIUM. SE NÃO FOR, SALVA OS CRÉDITOS ATUAIS COMO FREE CREDITS
+            const valorPago = parseFloat(transacao.monetary_value || 0);
+            const isMensalidadeOuPlano = valorPago >= 29.90 || (transacao.description && (transacao.description.includes('Mensalidade') || transacao.description.includes('Ciclo')));
+            const creditsToAdd = isMensalidadeOuPlano ? Math.max(100, parseInt(transacao.credits, 10) || 100) : (parseInt(transacao.credits, 10) || 100);
+
+            // Trava atômica: garante que duas requisições simultâneas (ex: webhook + polling) nunca creditem 2x
+            const claimTx = await pool.query(
+                `UPDATE public.transactions SET status = 'completed', credits = $1, updated_at = NOW() WHERE payment_id = $2 AND status = 'pending' RETURNING *`,
+                [creditsToAdd, txid]
+            );
+
+            if (claimTx.rowCount === 0) {
+                console.log(`Pagamento ${txid} já foi processado por outra requisição simultânea.`);
+                return res.json({
+                    pago: true,
+                    status: "CONCLUIDA",
+                    jaProcessado: true,
+                    mensagem: "Pagamento já creditado!",
+                    domain: transacao.full_domain,
+                    full_domain: transacao.full_domain,
+                    redirect: `https://sitexpres.com.br/sucesso?order=${txid}`
+                });
+            }
+
+            // VERIFICA SE O USUÁRIO JÁ TEM PLANO PAGO ATIVO (premium ou site_page). SE NÃO TIVER, SALVA OS CRÉDITOS ATUAIS COMO FREE CREDITS
             const checkPlan = await pool.query(
                 `SELECT plan FROM public.user_subscriptions WHERE user_id = $1 AND is_active = true`,
                 [transacao.user_id]
             );
             
-            const isPremium = checkPlan.rows.length > 0 && checkPlan.rows[0].plan === 'premium';
+            const isPaidPlan = checkPlan.rows.length > 0 && ['premium', 'site_page'].includes(checkPlan.rows[0].plan);
             
-            if (!isPremium) {
+            if (!isPaidPlan) {
                 await pool.query(
                     `UPDATE public.users SET free_credits = credits WHERE id = $1`,
                     [transacao.user_id]
@@ -354,22 +412,12 @@ export const consultarPix = async (req, res) => {
                 console.log(`Créditos free salvos (backup) para o usuário ${transacao.user_id}`);
             }
 
-            const valorPago = parseFloat(transacao.monetary_value || 0);
-            const isMensalidadeOuPlano = valorPago >= 29.90 || (transacao.description && (transacao.description.includes('Mensalidade') || transacao.description.includes('Ciclo')));
-            const creditsToAdd = isMensalidadeOuPlano ? Math.max(100, parseInt(transacao.credits, 10) || 100) : (parseInt(transacao.credits, 10) || 100);
-
             console.log(`Adicionando ${creditsToAdd} créditos ao usuário ${transacao.user_id}`);
 
             // Adiciona créditos
             await pool.query(
                 `UPDATE public.users SET credits = credits + $1 WHERE id = $2`,
                 [creditsToAdd, transacao.user_id]
-            );
-
-            // Atualiza status da transação com os créditos normalizados
-            await pool.query(
-                `UPDATE public.transactions SET status = 'completed', credits = $1, updated_at = NOW() WHERE payment_id = $2`,
-                [creditsToAdd, txid]
             );
 
             // Reativa eventuais serviços suspensos do usuário (hospedagens e sites)
@@ -977,13 +1025,29 @@ export const criarCobrancaUnica = async (req, res) => {
     var ID_user = req.body.userid || "00";
 
     if (existingTxId) {
-        // Se já existe um registro (ex: fatura registrada pelo back), atualiza ele
+        // Se já existe um registro pendente (ex: fatura registrada pelo back), atualiza apenas se ainda estiver 'pending'
         console.log(`Atualizando transação existente ${existingTxId} com novo txid ${txid}`);
         const finalCredits = Math.max(100, parseInt(qtd_creditos, 10) || 100);
-        await pool.query(
-            `UPDATE public.transactions SET payment_id = $1, credits = $2, status = 'pending', updated_at = NOW() WHERE payment_id = $3 OR id::text = $3`,
+        const updateExisting = await pool.query(
+            `UPDATE public.transactions SET payment_id = $1, credits = $2, status = 'pending', updated_at = NOW() WHERE (payment_id = $3 OR id::text = $3) AND status = 'pending' RETURNING *`,
             [txid, finalCredits, existingTxId]
         );
+        // Se a fatura anterior já havia sido concluída (completed), cria uma nova transação em vez de sobrescrever a paga
+        if (updateExisting.rowCount === 0) {
+            console.log(`Transação ${existingTxId} já estava concluída ou não foi encontrada como pendente. Criando nova transação ${txid}...`);
+            await criarTransacao({
+                ID_user,
+                txid,
+                valor: valorFormatado,
+                qtd_creditos: finalCredits,
+                nome: nomeCliente,
+                cpf: docLimpo,
+                descricao: 'Compra via pix Sitexpres IA e WebHosting',
+                chave: process.env.INTER_CHAVE_PIX,
+                expiracao: 3600,
+                status: "pending"
+            });
+        }
     } else {
         // Senão cria uma nova
         const transacao = await criarTransacao({

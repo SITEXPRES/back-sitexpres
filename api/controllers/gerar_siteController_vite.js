@@ -562,6 +562,16 @@ export default function App() {
       if (onProgress) onProgress(80);
       await uso_creditos(userId, 50, id_projeto);
     } else {
+      let creditosJaDescontadosNestePrompt = false;
+      const descontarCreditosUmaVez = async (totalTokens, label) => {
+        if (!creditosJaDescontadosNestePrompt) {
+          creditosJaDescontadosNestePrompt = true;
+          await uso_creditos(userId, totalTokens, id_projeto);
+        } else {
+          console.log(`[${new Date().toISOString()}] [GERAR_SITE_VITE] ℹ️ Retry interno (${label}) — sem cobrança duplicada de créditos para o cliente.`);
+        }
+      };
+
       // Chamada com streaming para DeepSeek (OpenAI-compatible)
       const streamDeepSeek = async (systemText, userContent, maxTok, label, modelo = "deepseek-chat") => {
         const cappedTokens = Math.min(maxTok || 8192, 8192);
@@ -611,7 +621,7 @@ export default function App() {
         const inputTokens = finalUsage?.prompt_tokens ?? Math.round((systemText.length + userContent.length) / 4);
         const outputTokens = finalUsage?.completion_tokens ?? Math.round(out.length / 4);
         console.log(`[${new Date().toISOString()}] [GERAR_SITE_VITE] 📊 Tokens DeepSeek: input=${inputTokens} output=${outputTokens}`);
-        await uso_creditos(userId, inputTokens + outputTokens, id_projeto);
+        await descontarCreditosUmaVez(inputTokens + outputTokens, label);
         return out;
       };
 
@@ -665,7 +675,7 @@ export default function App() {
         const inputTokens = (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0);
         const outputTokens = u.output_tokens ?? 0;
         console.log(`[${new Date().toISOString()}] [GERAR_SITE_VITE] 📊 Tokens: input=${u.input_tokens ?? 0} cache_write=${u.cache_creation_input_tokens ?? 0} cache_read=${u.cache_read_input_tokens ?? 0} output=${outputTokens}`);
-        await uso_creditos(userId, inputTokens + outputTokens, id_projeto);
+        await descontarCreditosUmaVez(inputTokens + outputTokens, label);
         return out;
       };
 
