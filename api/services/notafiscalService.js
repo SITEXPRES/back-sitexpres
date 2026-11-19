@@ -146,7 +146,7 @@ export async function gerarNotaNacional(data) {
           telefone: process.env.NFSE_TELEFONE || "",
           email: process.env.NFSE_EMAIL || "contato@sitexpres.com",
           optanteSimplesNacional: process.env.NFSE_OPTANTE_SN || 1, // 1 - Sim, 2 - Não...
-          certificadoPath: process.env.NFSE_CERTIFICADO_PATH || path.join(__dirname, "../../certificados/certificado.pfx"),
+          certificadoPath: process.env.NFSE_CERTIFICADO_PATH || path.join(__dirname, "../certificados/certificado_nota_nacional.pfx"),
           certificadoSenha: process.env.NFSE_CERTIFICADO_SENHA || ""
         },
         cliente: {

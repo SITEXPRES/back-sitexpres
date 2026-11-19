@@ -562,6 +562,9 @@ export const consultarPix = async (req, res) => {
 
             // NOTIFICAR ADMINISTRADOR (SUCESSO DA VENDA GERAL)
             try {
+                const erroNotaDetalhe = !notaFiscal.sucesso
+                    ? `<p><b>Motivo do Erro da Nota:</b> ${notaFiscal.mensagem || ''} - ${typeof notaFiscal.erro === 'object' ? JSON.stringify(notaFiscal.erro) : (notaFiscal.erro || '')}</p>`
+                    : '';
                 await sendMail(
                     "contato@sitexpres.com",
                     "✅ Pagamento Confirmado (Inter PIX)",
@@ -570,7 +573,7 @@ export const consultarPix = async (req, res) => {
                      <p><b>Valor:</b> R$ ${transacao.monetary_value}</p>
                      <p><b>TXID:</b> ${txid}</p>
                      <p><b>Status da Nota:</b> ${notaFiscal.sucesso ? 'Gerada com Sucesso' : 'Erro ao Gerar'}</p>
-                     ${notaFiscal.sucesso ? `<p><b>Chave de Acesso:</b> ${chaveAcesso}</p><p><b>Link de Consulta:</b> <a href="${linkNF}">${linkNF}</a></p>` : ''}`
+                     ${notaFiscal.sucesso ? `<p><b>Chave de Acesso:</b> ${chaveAcesso}</p><p><b>Link de Consulta:</b> <a href="${linkNF}">${linkNF}</a></p>` : erroNotaDetalhe}`
                 );
             } catch (mailErr) {
                 console.error("Erro ao enviar email de notificação Inter:", mailErr);
