@@ -97,6 +97,7 @@ export async function enviarHTMLSubdominio(host, usuario, senha, subdominio, htm
     const htaccessContent = `<IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
+  RewriteRule ^api/(.*)$ /api.php?_route=$1 [QSA,L]
   RewriteRule ^index\\.html$ - [L]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
@@ -195,11 +196,31 @@ export async function enviarDiretorioSubdominio(host, usuario, senha, subdominio
 
     // Limpa o diretório antes de fazer upload do novo
     // Preserva images/ (logos de deploys anteriores); o novo dist/images é mesclado por cima
+        let hasPgSync = false;
     for (const item of await client.list()) {
       if (item.name === "." || item.name === "..") continue;
       if (item.isDirectory && item.name === "images") continue;
+      if (!item.isDirectory && (item.name === "api.php" || item.name === "pg-sync.js")) {
+        if (item.name === "pg-sync.js") hasPgSync = true;
+        continue;
+      }
       if (item.isDirectory) await client.removeDir(item.name);
       else await client.remove(item.name);
+    }
+    if (hasPgSync) {
+      try {
+        const indexLocalPath = path.join(dirPath, "index.html");
+        if (existsSync(indexLocalPath)) {
+          const { readFileSync, writeFileSync } = await import("fs");
+          let idxHtml = readFileSync(indexLocalPath, "utf8");
+          if (!idxHtml.includes("/pg-sync.js")) {
+            idxHtml = idxHtml.replace('<script type="module"', '<script src="/pg-sync.js"></script>\n    <script type="module"');
+            writeFileSync(indexLocalPath, idxHtml, "utf8");
+          }
+        }
+      } catch (pgErr) {
+        console.warn("[FTP] Aviso ao injetar pg-sync.js no index.html:", pgErr.message);
+      }
     }
     console.log(`[FTP] 🧹 Diretório remoto limpo (images/ preservada)`);
 
@@ -220,6 +241,7 @@ export async function enviarDiretorioSubdominio(host, usuario, senha, subdominio
     const htaccessContent = `<IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
+  RewriteRule ^api/(.*)$ /api.php?_route=$1 [QSA,L]
   RewriteRule ^index\\.html$ - [L]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
